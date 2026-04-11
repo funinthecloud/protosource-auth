@@ -119,12 +119,43 @@ PROTOSOURCE_AUTH_TEST_DYNAMO_ENDPOINT=http://localhost:8000 go test ./app/...
 
 Skipped when the env var is unset, so CI without Docker is unaffected.
 
+## mgr CLI
+
+`protosource-authmgr` is the operational CLI. It talks to the store directly via the protosource aggregate Repository — **no HTTP round-trips to the running service**, so it works when the service is down, before the service has ever run, or when the last admin has been lost.
+
+```bash
+export AWS_REGION=us-east-1                    # plus credentials
+export PROTOSOURCE_AUTH_LOCAL_MASTER_KEY=...
+export PROTOSOURCE_AUTH_ISSUER_ISS=https://auth.example.com
+export PROTOSOURCE_AUTH_STORE_BACKEND=dynamodb
+export PROTOSOURCE_AUTH_SEED_SECRET=anything   # phase 9 gate: just has to be non-empty
+
+# Create the DynamoDB tables if they do not exist.
+protosource-authmgr ensure-tables
+
+# First-run setup on a fresh deployment.
+protosource-authmgr bootstrap \
+    --admin-email admin@example.com \
+    --admin-password hunter2
+
+# Lost-admin recovery. Creates a timestamped second super-admin role
+# + user alongside any existing ones. Refuses to run without --force.
+protosource-authmgr recover-admin \
+    --admin-email new-admin@example.com \
+    --admin-password different \
+    --force
+```
+
+Recovery creates a fresh `role-super-admin-recovery-<timestamp>` role and `user-recovery-admin-<timestamp>` user so the operation is fully additive — the original admin (if it still exists) is untouched and keeps its grants. Every recovery invocation is logged with a loud warning.
+
+The `PROTOSOURCE_AUTH_SEED_SECRET` env var gates bootstrap and recover-admin against accidental invocation. Phase 9 just checks that it is non-empty; a future phase wires it to KMS / Secrets Manager and verifies against a stored digest.
+
 ## Current limitations
 
-- **No mgr CLI yet.** Admin creation is via `BOOTSTRAP_EMAIL` / `BOOTSTRAP_PASSWORD` env vars at startup. Against persistent storage, re-running with different bootstrap values after the first run will error on the existing admin — a `--force-recover` flag is planned.
 - **No JWKS endpoint yet.** Downstream services cannot verify JWTs offline — they must dereference every call through `/authz/check`.
 - **Single-algorithm.** Ed25519 only.
+- **`PROTOSOURCE_AUTH_SEED_SECRET` is not verified** — phase 9 just checks that it is set. A future phase will verify against a KMS-stored digest.
 
-A proper mgr CLI, JWKS, and RS256 are planned for later phases.
+JWKS, RS256, and a real KMS-backed seed secret are planned for later phases.
 
 See [CLAUDE.md](CLAUDE.md) for architecture and build instructions.

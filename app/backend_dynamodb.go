@@ -21,6 +21,31 @@ import (
 	"github.com/funinthecloud/protosource-auth/service"
 )
 
+// NewDynamoDBClient constructs an AWS SDK DynamoDB client honoring the
+// optional AWSEndpoint (for DynamoDB Local / LocalStack) and AWSRegion
+// overrides on cfg. Credentials are resolved from the default chain
+// (env, shared config, IAM role). Exposed so the mgr CLI can share
+// the exact same client configuration the service uses.
+func NewDynamoDBClient(ctx context.Context, cfg *Config) (*dynamodb.Client, error) {
+	var loadOpts []func(*awsconfig.LoadOptions) error
+	if cfg.AWSRegion != "" {
+		loadOpts = append(loadOpts, awsconfig.WithRegion(cfg.AWSRegion))
+	}
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, loadOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	var clientOpts []func(*dynamodb.Options)
+	if cfg.AWSEndpoint != "" {
+		endpoint := cfg.AWSEndpoint
+		clientOpts = append(clientOpts, func(o *dynamodb.Options) {
+			o.BaseEndpoint = aws.String(endpoint)
+		})
+	}
+	return dynamodb.NewFromConfig(awsCfg, clientOpts...), nil
+}
+
 // newDynamoDBBundle wires all five aggregate repositories against a
 // single shared [dynamodbstore.DynamoDBStore] and returns a bundle
 // whose UserDirectory is GSI-backed (queries User.email via the
@@ -30,8 +55,8 @@ import (
 // already exist. See [EnsureTables] for a test/local-dev helper that
 // creates them idempotently, or provision them via the CloudFormation
 // template shipped by protosource.
-func newDynamoDBBundle(ctx context.Context, cfg *Config) (*storeBundle, error) {
-	client, err := newDynamoClient(ctx, cfg)
+func newDynamoDBBundle(ctx context.Context, cfg *Config) (*Bundle, error) {
+	client, err := NewDynamoDBClient(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("app: dynamodb client: %w", err)
 	}
@@ -50,38 +75,14 @@ func newDynamoDBBundle(ctx context.Context, cfg *Config) (*storeBundle, error) {
 
 	userClient := userv1.NewUserClient(opaqueStore)
 
-	return &storeBundle{
-		userRepo:   userv1.NewRepository(dynStore, serializer),
-		roleRepo:   rolev1.NewRepository(dynStore, serializer),
-		issuerRepo: issuerv1.NewRepository(dynStore, serializer),
-		keyRepo:    keyv1.NewRepository(dynStore, serializer),
-		tokenRepo:  tokenv1.NewRepository(dynStore, serializer),
-		directory:  &dynamoDirectory{client: userClient},
+	return &Bundle{
+		UserRepo:   userv1.NewRepository(dynStore, serializer),
+		RoleRepo:   rolev1.NewRepository(dynStore, serializer),
+		IssuerRepo: issuerv1.NewRepository(dynStore, serializer),
+		KeyRepo:    keyv1.NewRepository(dynStore, serializer),
+		TokenRepo:  tokenv1.NewRepository(dynStore, serializer),
+		Directory:  &dynamoDirectory{client: userClient},
 	}, nil
-}
-
-// newDynamoClient constructs an AWS SDK DynamoDB client honoring the
-// optional AWSEndpoint (for DynamoDB Local / LocalStack) and AWSRegion
-// overrides on cfg. Credentials are resolved from the default chain
-// (env, shared config, IAM role).
-func newDynamoClient(ctx context.Context, cfg *Config) (*dynamodb.Client, error) {
-	var loadOpts []func(*awsconfig.LoadOptions) error
-	if cfg.AWSRegion != "" {
-		loadOpts = append(loadOpts, awsconfig.WithRegion(cfg.AWSRegion))
-	}
-	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, loadOpts...)
-	if err != nil {
-		return nil, err
-	}
-
-	var clientOpts []func(*dynamodb.Options)
-	if cfg.AWSEndpoint != "" {
-		endpoint := cfg.AWSEndpoint
-		clientOpts = append(clientOpts, func(o *dynamodb.Options) {
-			o.BaseEndpoint = aws.String(endpoint)
-		})
-	}
-	return dynamodb.NewFromConfig(awsCfg, clientOpts...), nil
 }
 
 // dynamoDirectory satisfies [service.UserDirectory] by running the

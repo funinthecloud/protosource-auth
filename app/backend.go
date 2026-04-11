@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/funinthecloud/protosource"
 	"github.com/funinthecloud/protosource/serializers/protobinaryserializer"
 	"github.com/funinthecloud/protosource/stores/memorystore"
 
@@ -16,25 +15,45 @@ import (
 	"github.com/funinthecloud/protosource-auth/service"
 )
 
-// storeBundle is the set of aggregate repositories + a UserDirectory
-// assembled for a particular backend. [Run] wires this bundle into the
-// Loginer + Checker + Service without caring which backend built it.
-type storeBundle struct {
-	userRepo   service.AggregateRepo
-	roleRepo   service.AggregateRepo
-	issuerRepo service.AggregateRepo
-	keyRepo    service.AggregateRepo
-	tokenRepo  service.AggregateRepo
+// Bundle is the set of aggregate repositories + a UserDirectory assembled
+// for a particular backend. [Run] wires this bundle into the Loginer +
+// Checker + Service without caring which backend built it, and the
+// protosource-authmgr CLI calls aggregate commands directly on the
+// exposed repositories (bypassing HTTP entirely) for bootstrap and
+// recovery flows.
+type Bundle struct {
+	UserRepo   service.AggregateRepo
+	RoleRepo   service.AggregateRepo
+	IssuerRepo service.AggregateRepo
+	KeyRepo    service.AggregateRepo
+	TokenRepo  service.AggregateRepo
 
-	directory service.UserDirectory
+	Directory service.UserDirectory
 
-	// close is invoked by [App.Close] to release backend-specific
-	// resources (none for the memory backend).
-	close func() error
+	// CloseFn is invoked by [App.Close] to release backend-specific
+	// resources. Nil for the memory backend.
+	CloseFn func() error
 }
 
-// newBundle dispatches on cfg.Backend to build the appropriate bundle.
-func newBundle(ctx context.Context, cfg *Config) (*storeBundle, error) {
+// Close releases resources associated with this Bundle. Safe to call
+// on a Bundle with a nil CloseFn.
+func (b *Bundle) Close() error {
+	if b == nil || b.CloseFn == nil {
+		return nil
+	}
+	return b.CloseFn()
+}
+
+// NewBundle constructs a Bundle for the given config. Dispatches on
+// cfg.Backend. Errors from the underlying backend factories are
+// propagated unchanged.
+func NewBundle(ctx context.Context, cfg *Config) (*Bundle, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("app: cfg must not be nil")
+	}
+	if err := cfg.Normalize(); err != nil {
+		return nil, err
+	}
 	switch cfg.Backend {
 	case BackendMemory:
 		return newMemoryBundle()
@@ -47,15 +66,15 @@ func newBundle(ctx context.Context, cfg *Config) (*storeBundle, error) {
 
 // newMemoryBundle wires five in-process memorystore-backed repositories
 // and a [service.MapDirectory]. State is lost on process exit.
-func newMemoryBundle() (*storeBundle, error) {
+func newMemoryBundle() (*Bundle, error) {
 	serializer := protobinaryserializer.NewSerializer()
-	return &storeBundle{
-		userRepo:   userv1.NewRepository(memorystore.New(userv1.SnapshotEveryNEvents), serializer),
-		roleRepo:   rolev1.NewRepository(memorystore.New(rolev1.SnapshotEveryNEvents), serializer),
-		issuerRepo: issuerv1.NewRepository(memorystore.New(0), serializer),
-		keyRepo:    keyv1.NewRepository(memorystore.New(0), serializer),
-		tokenRepo:  tokenv1.NewRepository(memorystore.New(0), serializer),
-		directory:  service.NewMapDirectory(),
+	return &Bundle{
+		UserRepo:   userv1.NewRepository(memorystore.New(userv1.SnapshotEveryNEvents), serializer),
+		RoleRepo:   rolev1.NewRepository(memorystore.New(rolev1.SnapshotEveryNEvents), serializer),
+		IssuerRepo: issuerv1.NewRepository(memorystore.New(0), serializer),
+		KeyRepo:    keyv1.NewRepository(memorystore.New(0), serializer),
+		TokenRepo:  tokenv1.NewRepository(memorystore.New(0), serializer),
+		Directory:  service.NewMapDirectory(),
 	}, nil
 }
 
@@ -65,18 +84,4 @@ func newMemoryBundle() (*storeBundle, error) {
 // do not — new users are visible as soon as the index propagates.
 type emailRegistrar interface {
 	Add(email, userID string)
-}
-
-// compile-time hint so the linter does not flag the interface as
-// unused when the dynamo backend is built out.
-var _ = (emailRegistrar)(nil)
-
-// ensureProtosourceStoreNotNil is a tiny runtime guard so
-// constructors that accept interface-typed stores loudly reject nil
-// misconfigurations at startup rather than on first Apply.
-func ensureProtosourceStoreNotNil(name string, s protosource.Store) error {
-	if s == nil {
-		return fmt.Errorf("app: store %q is nil", name)
-	}
-	return nil
 }
