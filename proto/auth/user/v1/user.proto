@@ -1,0 +1,223 @@
+syntax = "proto3";
+
+package auth.user.v1;
+
+import "buf/validate/validate.proto";
+import "funinthecloud/protosource/options/v1/options_v1.proto";
+
+option go_package                                                      = "github.com/funinthecloud/protosource-auth/gen/auth/user/v1;userv1";
+option (funinthecloud.protosource.options.v1.protosource_file).enabled = true;
+
+// ── Aggregate ──
+
+enum State {
+  STATE_UNSPECIFIED = 0;
+  STATE_ACTIVE      = 1;
+  STATE_LOCKED      = 2;
+  STATE_DELETED     = 3;
+}
+
+// User is the auth service's identity aggregate. Credentials are stored as
+// an argon2id hash — raw passwords never enter the event log. Email is
+// indexed via GSI1 so the login endpoint can look up a user by email
+// without a full scan.
+message User {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).aggregate = {
+  };
+  string                 id            = 1;
+  int64                  version       = 2;
+  int64                  create_at     = 3 [(funinthecloud.protosource.options.v1.protosource_opaque_field) = { attributes: [ { type: OPAQUE_KEY_TYPE_GSI1SK } ] }];
+  string                 create_by     = 4;
+  int64                  modify_at     = 5;
+  string                 modify_by     = 6;
+  string                 email         = 7 [(funinthecloud.protosource.options.v1.protosource_opaque_field) = { attributes: [ { type: OPAQUE_KEY_TYPE_GSI1PK } ] }];
+  bytes                  password_hash = 8;
+  State                  state         = 9;
+  map<string, RoleGrant> roles         = 10;
+}
+
+message UserList {
+  repeated User items = 1;
+}
+
+// RoleGrant is a collection element on User.roles. role_id is the map key
+// and identifies the grant; assigned_at records when the role was attached.
+message RoleGrant {
+  string role_id     = 1;
+  int64  assigned_at = 2;
+}
+
+// ── Commands ──
+
+message Create {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Created" ]
+    lifecycle: COMMAND_LIFECYCLE_CREATION
+  };
+  string id            = 1;
+  string actor         = 2;
+  string email         = 3 [(buf.validate.field).string.min_len = 3];
+  bytes  password_hash = 4 [(buf.validate.field).bytes.min_len = 1];
+}
+
+message ChangePassword {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "PasswordChanged" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE", "STATE_LOCKED" ]
+  };
+  string id            = 1;
+  string actor         = 2;
+  bytes  password_hash = 3 [(buf.validate.field).bytes.min_len = 1];
+}
+
+message AssignRole {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "RoleAssigned" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string    id    = 1;
+  string    actor = 2;
+  RoleGrant grant = 3;
+}
+
+message RevokeRole {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "RoleRevoked" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id      = 1;
+  string actor   = 2;
+  string role_id = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+message Lock {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Locked" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id     = 1;
+  string actor  = 2;
+  string reason = 3;
+}
+
+message Unlock {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Unlocked" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_LOCKED" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
+message Delete {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Deleted" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE", "STATE_LOCKED" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
+// ── Events ──
+
+message Created {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_ACTIVE"
+  };
+  string id            = 1;
+  int64  version       = 2;
+  int64  at            = 3;
+  string actor         = 4;
+  string email         = 5;
+  bytes  password_hash = 6;
+}
+
+message PasswordChanged {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+  };
+  string id            = 1;
+  int64  version       = 2;
+  int64  at            = 3;
+  string actor         = 4;
+  bytes  password_hash = 5;
+}
+
+message RoleAssigned {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    collection: {
+      target: "roles"
+      action: COLLECTION_ACTION_ADD
+      key_field: "role_id"
+    }
+  };
+  string    id      = 1;
+  int64     version = 2;
+  int64     at      = 3;
+  string    actor   = 4;
+  RoleGrant grant   = 5;
+}
+
+message RoleRevoked {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    collection: {
+      target: "roles"
+      action: COLLECTION_ACTION_REMOVE
+      key_field: "role_id"
+    }
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+  string role_id = 5;
+}
+
+message Locked {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_LOCKED"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+  string reason  = 5;
+}
+
+message Unlocked {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_ACTIVE"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}
+
+message Deleted {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_DELETED"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}
+
+// ── Snapshot ──
+
+message Snapshot {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).snapshot = {
+    every_n_events: 50
+  };
+  string id       = 1;
+  int64  version  = 2;
+  int64  at       = 3;
+  string actor    = 4;
+  User   snapshot = 5;
+}

@@ -1,0 +1,7 @@
+version: v2
+modules:
+  - path: proto
+    name: buf.build/funinthecloud/protosource-auth
+deps:
+  - buf.build/funinthecloud/protosource
+  - buf.build/bufbuild/protovalidate
