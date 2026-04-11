@@ -20,6 +20,22 @@ import (
 	"time"
 )
 
+// Backend identifies which storage backend [Run] wires behind the
+// aggregate repositories.
+type Backend string
+
+const (
+	// BackendMemory uses an in-process memorystore per aggregate. State
+	// is lost on process exit; intended for local development, unit
+	// tests, and demos.
+	BackendMemory Backend = "memory"
+	// BackendDynamoDB uses a shared DynamoDB event store + opaquedata
+	// store. Tables must already exist (see [EnsureTables] for a
+	// test/local-dev helper, or provision via the CloudFormation
+	// template shipped by protosource).
+	BackendDynamoDB Backend = "dynamodb"
+)
+
 // Config is the runtime configuration for a protosource-auth instance.
 // Zero-value fields are populated with defaults by [Config.Normalize].
 type Config struct {
@@ -48,13 +64,38 @@ type Config struct {
 	// TokenTTL is how long issued shadow tokens live. Default 10h.
 	TokenTTL time.Duration
 
+	// Backend selects the storage backend wired behind the aggregate
+	// repositories. Default: [BackendMemory].
+	Backend Backend
+
+	// EventsTable is the DynamoDB table name used as the event store
+	// when Backend is [BackendDynamoDB]. Default:
+	// "protosource-auth-events".
+	EventsTable string
+
+	// AggregatesTable is the DynamoDB table name used by the
+	// opaquedata layer for materialized aggregates and GSI queries
+	// when Backend is [BackendDynamoDB]. Default:
+	// "protosource-auth-aggregates".
+	AggregatesTable string
+
+	// AWSEndpoint overrides the AWS SDK's endpoint resolution. Set to
+	// "http://localhost:8000" (or wherever DynamoDB Local is
+	// listening) for local development. Leave empty for real AWS.
+	AWSEndpoint string
+
+	// AWSRegion overrides the AWS SDK's region. Defaults to whatever
+	// the SDK resolves from env/profile.
+	AWSRegion string
+
 	// BootstrapAdminEmail, if non-empty, enables startup bootstrap:
 	// the service creates a default Issuer, a super-admin Role
 	// granting "*", an ACTIVE User with the provided email and
-	// password, and assigns the super-admin role to it. In phase 7
-	// this runs on every startup because the memorystore resets;
-	// when we switch to persistent storage it will become a
-	// first-run-only operation.
+	// password, and assigns the super-admin role to it. With
+	// [BackendMemory] this runs on every startup; with
+	// [BackendDynamoDB] it's idempotent in spirit (re-running will
+	// fail at the first ErrAlreadyCreated and the existing admin
+	// persists).
 	BootstrapAdminEmail string
 
 	// BootstrapAdminPassword is the plaintext password for the
@@ -77,6 +118,11 @@ const (
 	EnvTokenTTL               = "PROTOSOURCE_AUTH_TOKEN_TTL"
 	EnvBootstrapAdminEmail    = "PROTOSOURCE_AUTH_BOOTSTRAP_EMAIL"
 	EnvBootstrapAdminPassword = "PROTOSOURCE_AUTH_BOOTSTRAP_PASSWORD"
+	EnvBackend                = "PROTOSOURCE_AUTH_STORE_BACKEND"
+	EnvEventsTable            = "PROTOSOURCE_AUTH_EVENTS_TABLE"
+	EnvAggregatesTable        = "PROTOSOURCE_AUTH_AGGREGATES_TABLE"
+	EnvAWSEndpoint            = "PROTOSOURCE_AUTH_AWS_ENDPOINT"
+	EnvAWSRegion              = "PROTOSOURCE_AUTH_AWS_REGION"
 )
 
 // LoadConfigFromEnv returns a Config populated from the environment.
@@ -89,6 +135,11 @@ func LoadConfigFromEnv() (*Config, error) {
 		IssuerDisplayName:      os.Getenv(EnvIssuerDisplayName),
 		BootstrapAdminEmail:    os.Getenv(EnvBootstrapAdminEmail),
 		BootstrapAdminPassword: os.Getenv(EnvBootstrapAdminPassword),
+		Backend:                Backend(os.Getenv(EnvBackend)),
+		EventsTable:            os.Getenv(EnvEventsTable),
+		AggregatesTable:        os.Getenv(EnvAggregatesTable),
+		AWSEndpoint:            os.Getenv(EnvAWSEndpoint),
+		AWSRegion:              os.Getenv(EnvAWSRegion),
 	}
 
 	if raw := os.Getenv(EnvMasterKey); raw != "" {
@@ -136,6 +187,15 @@ func (c *Config) Normalize() error {
 	if c.BootstrapActor == "" {
 		c.BootstrapActor = "bootstrap"
 	}
+	if c.Backend == "" {
+		c.Backend = BackendMemory
+	}
+	if c.EventsTable == "" {
+		c.EventsTable = "protosource-auth-events"
+	}
+	if c.AggregatesTable == "" {
+		c.AggregatesTable = "protosource-auth-aggregates"
+	}
 
 	if len(c.MasterKey) == 0 {
 		return errors.New("app: MasterKey is required (set " + EnvMasterKey + ")")
@@ -145,6 +205,12 @@ func (c *Config) Normalize() error {
 	}
 	if c.BootstrapAdminEmail != "" && c.BootstrapAdminPassword == "" {
 		return errors.New("app: BootstrapAdminPassword is required when BootstrapAdminEmail is set")
+	}
+	switch c.Backend {
+	case BackendMemory, BackendDynamoDB:
+		// ok
+	default:
+		return errors.New("app: unknown Backend " + string(c.Backend) + " (want memory or dynamodb)")
 	}
 	return nil
 }
