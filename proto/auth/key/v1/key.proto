@@ -1,0 +1,143 @@
+syntax = "proto3";
+
+package auth.key.v1;
+
+import "buf/validate/validate.proto";
+import "funinthecloud/protosource/options/v1/options_v1.proto";
+
+option go_package                                                      = "github.com/funinthecloud/protosource-auth/gen/auth/key/v1;keyv1";
+option (funinthecloud.protosource.options.v1.protosource_file).enabled = true;
+
+// ── Aggregate ──
+
+enum State {
+  STATE_UNSPECIFIED = 0;
+  // STATE_SIGNING: the active signing key for its (issuer, algorithm, day).
+  // Used to sign new JWTs until signing_until.
+  STATE_SIGNING = 1;
+  // STATE_VERIFY_ONLY: past its signing window but still needed to verify
+  // JWTs that were signed while it was active. Published in JWKS until
+  // verify_until passes.
+  STATE_VERIFY_ONLY = 2;
+  // STATE_EXPIRED: no longer valid for verification. May be pruned.
+  STATE_EXPIRED = 3;
+}
+
+// Key is the per-issuer, per-day, per-algorithm signing key aggregate. The
+// aggregate id IS the kid — deterministic "{issuer_id}:{YYYY-MM-DD}:
+// {algorithm}" so two service instances racing to create today's key both
+// derive the same id and the second Apply fails loudly with
+// ErrAlreadyCreated, letting the loser fall through to Load.
+//
+// public_jwk is the RFC 7517 JSON Web Key form of the public half, safe to
+// store in events and publish via JWKS.
+//
+// wrapped_private is an opaque blob produced by a KeyProvider's Encrypt
+// method. The private material is never in plaintext in the event log; the
+// plaintext lives only in the key resolver's in-memory cache after a
+// single Decrypt call per process.
+message Key {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).aggregate = {
+  };
+  string id              = 1;
+  int64  version         = 2;
+  int64  create_at       = 3;
+  string create_by       = 4;
+  int64  modify_at       = 5;
+  string modify_by       = 6;
+  string issuer_id       = 7;
+  string algorithm       = 8;
+  bytes  public_jwk      = 9;
+  bytes  wrapped_private = 10;
+  string key_provider    = 11;
+  string master_key_ref  = 12;
+  int64  effective_at    = 13;
+  int64  signing_until   = 14;
+  int64  verify_until    = 15;
+  State  state           = 16;
+}
+
+message KeyList {
+  repeated Key items = 1;
+}
+
+// ── Commands ──
+
+message Generate {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Generated" ]
+    lifecycle: COMMAND_LIFECYCLE_CREATION
+  };
+  string id              = 1;
+  string actor           = 2;
+  string issuer_id       = 3 [(buf.validate.field).string.min_len = 1];
+  string algorithm       = 4 [(buf.validate.field).string.min_len = 1];
+  bytes  public_jwk      = 5 [(buf.validate.field).bytes.min_len = 1];
+  bytes  wrapped_private = 6 [(buf.validate.field).bytes.min_len = 1];
+  string key_provider    = 7 [(buf.validate.field).string.min_len = 1];
+  string master_key_ref  = 8;
+  int64  effective_at    = 9;
+  int64  signing_until   = 10;
+  int64  verify_until    = 11;
+}
+
+message Retire {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Retired" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_SIGNING" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
+message Expire {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Expired" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_VERIFY_ONLY" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
+// ── Events ──
+
+message Generated {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_SIGNING"
+  };
+  string id              = 1;
+  int64  version         = 2;
+  int64  at              = 3;
+  string actor           = 4;
+  string issuer_id       = 5;
+  string algorithm       = 6;
+  bytes  public_jwk      = 7;
+  bytes  wrapped_private = 8;
+  string key_provider    = 9;
+  string master_key_ref  = 10;
+  int64  effective_at    = 11;
+  int64  signing_until   = 12;
+  int64  verify_until    = 13;
+}
+
+message Retired {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_VERIFY_ONLY"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}
+
+message Expired {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_EXPIRED"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}

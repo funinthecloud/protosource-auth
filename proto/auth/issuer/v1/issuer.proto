@@ -1,0 +1,208 @@
+syntax = "proto3";
+
+package auth.issuer.v1;
+
+import "buf/validate/validate.proto";
+import "funinthecloud/protosource/options/v1/options_v1.proto";
+
+option go_package                                                      = "github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1;issuerv1";
+option (funinthecloud.protosource.options.v1.protosource_file).enabled = true;
+
+// ── Aggregate ──
+
+enum State {
+  STATE_UNSPECIFIED = 0;
+  STATE_ACTIVE      = 1;
+  STATE_DEACTIVATED = 2;
+  STATE_DELETED     = 3;
+}
+
+enum Kind {
+  KIND_UNSPECIFIED = 0;
+  // KIND_SELF issuers are JWTs we sign ourselves — they own Key aggregates
+  // under this service and publish their public half via JWKS.
+  KIND_SELF = 1;
+  // KIND_EXTERNAL issuers are JWTs we only verify (Google, Auth0, peer
+  // services). We keep jwks_url or a pinned public key, never a private.
+  KIND_EXTERNAL = 2;
+}
+
+// Issuer represents a JWT issuer — either this service (KIND_SELF) or a
+// trusted third-party (KIND_EXTERNAL). Phase 4 models one active signing
+// algorithm per issuer; multi-algorithm support is deferred.
+message Issuer {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).aggregate = {
+  };
+  string id                = 1;
+  int64  version           = 2;
+  int64  create_at         = 3;
+  string create_by         = 4;
+  int64  modify_at         = 5;
+  string modify_by         = 6;
+  string iss               = 7;
+  string display_name      = 8;
+  Kind   kind              = 9;
+  string default_algorithm = 10;
+  string jwks_url          = 11;
+  State  state             = 12;
+}
+
+message IssuerList {
+  repeated Issuer items = 1;
+}
+
+// ── Commands ──
+
+message Register {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Registered" ]
+    lifecycle: COMMAND_LIFECYCLE_CREATION
+  };
+  string id                = 1;
+  string actor             = 2;
+  string iss               = 3 [(buf.validate.field).string.min_len = 1];
+  string display_name      = 4;
+  Kind   kind              = 5;
+  string default_algorithm = 6;
+  string jwks_url          = 7;
+}
+
+message Rename {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Renamed" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id           = 1;
+  string actor        = 2;
+  string display_name = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+message SetDefaultAlgorithm {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "DefaultAlgorithmSet" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id                = 1;
+  string actor             = 2;
+  string default_algorithm = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+message SetJWKSURL {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "JWKSURLSet" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id       = 1;
+  string actor    = 2;
+  string jwks_url = 3;
+}
+
+message Deactivate {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Deactivated" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
+message Reactivate {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Reactivated" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_DEACTIVATED" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
+message Delete {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Deleted" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE", "STATE_DEACTIVATED" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
+// ── Events ──
+
+message Registered {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_ACTIVE"
+  };
+  string id                = 1;
+  int64  version           = 2;
+  int64  at                = 3;
+  string actor             = 4;
+  string iss               = 5;
+  string display_name      = 6;
+  Kind   kind              = 7;
+  string default_algorithm = 8;
+  string jwks_url          = 9;
+}
+
+message Renamed {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+  };
+  string id           = 1;
+  int64  version      = 2;
+  int64  at           = 3;
+  string actor        = 4;
+  string display_name = 5;
+}
+
+message DefaultAlgorithmSet {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+  };
+  string id                = 1;
+  int64  version           = 2;
+  int64  at                = 3;
+  string actor             = 4;
+  string default_algorithm = 5;
+}
+
+message JWKSURLSet {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+  };
+  string id       = 1;
+  int64  version  = 2;
+  int64  at       = 3;
+  string actor    = 4;
+  string jwks_url = 5;
+}
+
+message Deactivated {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_DEACTIVATED"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}
+
+message Reactivated {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_ACTIVE"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}
+
+message Deleted {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_DELETED"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}
