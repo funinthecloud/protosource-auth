@@ -81,7 +81,17 @@ func (h *Handler) HandleCreate(ctx context.Context, request protosource.Request)
 		return authzErrorResponse(err)
 	}
 
-	if request.Actor == "" {
+	// Prefer the authenticated user id stashed by the Authorizer
+	// (via authz.WithUserID) so the command's Actor field reflects
+	// the resolved identity — the raw bearer token in shadow-token
+	// flows is never written to the aggregate's audit trail. Falls
+	// back to request.Actor populated by the adapter's
+	// ActorExtractor for allowall / X-Actor developer flows.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		actor = request.Actor
+	}
+	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
 
@@ -90,8 +100,11 @@ func (h *Handler) HandleCreate(ctx context.Context, request protosource.Request)
 		return errorResponse(http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
 	}
 
-	// Override actor from auth context to prevent spoofing.
-	cmd.Actor = request.Actor
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above (context user id preferred,
+	// otherwise request.Actor). Never trust an actor field coming
+	// from the wire — it would let any caller spoof any identity.
+	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
 	if err != nil {
@@ -117,7 +130,17 @@ func (h *Handler) HandleChangePassword(ctx context.Context, request protosource.
 		return authzErrorResponse(err)
 	}
 
-	if request.Actor == "" {
+	// Prefer the authenticated user id stashed by the Authorizer
+	// (via authz.WithUserID) so the command's Actor field reflects
+	// the resolved identity — the raw bearer token in shadow-token
+	// flows is never written to the aggregate's audit trail. Falls
+	// back to request.Actor populated by the adapter's
+	// ActorExtractor for allowall / X-Actor developer flows.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		actor = request.Actor
+	}
+	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
 
@@ -126,8 +149,11 @@ func (h *Handler) HandleChangePassword(ctx context.Context, request protosource.
 		return errorResponse(http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
 	}
 
-	// Override actor from auth context to prevent spoofing.
-	cmd.Actor = request.Actor
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above (context user id preferred,
+	// otherwise request.Actor). Never trust an actor field coming
+	// from the wire — it would let any caller spoof any identity.
+	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
 	if err != nil {
@@ -153,7 +179,17 @@ func (h *Handler) HandleAssignRole(ctx context.Context, request protosource.Requ
 		return authzErrorResponse(err)
 	}
 
-	if request.Actor == "" {
+	// Prefer the authenticated user id stashed by the Authorizer
+	// (via authz.WithUserID) so the command's Actor field reflects
+	// the resolved identity — the raw bearer token in shadow-token
+	// flows is never written to the aggregate's audit trail. Falls
+	// back to request.Actor populated by the adapter's
+	// ActorExtractor for allowall / X-Actor developer flows.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		actor = request.Actor
+	}
+	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
 
@@ -162,8 +198,11 @@ func (h *Handler) HandleAssignRole(ctx context.Context, request protosource.Requ
 		return errorResponse(http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
 	}
 
-	// Override actor from auth context to prevent spoofing.
-	cmd.Actor = request.Actor
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above (context user id preferred,
+	// otherwise request.Actor). Never trust an actor field coming
+	// from the wire — it would let any caller spoof any identity.
+	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
 	if err != nil {
@@ -189,7 +228,17 @@ func (h *Handler) HandleRevokeRole(ctx context.Context, request protosource.Requ
 		return authzErrorResponse(err)
 	}
 
-	if request.Actor == "" {
+	// Prefer the authenticated user id stashed by the Authorizer
+	// (via authz.WithUserID) so the command's Actor field reflects
+	// the resolved identity — the raw bearer token in shadow-token
+	// flows is never written to the aggregate's audit trail. Falls
+	// back to request.Actor populated by the adapter's
+	// ActorExtractor for allowall / X-Actor developer flows.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		actor = request.Actor
+	}
+	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
 
@@ -198,8 +247,11 @@ func (h *Handler) HandleRevokeRole(ctx context.Context, request protosource.Requ
 		return errorResponse(http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
 	}
 
-	// Override actor from auth context to prevent spoofing.
-	cmd.Actor = request.Actor
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above (context user id preferred,
+	// otherwise request.Actor). Never trust an actor field coming
+	// from the wire — it would let any caller spoof any identity.
+	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
 	if err != nil {
@@ -225,7 +277,17 @@ func (h *Handler) HandleLock(ctx context.Context, request protosource.Request) p
 		return authzErrorResponse(err)
 	}
 
-	if request.Actor == "" {
+	// Prefer the authenticated user id stashed by the Authorizer
+	// (via authz.WithUserID) so the command's Actor field reflects
+	// the resolved identity — the raw bearer token in shadow-token
+	// flows is never written to the aggregate's audit trail. Falls
+	// back to request.Actor populated by the adapter's
+	// ActorExtractor for allowall / X-Actor developer flows.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		actor = request.Actor
+	}
+	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
 
@@ -234,8 +296,11 @@ func (h *Handler) HandleLock(ctx context.Context, request protosource.Request) p
 		return errorResponse(http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
 	}
 
-	// Override actor from auth context to prevent spoofing.
-	cmd.Actor = request.Actor
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above (context user id preferred,
+	// otherwise request.Actor). Never trust an actor field coming
+	// from the wire — it would let any caller spoof any identity.
+	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
 	if err != nil {
@@ -261,7 +326,17 @@ func (h *Handler) HandleUnlock(ctx context.Context, request protosource.Request)
 		return authzErrorResponse(err)
 	}
 
-	if request.Actor == "" {
+	// Prefer the authenticated user id stashed by the Authorizer
+	// (via authz.WithUserID) so the command's Actor field reflects
+	// the resolved identity — the raw bearer token in shadow-token
+	// flows is never written to the aggregate's audit trail. Falls
+	// back to request.Actor populated by the adapter's
+	// ActorExtractor for allowall / X-Actor developer flows.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		actor = request.Actor
+	}
+	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
 
@@ -270,8 +345,11 @@ func (h *Handler) HandleUnlock(ctx context.Context, request protosource.Request)
 		return errorResponse(http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
 	}
 
-	// Override actor from auth context to prevent spoofing.
-	cmd.Actor = request.Actor
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above (context user id preferred,
+	// otherwise request.Actor). Never trust an actor field coming
+	// from the wire — it would let any caller spoof any identity.
+	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
 	if err != nil {
@@ -297,7 +375,17 @@ func (h *Handler) HandleDelete(ctx context.Context, request protosource.Request)
 		return authzErrorResponse(err)
 	}
 
-	if request.Actor == "" {
+	// Prefer the authenticated user id stashed by the Authorizer
+	// (via authz.WithUserID) so the command's Actor field reflects
+	// the resolved identity — the raw bearer token in shadow-token
+	// flows is never written to the aggregate's audit trail. Falls
+	// back to request.Actor populated by the adapter's
+	// ActorExtractor for allowall / X-Actor developer flows.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		actor = request.Actor
+	}
+	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
 
@@ -306,8 +394,11 @@ func (h *Handler) HandleDelete(ctx context.Context, request protosource.Request)
 		return errorResponse(http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
 	}
 
-	// Override actor from auth context to prevent spoofing.
-	cmd.Actor = request.Actor
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above (context user id preferred,
+	// otherwise request.Actor). Never trust an actor field coming
+	// from the wire — it would let any caller spoof any identity.
+	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
 	if err != nil {
@@ -589,11 +680,22 @@ func errorResponse(statusCode int, code, message string, cause error) protosourc
 }
 
 // authzErrorResponse maps an authz.Authorizer error to an HTTP response.
-// ErrUnauthenticated yields 401; ErrForbidden yields 403. Any other error is
-// treated as forbidden for conservative safety — implementations should wrap
-// their internal errors in one of the typed sentinels when they want a
-// specific status code. Error details are intentionally not leaked to the
-// response body.
+//
+//	ErrUnauthenticated  → 401 — the caller is not who they claim to be.
+//	ErrForbidden        → 403 — the caller is known but lacks the grant.
+//	any other error     → 503 — the authorization decision could not be
+//	                      made (auth service unreachable, timeout, DNS
+//	                      failure, etc). The handler still fails closed
+//	                      — the request is rejected — but 503 signals
+//	                      to clients and upstream monitoring that this
+//	                      is a transient condition worth retrying and
+//	                      alerting on, NOT a permission denial.
+//
+// Error details are intentionally not leaked to the response body; callers
+// that need diagnostic context should consult server-side logs.
+// Implementations that want a specific non-default status for a
+// particular internal error should wrap it in one of the typed sentinels
+// above before returning it from Authorize.
 func authzErrorResponse(err error) protosource.Response {
 	switch {
 	case errors.Is(err, authz.ErrUnauthenticated):
@@ -601,7 +703,7 @@ func authzErrorResponse(err error) protosource.Response {
 	case errors.Is(err, authz.ErrForbidden):
 		return errorResponse(http.StatusForbidden, "AUTHZ_FORBIDDEN", "forbidden", nil)
 	default:
-		return errorResponse(http.StatusForbidden, "AUTHZ_ERROR", "authorization failed", nil)
+		return errorResponse(http.StatusServiceUnavailable, "AUTHZ_UNAVAILABLE", "authorization service unavailable", nil)
 	}
 }
 

@@ -134,6 +134,11 @@ func (s *Service) HandleCheck(ctx context.Context, req protosource.Request) prot
 
 // ── Error mapping ──
 
+// loginErrorResponse maps Loginer errors to HTTP responses. Unknown
+// errors are mapped to 503 (not 500) so clients, load balancers, and
+// monitoring distinguish "the auth service is having a transient
+// problem" from "your credentials are wrong" — same fail-closed
+// reasoning as the framework's authzErrorResponse.
 func loginErrorResponse(err error) protosource.Response {
 	switch {
 	case errors.Is(err, ErrInvalidCredentials):
@@ -143,10 +148,14 @@ func loginErrorResponse(err error) protosource.Response {
 	case errors.Is(err, ErrIssuerNotActive):
 		return jsonError(http.StatusServiceUnavailable, "LOGIN_ISSUER_NOT_ACTIVE", "issuer is not active or not configured for signing")
 	default:
-		return jsonError(http.StatusInternalServerError, "LOGIN_INTERNAL", "login failed")
+		return jsonError(http.StatusServiceUnavailable, "LOGIN_UNAVAILABLE", "login service unavailable")
 	}
 }
 
+// checkErrorResponse maps Checker errors to HTTP responses. Unknown
+// errors map to 503 for the same retry/alerting reason — a transient
+// store failure must not look like a permission denial to the
+// downstream caller.
 func checkErrorResponse(err error) protosource.Response {
 	switch {
 	case errors.Is(err, authz.ErrUnauthenticated):
@@ -154,7 +163,7 @@ func checkErrorResponse(err error) protosource.Response {
 	case errors.Is(err, authz.ErrForbidden):
 		return jsonError(http.StatusForbidden, "CHECK_FORBIDDEN", "forbidden")
 	default:
-		return jsonError(http.StatusInternalServerError, "CHECK_INTERNAL", "check failed")
+		return jsonError(http.StatusServiceUnavailable, "CHECK_UNAVAILABLE", "authorization service unavailable")
 	}
 }
 
