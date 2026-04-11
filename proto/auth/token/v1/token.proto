@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package auth.token.v1;
+
+import "buf/validate/validate.proto";
+import "funinthecloud/protosource/options/v1/options_v1.proto";
+
+option go_package                                                      = "github.com/funinthecloud/protosource-auth/gen/auth/token/v1;tokenv1";
+option (funinthecloud.protosource.options.v1.protosource_file).enabled = true;
+
+// ── Aggregate ──
+
+enum State {
+  STATE_UNSPECIFIED = 0;
+  STATE_ISSUED      = 1;
+  STATE_REVOKED     = 2;
+}
+
+// Token is an ephemeral shadow-token aggregate. The aggregate id IS the
+// opaque bearer value handed to the caller — there is no separate mapping
+// table. Issue is a CREATION command; the Loginer generates a fresh
+// cryptographic random id and Apply's Issue in one shot.
+//
+// event_ttl_seconds = 36000 (10h) tells the underlying store (DynamoDB
+// today, Bolt later) to automatically delete the aggregate's events after
+// the TTL elapses, so expired tokens self-prune without a scheduled job.
+// Revocation is separate: the Revoke command sets STATE_REVOKED so the
+// Checker can reject the token immediately while the record still exists.
+message Token {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).aggregate = {
+    event_ttl_seconds: 36000
+  };
+  string id         = 1;
+  int64  version    = 2;
+  int64  create_at  = 3;
+  string create_by  = 4;
+  int64  modify_at  = 5;
+  string modify_by  = 6;
+  string user_id    = 7;
+  string issuer_id  = 8;
+  string jwt        = 9;
+  int64  issued_at  = 10;
+  int64  expires_at = 11;
+  State  state      = 12;
+}
+
+message TokenList {
+  repeated Token items = 1;
+}
+
+// ── Commands ──
+
+message Issue {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Issued" ]
+    lifecycle: COMMAND_LIFECYCLE_CREATION
+  };
+  string id         = 1;
+  string actor      = 2;
+  string user_id    = 3 [(buf.validate.field).string.min_len = 1];
+  string issuer_id  = 4 [(buf.validate.field).string.min_len = 1];
+  string jwt        = 5 [(buf.validate.field).string.min_len = 1];
+  int64  issued_at  = 6;
+  int64  expires_at = 7;
+}
+
+message Revoke {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Revoked" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ISSUED" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
+// ── Events ──
+
+message Issued {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_ISSUED"
+  };
+  string id         = 1;
+  int64  version    = 2;
+  int64  at         = 3;
+  string actor      = 4;
+  string user_id    = 5;
+  string issuer_id  = 6;
+  string jwt        = 7;
+  int64  issued_at  = 8;
+  int64  expires_at = 9;
+}
+
+message Revoked {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_REVOKED"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}
