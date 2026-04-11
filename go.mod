@@ -5,7 +5,7 @@ go 1.25.7
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260209202127-80ab13bee0bf.1
 	buf.build/go/protovalidate v1.1.3
-	github.com/funinthecloud/protosource v0.1.2-0.20260411001941-741099b91d90
+	github.com/funinthecloud/protosource v0.1.2
 	github.com/goforj/wire v1.1.0
 	golang.org/x/crypto v0.49.0
 	google.golang.org/protobuf v1.36.11
