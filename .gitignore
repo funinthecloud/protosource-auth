@@ -3,6 +3,10 @@
 *.test
 *.out
 
+# Build artifacts
+/protosource-auth
+/protosource-authmgr
+
 # IDE
 .idea/
 .vscode/
