@@ -1,0 +1,203 @@
+syntax = "proto3";
+
+package auth.role.v1;
+
+import "buf/validate/validate.proto";
+import "funinthecloud/protosource/options/v1/options_v1.proto";
+
+option go_package                                                      = "github.com/funinthecloud/protosource-auth/gen/auth/role/v1;rolev1";
+option (funinthecloud.protosource.options.v1.protosource_file).enabled = true;
+
+// ── Aggregate ──
+
+enum State {
+  STATE_UNSPECIFIED = 0;
+  STATE_ACTIVE      = 1;
+  STATE_DELETED     = 2;
+}
+
+// Role is a named collection of function grants. Users are assigned zero or
+// more roles; at authorization time the union of all their roles' functions
+// is the set of operations they can perform. Function names are opaque
+// strings by convention "{proto_package}.{CommandMessageName}" (e.g.
+// "auth.user.v1.Create"), with wildcards matched by the functions package.
+message Role {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).aggregate = {
+  };
+  string                     id          = 1;
+  int64                      version     = 2;
+  int64                      create_at   = 3;
+  string                     create_by   = 4;
+  int64                      modify_at   = 5;
+  string                     modify_by   = 6;
+  string                     name        = 7;
+  string                     description = 8;
+  State                      state       = 9;
+  map<string, FunctionGrant> functions   = 10;
+}
+
+message RoleList {
+  repeated Role items = 1;
+}
+
+// FunctionGrant is a collection element on Role.functions. The "function"
+// field is both the map key and the canonical function-name string that
+// the authorizer checks against at request time.
+message FunctionGrant {
+  string function   = 1;
+  int64  granted_at = 2;
+}
+
+// ── Commands ──
+
+message Create {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Created" ]
+    lifecycle: COMMAND_LIFECYCLE_CREATION
+  };
+  string id          = 1;
+  string actor       = 2;
+  string name        = 3 [(buf.validate.field).string.min_len = 1];
+  string description = 4;
+}
+
+message Rename {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Renamed" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id    = 1;
+  string actor = 2;
+  string name  = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+message SetDescription {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "DescriptionSet" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id          = 1;
+  string actor       = 2;
+  string description = 3;
+}
+
+message AddFunction {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "FunctionAdded" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string        id    = 1;
+  string        actor = 2;
+  FunctionGrant grant = 3;
+}
+
+message RemoveFunction {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "FunctionRemoved" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id       = 1;
+  string actor    = 2;
+  string function = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+message Delete {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Deleted" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
+// ── Events ──
+
+message Created {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_ACTIVE"
+  };
+  string id          = 1;
+  int64  version     = 2;
+  int64  at          = 3;
+  string actor       = 4;
+  string name        = 5;
+  string description = 6;
+}
+
+message Renamed {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+  string name    = 5;
+}
+
+message DescriptionSet {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+  };
+  string id          = 1;
+  int64  version     = 2;
+  int64  at          = 3;
+  string actor       = 4;
+  string description = 5;
+}
+
+message FunctionAdded {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    collection: {
+      target: "functions"
+      action: COLLECTION_ACTION_ADD
+      key_field: "function"
+    }
+  };
+  string        id      = 1;
+  int64         version = 2;
+  int64         at      = 3;
+  string        actor   = 4;
+  FunctionGrant grant   = 5;
+}
+
+message FunctionRemoved {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    collection: {
+      target: "functions"
+      action: COLLECTION_ACTION_REMOVE
+      key_field: "function"
+    }
+  };
+  string id       = 1;
+  int64  version  = 2;
+  int64  at       = 3;
+  string actor    = 4;
+  string function = 5;
+}
+
+message Deleted {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_DELETED"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}
+
+// ── Snapshot ──
+
+message Snapshot {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).snapshot = {
+    every_n_events: 50
+  };
+  string id       = 1;
+  int64  version  = 2;
+  int64  at       = 3;
+  string actor    = 4;
+  Role   snapshot = 5;
+}
