@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: protosource-auth - shadow-token auth service on Lambda
+
+Globals:
+  Function:
+    Timeout: 10
+    MemorySize: 256
+
+Parameters:
+  EventsTableName:
+    Type: String
+    Default: protosource-auth-events
+  AggregatesTableName:
+    Type: String
+    Default: protosource-auth-aggregates
+  MasterKeyBase64:
+    Type: String
+    NoEcho: true
+    Description: Base64-encoded 32-byte master key for envelope encryption
+  IssuerIss:
+    Type: String
+    Description: JWT "iss" claim value (e.g. https://auth.example.com)
+  DomainName:
+    Type: String
+    Description: Custom domain name (e.g. auth.example.com)
+  CertificateArn:
+    Type: String
+    Description: ACM certificate ARN for the custom domain (must be in same region for regional)
+  HostedZoneId:
+    Type: String
+    Description: Route 53 hosted zone ID for the domain
+
+Resources:
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      CodeUri: ./cmd/protosource-auth-lambda/
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTableName
+          AGGREGATES_TABLE: !Ref AggregatesTableName
+          PROTOSOURCE_AUTH_LOCAL_MASTER_KEY: !Ref MasterKeyBase64
+          PROTOSOURCE_AUTH_ISSUER_ISS: !Ref IssuerIss
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTableName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AggregatesTableName
+      Events:
+        ApiCatchAll:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+  ApiDomainName:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref DomainName
+      RegionalCertificateArn: !Ref CertificateArn
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  ApiBasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    DependsOn: ServerlessRestApiProdStage
+    Properties:
+      DomainName: !Ref ApiDomainName
+      RestApiId: !Ref ServerlessRestApi
+      Stage: Prod
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApiDomainName.RegionalDomainName
+        HostedZoneId: !GetAtt ApiDomainName.RegionalHostedZoneId
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  CustomDomainUrl:
+    Description: Custom domain URL
+    Value: !Sub "https://${DomainName}/"
+  AuthFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt AuthFunction.Arn
