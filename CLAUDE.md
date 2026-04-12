@@ -4,55 +4,90 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # protosource-auth
 
-A shadow-token authentication and authorization service built on the [protosource](https://github.com/funinthecloud/protosource) event sourcing framework. Users authenticate with credentials, receive an opaque token (GUID), and the backend dereferences the opaque token to the real JWT on every protected call. Authorization is a set-membership check against `{proto_package}.{CommandName}` function strings.
+Shadow-token authentication and authorization service built on [protosource](https://github.com/funinthecloud/protosource). Users authenticate with credentials, receive an opaque token (GUID), and downstream services dereference the opaque token against `/authz/check` on every protected call. Authorization is a set-membership check against `{proto_package}.{CommandName}` function strings with wildcard support.
 
-## Architecture (in progress)
+## Aggregates
 
-Five aggregates, all defined as protosource protos and code-generated:
+Five, all defined as protosource protos and code-generated under `gen/auth/`:
 
-| Aggregate | Purpose |
-|---|---|
-| `User` | identity, argon2id credentials, collection of role ids |
-| `Role` | collection of function string grants (with wildcards) |
-| `Token` | opaque GUID → user id + cached JWT, 10h event TTL |
-| `Issuer` | JWT iss metadata; SELF issuers own signing keys, EXTERNAL verify only |
-| `PublicPrivateKey` | per-issuer/per-day key, wrapped private via KeyProvider |
+| Aggregate | Package | Purpose |
+|---|---|---|
+| `User` | `auth.user.v1` | identity, argon2id credentials, `map<string, RoleGrant>` collection |
+| `Role` | `auth.role.v1` | `map<string, FunctionGrant>` of function strings (with wildcards) |
+| `Token` | `auth.token.v1` | opaque GUID (the aggregate id) → user_id + cached JWT, `event_ttl_seconds: 36000` |
+| `Issuer` | `auth.issuer.v1` | JWT `iss` metadata; KIND_SELF issuers sign, KIND_EXTERNAL verify only |
+| `Key` | `auth.key.v1` | per-issuer/per-day/per-algorithm signing key; deterministic kid `{issuer_id}:{YYYY-MM-DD}:{algorithm}` |
 
-Phase 2 of the plan covers only `User` + argon2id credential helpers. Additional aggregates land in subsequent phases.
+## Runtime layers
+
+- **`credentials/`** — argon2id Hash/Verify (PHC string format, 64MiB/t=3/p=2).
+- **`functions/`** — wildcard matcher for function strings. `*` grants everything, `prefix.*` matches anything starting with `prefix.`, otherwise exact. Leading/middle wildcards are treated as literals.
+- **`signers/`** — `Signer` interface + `ed25519signer` (EdDSA, RFC 8037 JWK). RS256 is a planned follow-up.
+- **`keyproviders/`** — `KeyProvider` interface for envelope-encryption of signing keys. `keyproviders/local` uses XChaCha20-Poly1305 with a 32-byte master key from env. AWS KMS / GCP KMS / Azure / OCI planned.
+- **`keys/`** — `Resolver` for lazy per-day key materialization. First call for an (issuer, algorithm, today) generates a keypair, wraps via the KeyProvider, persists the Key aggregate, and caches the plaintext in memory. Race-safe via deterministic kid + `ErrAlreadyCreated` fallback. `VerificationKey` returns a stripped clone with no private material.
+- **`service/`** — hand-written `Loginer` and `Checker` + `Service` HTTP adapter registering `POST /login` and `POST /authz/check`. Orchestrates the generated aggregates that cannot be a single protosource command (credential verify spans User + Issuer + Key + Token). Includes `MapDirectory` (in-memory) and `functionCache` (TTL-bounded user→function-set).
+- **`authz/httpauthz/`** — the concrete `authz.Authorizer` downstream consumers wire in. POSTs to `/authz/check` with a shadow token and required function, enriches `ctx` with `authz.WithUserID` / `authz.WithJWT` on success. Pluggable `TokenSource` (AuthorizationHeader, Cookie, Chain).
+- **`app/`** — `Config` + `Run(ctx, cfg) → *App` assembling everything into an `http.Handler`. `Backend` dispatch for memory or DynamoDB. Startup bootstrap. Public `NewBundle`, `Bootstrap`, `RegisterDefaultIssuer`, `EnsureTables` for the mgr CLI.
+- **`cmd/protosource-auth/`** — runnable service binary.
+- **`cmd/protosource-authmgr/`** — operational CLI (`ensure-tables`, `bootstrap`, `recover-admin`) that talks to the store directly via the aggregate Repository — no HTTP round-trips to the running service, so it works when the service is down or before it has ever run.
 
 ## Build & Run
 
 ```bash
-go install ./cmd/protoc-gen-protosource   # one-time, from protosource repo
-buf generate                                # regenerate Go from proto/
+go install github.com/funinthecloud/protosource/cmd/protoc-gen-protosource@latest
+buf generate
 go build ./...
-go test ./...
+go test ./...                          # full suite
+go test -race ./...                    # under the race detector
 go vet ./...
 ```
 
-## Proto Layout
+## Local dev
 
-```
-proto/auth/user/v1/user.proto      # package auth.user.v1
+```bash
+# Required
+export PROTOSOURCE_AUTH_LOCAL_MASTER_KEY="$(openssl rand 32 | base64)"
+export PROTOSOURCE_AUTH_ISSUER_ISS="https://auth.local"
+
+# Optional: create an admin on first run (memorystore re-creates every start)
+export PROTOSOURCE_AUTH_BOOTSTRAP_EMAIL="admin@example.com"
+export PROTOSOURCE_AUTH_BOOTSTRAP_PASSWORD="hunter2"
+
+go run ./cmd/protosource-auth      # :8080
 ```
 
-Generated Go lands under `gen/auth/user/v1/...` via the `module=` buf option. Hand-written domain helpers (argon2id, etc.) live in top-level packages like `credentials/`.
+See `README.md` for the DynamoDB Local flow and curl examples for `/login` + `/authz/check`.
+
+## mgr CLI
+
+```bash
+export PROTOSOURCE_AUTH_SEED_SECRET=anything              # phase 9: just has to be non-empty
+
+protosource-authmgr ensure-tables                         # idempotent table create
+protosource-authmgr bootstrap --admin-email ... --admin-password ...
+protosource-authmgr recover-admin --admin-email ... --admin-password ... --force
+```
+
+Recovery creates a timestamped `role-super-admin-recovery-<ts>` + `user-recovery-admin-<ts>` alongside existing state — fully additive, never destructive. `--force` is required; the original super-admin is untouched.
 
 ## Conventions
 
 - Module path: `github.com/funinthecloud/protosource-auth`
-- Go 1.25+
+- Go 1.25+, depends on `github.com/funinthecloud/protosource v0.1.3+`
 - Generated files under `gen/` are auto-generated — never edit by hand
-- Proto files are formatted with `clang-format --style=file -i proto/**/*.proto` (NOT `buf format`)
-- Depends on `github.com/funinthecloud/protosource` for the event sourcing framework and the `authz.Authorizer` interface that downstream consumers will wire in via `httpauthz` once that package lands
+- Proto files formatted with `clang-format --style=file -i proto/**/*.proto` (NOT `buf format`)
+- Protosource field-name contracts bit us in phase 2: aggregates need `create_at` / `create_by` / `modify_at` / `modify_by` (not `created_at`); command fields must name-match event fields for mechanical copying; ADD events embed the element message type (`RoleGrant grant`, `FunctionGrant grant`)
 
-## Function Name Convention
+## Function name convention
 
-Role entries use canonical function names derived from the proto package and command message name. For this service, that means:
+Role entries use canonical `{proto_package}.{CommandMessageName}` strings. Examples:
 
-- `auth.user.v1.Create`
-- `auth.user.v1.AssignRole`
-- `auth.user.v1.Lock`
-- etc.
+- `auth.user.v1.Create`, `auth.user.v1.Lock`, `auth.user.v1.AssignRole`
+- `showcase.app.todolist.v1.Create`, `showcase.app.todolist.v1.Archive`
+- Wildcards: `auth.user.v1.*`, `auth.**` (no — only single-trailing-`.*` is supported), `*` (super-admin)
 
-Role entries for downstream services (todoapp, etc.) look like `showcase.app.todolist.v1.Create`. Wildcards (`auth.user.v1.*`, `*`) are supported at check time.
+See `functions/match.go` for the exact matcher semantics and 28 test cases.
+
+## TODO
+
+See [TODO.md](TODO.md) for remaining work.
