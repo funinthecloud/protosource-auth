@@ -16,7 +16,7 @@ Parameters:
     Default: aggregates
   KmsKeyArn:
     Type: String
-    Description: KMS key ARN or alias for signing key encryption
+    Description: Full KMS key ARN (e.g. arn:aws:kms:us-east-1:123456:key/abc-def)
   DomainName:
     Type: String
     Description: Custom domain name (e.g. auth.example.com)
@@ -48,10 +48,13 @@ Resources:
             TableName: !Ref EventsTableName
         - DynamoDBCrudPolicy:
             TableName: !Ref AggregatesTableName
-        - KMSEncryptPolicy:
-            KeyId: !Ref KmsKeyArn
-        - KMSDecryptPolicy:
-            KeyId: !Ref KmsKeyArn
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+              Resource: !Ref KmsKeyArn
       Events:
         ApiCatchAll:
           Type: Api
