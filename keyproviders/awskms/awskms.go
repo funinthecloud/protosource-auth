@@ -1,11 +1,11 @@
 // Package awskms implements [keyproviders.KeyProvider] using AWS KMS
-// direct encryption. Signing key private material (~32-64 bytes for
-// Ed25519/RSA seeds) is well under KMS's 4 KiB plaintext limit, so no
-// envelope encryption is needed.
+// direct encryption. Ed25519 signing key material is 32-64 bytes,
+// well under KMS's 4 KiB plaintext limit, so no envelope encryption
+// is needed.
 //
-// The masterKeyRef parameter is the KMS key ARN or alias
-// (e.g. "arn:aws:kms:us-east-1:123456:key/abc-def" or
-// "alias/protosource-auth-signing").
+// masterKeyRef is used as the KeyId for Encrypt calls only. Decrypt
+// omits KeyId so KMS infers the correct key from the ciphertext blob,
+// which is safe even if an alias is repointed after encryption.
 package awskms
 
 import (
@@ -54,9 +54,11 @@ func (p *Provider) Encrypt(ctx context.Context, masterKeyRef string, plaintext [
 }
 
 // Decrypt unwraps a blob previously produced by this provider's Encrypt.
-func (p *Provider) Decrypt(ctx context.Context, masterKeyRef string, wrapped []byte) ([]byte, error) {
+// KeyId is omitted so KMS infers the correct key from the ciphertext
+// metadata. This is safe even if masterKeyRef is an alias that has been
+// repointed since the blob was encrypted.
+func (p *Provider) Decrypt(ctx context.Context, _ string, wrapped []byte) ([]byte, error) {
 	out, err := p.client.Decrypt(ctx, &kms.DecryptInput{
-		KeyId:          &masterKeyRef,
 		CiphertextBlob: wrapped,
 	})
 	if err != nil {
