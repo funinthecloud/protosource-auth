@@ -10,17 +10,14 @@ Globals:
 Parameters:
   EventsTableName:
     Type: String
-    Default: protosource-auth-events
+    Default: events
   AggregatesTableName:
     Type: String
-    Default: protosource-auth-aggregates
+    Default: aggregates
   MasterKeyBase64:
     Type: String
     NoEcho: true
     Description: Base64-encoded 32-byte master key for envelope encryption
-  IssuerIss:
-    Type: String
-    Description: JWT "iss" claim value (e.g. https://auth.example.com)
   DomainName:
     Type: String
     Description: Custom domain name (e.g. auth.example.com)
@@ -44,10 +41,9 @@ Resources:
       CodeUri: ./cmd/protosource-auth-lambda/
       Environment:
         Variables:
-          EVENTS_TABLE: !Ref EventsTableName
-          AGGREGATES_TABLE: !Ref AggregatesTableName
+          PROTOSOURCE_AUTH_EVENTS_TABLE: !Ref EventsTableName
+          PROTOSOURCE_AUTH_AGGREGATES_TABLE: !Ref AggregatesTableName
           PROTOSOURCE_AUTH_LOCAL_MASTER_KEY: !Ref MasterKeyBase64
-          PROTOSOURCE_AUTH_ISSUER_ISS: !Ref IssuerIss
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref EventsTableName

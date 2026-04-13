@@ -21,10 +21,6 @@ import (
 // from other []byte values in the graph.
 type MasterKey []byte
 
-// IssuerIss is a named type so wire can distinguish the issuer "iss"
-// claim from other string values in the graph.
-type IssuerIss string
-
 func provideKeyProvider(key MasterKey) (keyproviders.KeyProvider, error) {
 	return local.New([]byte(key))
 }

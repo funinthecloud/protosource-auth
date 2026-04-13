@@ -3,10 +3,13 @@
 //
 // Configuration is read from environment variables:
 //
-//	EVENTS_TABLE                        DynamoDB events table name
-//	AGGREGATES_TABLE                    DynamoDB aggregates table name
+//	PROTOSOURCE_AUTH_EVENTS_TABLE       DynamoDB events table name (default "events")
+//	PROTOSOURCE_AUTH_AGGREGATES_TABLE   DynamoDB aggregates table name (default "aggregates")
 //	PROTOSOURCE_AUTH_LOCAL_MASTER_KEY   base64(32 random bytes)
-//	PROTOSOURCE_AUTH_ISSUER_ISS         JWT "iss" claim
+//
+// The issuer and admin bootstrap are handled by protosource-authmgr
+// before the Lambda is deployed — they are not part of the cold-start
+// path.
 package main
 
 import (
@@ -32,12 +35,11 @@ func main() {
 
 	client := dynamodb.NewFromConfig(cfg)
 
-	eventsTable := dynamodbstore.EventsTableName(envOrDefault("EVENTS_TABLE", "protosource-auth-events"))
-	aggregatesTable := dynamodbstore.AggregatesTableName(envOrDefault("AGGREGATES_TABLE", "protosource-auth-aggregates"))
+	eventsTable := dynamodbstore.EventsTableName(envOrDefault("PROTOSOURCE_AUTH_EVENTS_TABLE", "events"))
+	aggregatesTable := dynamodbstore.AggregatesTableName(envOrDefault("PROTOSOURCE_AUTH_AGGREGATES_TABLE", "aggregates"))
 	masterKey := mustDecodeMasterKey()
-	issuerIss := IssuerIss(os.Getenv("PROTOSOURCE_AUTH_ISSUER_ISS"))
 
-	router, err := InitializeRouter(client, eventsTable, aggregatesTable, masterKey, issuerIss)
+	router, err := InitializeRouter(client, eventsTable, aggregatesTable, masterKey)
 	if err != nil {
 		panic(err)
 	}
@@ -65,6 +67,9 @@ func mustDecodeMasterKey() MasterKey {
 	key, err := base64.StdEncoding.DecodeString(raw)
 	if err != nil {
 		panic(fmt.Sprintf("PROTOSOURCE_AUTH_LOCAL_MASTER_KEY: invalid base64: %v", err))
+	}
+	if len(key) != 32 {
+		panic(fmt.Sprintf("PROTOSOURCE_AUTH_LOCAL_MASTER_KEY: decoded key is %d bytes, want 32", len(key)))
 	}
 	return MasterKey(key)
 }

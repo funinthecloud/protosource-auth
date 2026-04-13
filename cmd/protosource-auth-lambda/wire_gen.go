@@ -23,7 +23,7 @@ import (
 
 // InitializeRouter wires all dependencies and returns a configured
 // router ready for awslambda.WrapRouter.
-func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsTableName, aggregatesTable dynamodbstore.AggregatesTableName, masterKey MasterKey, issuerIss IssuerIss) (*protosource.Router, error) {
+func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsTableName, aggregatesTable dynamodbstore.AggregatesTableName, masterKey MasterKey) (*protosource.Router, error) {
 	store := dynamodbstore.ProvideOpaqueStore(client, aggregatesTable)
 	dynamoDBStore, err := dynamodbstore.ProvideStore(client, store, eventsTable)
 	if err != nil {

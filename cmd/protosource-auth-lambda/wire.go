@@ -28,7 +28,6 @@ func InitializeRouter(
 	eventsTable dynamodbstore.EventsTableName,
 	aggregatesTable dynamodbstore.AggregatesTableName,
 	masterKey MasterKey,
-	issuerIss IssuerIss,
 ) (*protosource.Router, error) {
 	wire.Build(
 		// Infrastructure bindings.
