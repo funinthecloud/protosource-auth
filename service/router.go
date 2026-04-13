@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/funinthecloud/protosource"
@@ -97,7 +98,7 @@ func (s *Service) HandleLogin(ctx context.Context, req protosource.Request) prot
 		IssuerID: in.Issuer,
 	})
 	if err != nil {
-		return loginErrorResponse(err)
+		return loginErrorResponse(ctx, err, in.Email, in.Issuer)
 	}
 
 	return jsonOK(loginResponseJSON{
@@ -123,7 +124,7 @@ func (s *Service) HandleCheck(ctx context.Context, req protosource.Request) prot
 		RequiredFunction: in.RequiredFunction,
 	})
 	if err != nil {
-		return checkErrorResponse(err)
+		return checkErrorResponse(ctx, err, in.RequiredFunction)
 	}
 
 	return jsonOK(CheckResponseJSON{
@@ -139,15 +140,27 @@ func (s *Service) HandleCheck(ctx context.Context, req protosource.Request) prot
 // monitoring distinguish "the auth service is having a transient
 // problem" from "your credentials are wrong" — same fail-closed
 // reasoning as the framework's authzErrorResponse.
-func loginErrorResponse(err error) protosource.Response {
+func loginErrorResponse(ctx context.Context, err error, email, issuerID string) protosource.Response {
 	switch {
 	case errors.Is(err, ErrInvalidCredentials):
 		return jsonError(http.StatusUnauthorized, "LOGIN_INVALID_CREDENTIALS", "invalid credentials")
 	case errors.Is(err, ErrUserNotActive):
 		return jsonError(http.StatusForbidden, "LOGIN_USER_NOT_ACTIVE", "user account is not active")
 	case errors.Is(err, ErrIssuerNotActive):
+		slog.ErrorContext(ctx, "login: issuer not active",
+			"code", "LOGIN_ISSUER_NOT_ACTIVE",
+			"email", email,
+			"issuer_id", issuerID,
+			"error", err,
+		)
 		return jsonError(http.StatusServiceUnavailable, "LOGIN_ISSUER_NOT_ACTIVE", "issuer is not active or not configured for signing")
 	default:
+		slog.ErrorContext(ctx, "login: unexpected error",
+			"code", "LOGIN_UNAVAILABLE",
+			"email", email,
+			"issuer_id", issuerID,
+			"error", err,
+		)
 		return jsonError(http.StatusServiceUnavailable, "LOGIN_UNAVAILABLE", "login service unavailable")
 	}
 }
@@ -156,13 +169,18 @@ func loginErrorResponse(err error) protosource.Response {
 // errors map to 503 for the same retry/alerting reason — a transient
 // store failure must not look like a permission denial to the
 // downstream caller.
-func checkErrorResponse(err error) protosource.Response {
+func checkErrorResponse(ctx context.Context, err error, requiredFunction string) protosource.Response {
 	switch {
 	case errors.Is(err, authz.ErrUnauthenticated):
 		return jsonError(http.StatusUnauthorized, "CHECK_UNAUTHENTICATED", "unauthenticated")
 	case errors.Is(err, authz.ErrForbidden):
 		return jsonError(http.StatusForbidden, "CHECK_FORBIDDEN", "forbidden")
 	default:
+		slog.ErrorContext(ctx, "check: unexpected error",
+			"code", "CHECK_UNAVAILABLE",
+			"required_function", requiredFunction,
+			"error", err,
+		)
 		return jsonError(http.StatusServiceUnavailable, "CHECK_UNAVAILABLE", "authorization service unavailable")
 	}
 }
