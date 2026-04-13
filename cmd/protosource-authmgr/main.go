@@ -29,6 +29,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/funinthecloud/protosource/stores/dynamodbstore"
+
 	"github.com/funinthecloud/protosource-auth/app"
 )
 
@@ -104,7 +106,7 @@ func runEnsureTables(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("dynamodb client: %w", err)
 	}
-	if err := app.EnsureTables(ctx, client, cfg.EventsTable, cfg.AggregatesTable); err != nil {
+	if err := dynamodbstore.EnsureTables(ctx, client, cfg.EventsTable, cfg.AggregatesTable); err != nil {
 		return err
 	}
 	log.Printf("ensured tables events=%q aggregates=%q", cfg.EventsTable, cfg.AggregatesTable)
@@ -149,7 +151,7 @@ func runBootstrap(ctx context.Context, args []string) error {
 		if err != nil {
 			return fmt.Errorf("dynamodb client: %w", err)
 		}
-		if err := app.EnsureTables(ctx, client, cfg.EventsTable, cfg.AggregatesTable); err != nil {
+		if err := dynamodbstore.EnsureTables(ctx, client, cfg.EventsTable, cfg.AggregatesTable); err != nil {
 			return fmt.Errorf("ensure tables: %w", err)
 		}
 	}

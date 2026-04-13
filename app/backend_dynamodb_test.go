@@ -19,6 +19,7 @@ import (
 
 	"github.com/funinthecloud/protosource"
 	"github.com/funinthecloud/protosource/authz"
+	"github.com/funinthecloud/protosource/stores/dynamodbstore"
 
 	"github.com/funinthecloud/protosource-auth/app"
 	"github.com/funinthecloud/protosource-auth/authz/httpauthz"
@@ -74,7 +75,7 @@ func TestDynamoDBBackendEndToEnd(t *testing.T) {
 	eventsTable := "events-" + runTag
 	aggregatesTable := "aggregates-" + runTag
 
-	if err := app.EnsureTables(ctx, client, eventsTable, aggregatesTable); err != nil {
+	if err := dynamodbstore.EnsureTables(ctx, client, eventsTable, aggregatesTable); err != nil {
 		t.Fatalf("EnsureTables: %v", err)
 	}
 	t.Cleanup(func() {
