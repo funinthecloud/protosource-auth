@@ -168,11 +168,11 @@ func TestConfigNormalizeAppliesDefaults(t *testing.T) {
 	}
 }
 
-func TestConfigNormalizeRequiresMasterKey(t *testing.T) {
+func TestRunRequiresMasterKey(t *testing.T) {
 	cfg := &app.Config{IssuerIss: "https://x"}
-	err := cfg.Normalize()
+	_, err := app.Run(context.Background(), cfg)
 	if err == nil {
-		t.Errorf("Normalize with no MasterKey should error")
+		t.Errorf("Run with no MasterKey should error")
 	}
 }
 
