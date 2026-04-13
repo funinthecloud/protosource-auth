@@ -14,8 +14,7 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
-	"fmt"
+	"log"
 	"os"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -25,23 +24,29 @@ import (
 
 	"github.com/funinthecloud/protosource/adapters/awslambda"
 	"github.com/funinthecloud/protosource/stores/dynamodbstore"
+
+	"github.com/funinthecloud/protosource-auth/keyproviders/local"
 )
 
 func main() {
 	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatalf("aws config: %v", err)
 	}
 
 	client := dynamodb.NewFromConfig(cfg)
 
 	eventsTable := dynamodbstore.EventsTableName(envOrDefault("PROTOSOURCE_AUTH_EVENTS_TABLE", "events"))
 	aggregatesTable := dynamodbstore.AggregatesTableName(envOrDefault("PROTOSOURCE_AUTH_AGGREGATES_TABLE", "aggregates"))
-	masterKey := mustDecodeMasterKey()
 
-	router, err := InitializeRouter(client, eventsTable, aggregatesTable, masterKey)
+	keyProvider, err := local.FromEnv()
 	if err != nil {
-		panic(err)
+		log.Fatalf("key provider: %v", err)
+	}
+
+	router, err := InitializeRouter(client, eventsTable, aggregatesTable, keyProvider)
+	if err != nil {
+		log.Fatalf("initialize: %v", err)
 	}
 
 	handler := awslambda.WrapRouter(router, extractActor)
@@ -57,19 +62,4 @@ func envOrDefault(key, fallback string) string {
 		return v
 	}
 	return fallback
-}
-
-func mustDecodeMasterKey() MasterKey {
-	raw := os.Getenv("PROTOSOURCE_AUTH_LOCAL_MASTER_KEY")
-	if raw == "" {
-		panic("PROTOSOURCE_AUTH_LOCAL_MASTER_KEY is required")
-	}
-	key, err := base64.StdEncoding.DecodeString(raw)
-	if err != nil {
-		panic(fmt.Sprintf("PROTOSOURCE_AUTH_LOCAL_MASTER_KEY: invalid base64: %v", err))
-	}
-	if len(key) != 32 {
-		panic(fmt.Sprintf("PROTOSOURCE_AUTH_LOCAL_MASTER_KEY: decoded key is %d bytes, want 32", len(key)))
-	}
-	return MasterKey(key)
 }

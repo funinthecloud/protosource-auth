@@ -10,20 +10,11 @@ import (
 	tokenv1 "github.com/funinthecloud/protosource-auth/gen/auth/token/v1"
 	userv1 "github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
 	"github.com/funinthecloud/protosource-auth/keyproviders"
-	"github.com/funinthecloud/protosource-auth/keyproviders/local"
 	"github.com/funinthecloud/protosource-auth/keys"
 	"github.com/funinthecloud/protosource-auth/service"
 	"github.com/funinthecloud/protosource-auth/signers"
 	"github.com/funinthecloud/protosource-auth/signers/ed25519signer"
 )
-
-// MasterKey is a named type so wire can distinguish the raw key bytes
-// from other []byte values in the graph.
-type MasterKey []byte
-
-func provideKeyProvider(key MasterKey) (keyproviders.KeyProvider, error) {
-	return local.New([]byte(key))
-}
 
 func provideResolver(repo keyv1.Repo, provider keyproviders.KeyProvider) *keys.Resolver {
 	return keys.NewResolver(

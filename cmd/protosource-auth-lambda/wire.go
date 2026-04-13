@@ -15,6 +15,7 @@ import (
 
 	issuerv1dynamodb "github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1/issuerv1dynamodb"
 	keyv1dynamodb "github.com/funinthecloud/protosource-auth/gen/auth/key/v1/keyv1dynamodb"
+	"github.com/funinthecloud/protosource-auth/keyproviders"
 	rolev1dynamodb "github.com/funinthecloud/protosource-auth/gen/auth/role/v1/rolev1dynamodb"
 	tokenv1dynamodb "github.com/funinthecloud/protosource-auth/gen/auth/token/v1/tokenv1dynamodb"
 	userv1 "github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
@@ -27,7 +28,7 @@ func InitializeRouter(
 	client *dynamodb.Client,
 	eventsTable dynamodbstore.EventsTableName,
 	aggregatesTable dynamodbstore.AggregatesTableName,
-	masterKey MasterKey,
+	keyProvider keyproviders.KeyProvider,
 ) (*protosource.Router, error) {
 	wire.Build(
 		// Infrastructure bindings.
@@ -47,7 +48,6 @@ func InitializeRouter(
 		userv1.NewUserClient,
 
 		// Auth-service provider functions.
-		provideKeyProvider,
 		provideResolver,
 		provideDirectory,
 		provideLoginer,

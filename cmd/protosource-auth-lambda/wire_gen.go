@@ -15,6 +15,7 @@ import (
 	"github.com/funinthecloud/protosource-auth/gen/auth/token/v1/tokenv1dynamodb"
 	"github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
 	"github.com/funinthecloud/protosource-auth/gen/auth/user/v1/userv1dynamodb"
+	"github.com/funinthecloud/protosource-auth/keyproviders"
 	"github.com/funinthecloud/protosource/serializers/protobinaryserializer"
 	"github.com/funinthecloud/protosource/stores/dynamodbstore"
 )
@@ -23,7 +24,7 @@ import (
 
 // InitializeRouter wires all dependencies and returns a configured
 // router ready for awslambda.WrapRouter.
-func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsTableName, aggregatesTable dynamodbstore.AggregatesTableName, masterKey MasterKey) (*protosource.Router, error) {
+func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsTableName, aggregatesTable dynamodbstore.AggregatesTableName, keyProvider keyproviders.KeyProvider) (*protosource.Router, error) {
 	store := dynamodbstore.ProvideOpaqueStore(client, aggregatesTable)
 	dynamoDBStore, err := dynamodbstore.ProvideStore(client, store, eventsTable)
 	if err != nil {
@@ -36,10 +37,6 @@ func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsT
 	userClient := userv1.NewUserClient(store)
 	userDirectory := provideDirectory(userClient)
 	keyv1dynamodbRepository := keyv1dynamodb.ProvideRepository(dynamoDBStore, serializer)
-	keyProvider, err := provideKeyProvider(masterKey)
-	if err != nil {
-		return nil, err
-	}
 	resolver := provideResolver(keyv1dynamodbRepository, keyProvider)
 	loginer := provideLoginer(repository, issuerv1dynamodbRepository, tokenv1dynamodbRepository, userDirectory, resolver)
 	rolev1dynamodbRepository := rolev1dynamodb.ProvideRepository(dynamoDBStore, serializer)
