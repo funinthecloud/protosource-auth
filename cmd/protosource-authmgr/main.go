@@ -107,7 +107,7 @@ func runEnsureTables(ctx context.Context, args []string) error {
 		return fmt.Errorf("dynamodb client: %w", err)
 	}
 	if err := dynamodbstore.EnsureTables(ctx, client, cfg.EventsTable, cfg.AggregatesTable); err != nil {
-		return err
+		return fmt.Errorf("ensure tables (events=%q, aggregates=%q): %w", cfg.EventsTable, cfg.AggregatesTable, err)
 	}
 	log.Printf("ensured tables events=%q aggregates=%q", cfg.EventsTable, cfg.AggregatesTable)
 	return nil
