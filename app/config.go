@@ -191,10 +191,10 @@ func (c *Config) Normalize() error {
 		c.Backend = BackendMemory
 	}
 	if c.EventsTable == "" {
-		c.EventsTable = "protosource-auth-events"
+		c.EventsTable = "events"
 	}
 	if c.AggregatesTable == "" {
-		c.AggregatesTable = "protosource-auth-aggregates"
+		c.AggregatesTable = "aggregates"
 	}
 
 	if c.IssuerIss == "" {
