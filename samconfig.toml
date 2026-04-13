@@ -5,7 +5,7 @@ stack_name = "protosource-auth"
 resolve_s3 = true
 s3_prefix = "protosource-auth"
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "EventsTableName=\"events\" AggregatesTableName=\"aggregates\" MasterKeyBase64=\"CHANGE_ME\" DomainName=\"auth.example.com\" CertificateArn=\"arn:aws:acm:us-east-1:ACCOUNT:certificate/CHANGE_ME\" HostedZoneId=\"CHANGE_ME\""
+parameter_overrides = "EventsTableName=\"events\" AggregatesTableName=\"aggregates\" KmsKeyArn=\"arn:aws:kms:us-east-1:ACCOUNT:key/CHANGE_ME\" DomainName=\"auth.example.com\" CertificateArn=\"arn:aws:acm:us-east-1:ACCOUNT:certificate/CHANGE_ME\" HostedZoneId=\"CHANGE_ME\""
 image_repositories = []
 
 [default.global.parameters]
