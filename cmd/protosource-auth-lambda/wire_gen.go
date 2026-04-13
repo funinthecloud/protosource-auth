@@ -24,7 +24,7 @@ import (
 
 // InitializeRouter wires all dependencies and returns a configured
 // router ready for awslambda.WrapRouter.
-func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsTableName, aggregatesTable dynamodbstore.AggregatesTableName, keyProvider keyproviders.KeyProvider) (*protosource.Router, error) {
+func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsTableName, aggregatesTable dynamodbstore.AggregatesTableName, keyProvider keyproviders.KeyProvider, masterKeyRef MasterKeyRef) (*protosource.Router, error) {
 	store := dynamodbstore.ProvideOpaqueStore(client, aggregatesTable)
 	dynamoDBStore, err := dynamodbstore.ProvideStore(client, store, eventsTable)
 	if err != nil {
@@ -37,7 +37,7 @@ func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsT
 	userClient := userv1.NewUserClient(store)
 	userDirectory := provideDirectory(userClient)
 	keyv1dynamodbRepository := keyv1dynamodb.ProvideRepository(dynamoDBStore, serializer)
-	resolver := provideResolver(keyv1dynamodbRepository, keyProvider)
+	resolver := provideResolver(keyv1dynamodbRepository, keyProvider, masterKeyRef)
 	loginer := provideLoginer(repository, issuerv1dynamodbRepository, tokenv1dynamodbRepository, userDirectory, resolver)
 	rolev1dynamodbRepository := rolev1dynamodb.ProvideRepository(dynamoDBStore, serializer)
 	checker := provideChecker(tokenv1dynamodbRepository, repository, rolev1dynamodbRepository)

@@ -16,11 +16,15 @@ import (
 	"github.com/funinthecloud/protosource-auth/signers/ed25519signer"
 )
 
-func provideResolver(repo keyv1.Repo, provider keyproviders.KeyProvider) *keys.Resolver {
+// MasterKeyRef is a named type so wire can distinguish the KMS key
+// ARN from other string values in the graph.
+type MasterKeyRef string
+
+func provideResolver(repo keyv1.Repo, provider keyproviders.KeyProvider, ref MasterKeyRef) *keys.Resolver {
 	return keys.NewResolver(
 		repo,
 		provider,
-		"local-master",
+		string(ref),
 		map[string]signers.Signer{
 			ed25519signer.Algorithm: ed25519signer.Signer{},
 		},

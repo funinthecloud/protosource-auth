@@ -14,10 +14,9 @@ Parameters:
   AggregatesTableName:
     Type: String
     Default: aggregates
-  MasterKeyBase64:
+  KmsKeyArn:
     Type: String
-    NoEcho: true
-    Description: Base64-encoded 32-byte master key for envelope encryption
+    Description: KMS key ARN or alias for signing key encryption
   DomainName:
     Type: String
     Description: Custom domain name (e.g. auth.example.com)
@@ -43,12 +42,16 @@ Resources:
         Variables:
           PROTOSOURCE_AUTH_EVENTS_TABLE: !Ref EventsTableName
           PROTOSOURCE_AUTH_AGGREGATES_TABLE: !Ref AggregatesTableName
-          PROTOSOURCE_AUTH_LOCAL_MASTER_KEY: !Ref MasterKeyBase64
+          PROTOSOURCE_AUTH_KMS_KEY_ARN: !Ref KmsKeyArn
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref EventsTableName
         - DynamoDBCrudPolicy:
             TableName: !Ref AggregatesTableName
+        - KMSEncryptPolicy:
+            KeyId: !Ref KmsKeyArn
+        - KMSDecryptPolicy:
+            KeyId: !Ref KmsKeyArn
       Events:
         ApiCatchAll:
           Type: Api

@@ -5,7 +5,7 @@
 //
 //	PROTOSOURCE_AUTH_EVENTS_TABLE       DynamoDB events table name (default "events")
 //	PROTOSOURCE_AUTH_AGGREGATES_TABLE   DynamoDB aggregates table name (default "aggregates")
-//	PROTOSOURCE_AUTH_LOCAL_MASTER_KEY   base64(32 random bytes)
+//	PROTOSOURCE_AUTH_KMS_KEY_ARN        KMS key ARN or alias for signing key encryption
 //
 // The issuer and admin bootstrap are handled by protosource-authmgr
 // before the Lambda is deployed — they are not part of the cold-start
@@ -21,11 +21,12 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 
 	"github.com/funinthecloud/protosource/adapters/awslambda"
 	"github.com/funinthecloud/protosource/stores/dynamodbstore"
 
-	"github.com/funinthecloud/protosource-auth/keyproviders/local"
+	"github.com/funinthecloud/protosource-auth/keyproviders/awskms"
 )
 
 func main() {
@@ -39,12 +40,14 @@ func main() {
 	eventsTable := dynamodbstore.EventsTableName(envOrDefault("PROTOSOURCE_AUTH_EVENTS_TABLE", "events"))
 	aggregatesTable := dynamodbstore.AggregatesTableName(envOrDefault("PROTOSOURCE_AUTH_AGGREGATES_TABLE", "aggregates"))
 
-	keyProvider, err := local.FromEnv()
-	if err != nil {
-		log.Fatalf("key provider: %v", err)
+	kmsKeyArn := os.Getenv("PROTOSOURCE_AUTH_KMS_KEY_ARN")
+	if kmsKeyArn == "" {
+		log.Fatalf("PROTOSOURCE_AUTH_KMS_KEY_ARN is required")
 	}
 
-	router, err := InitializeRouter(client, eventsTable, aggregatesTable, keyProvider)
+	keyProvider := awskms.New(kms.NewFromConfig(cfg))
+
+	router, err := InitializeRouter(client, eventsTable, aggregatesTable, keyProvider, MasterKeyRef(kmsKeyArn))
 	if err != nil {
 		log.Fatalf("initialize: %v", err)
 	}
