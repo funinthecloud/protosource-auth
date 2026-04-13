@@ -197,9 +197,6 @@ func (c *Config) Normalize() error {
 		c.AggregatesTable = "protosource-auth-aggregates"
 	}
 
-	if len(c.MasterKey) == 0 {
-		return errors.New("app: MasterKey is required (set " + EnvMasterKey + ")")
-	}
 	if c.IssuerIss == "" {
 		return errors.New("app: IssuerIss is required (set " + EnvIssuerIss + ")")
 	}

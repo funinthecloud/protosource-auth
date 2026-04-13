@@ -77,6 +77,9 @@ func Run(ctx context.Context, cfg *Config) (*App, error) {
 	if err := cfg.Normalize(); err != nil {
 		return nil, err
 	}
+	if len(cfg.MasterKey) == 0 {
+		return nil, fmt.Errorf("app: MasterKey is required (set %s)", EnvMasterKey)
+	}
 
 	bundle, err := NewBundle(ctx, cfg)
 	if err != nil {
