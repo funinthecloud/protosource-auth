@@ -60,7 +60,7 @@ Resources:
           Type: Api
           Properties:
             Path: /
-            Method: GET
+            Method: ANY
         ApiCatchAll:
           Type: Api
           Properties:

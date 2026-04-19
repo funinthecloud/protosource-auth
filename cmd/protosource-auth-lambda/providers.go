@@ -58,8 +58,8 @@ func provideService(loginer *service.Loginer, checker *service.Checker) *service
 	return service.NewService(loginer, checker)
 }
 
-func providePage() *loginpage.Page {
-	return loginpage.New(envOrDefault("PROTOSOURCE_AUTH_ISSUER_ID", "default"))
+func providePage(loginer *service.Loginer) *loginpage.Page {
+	return loginpage.New(envOrDefault("PROTOSOURCE_AUTH_ISSUER_ID", "default"), loginer)
 }
 
 func provideRouter(svc *service.Service, page *loginpage.Page) *protosource.Router {

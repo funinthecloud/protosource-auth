@@ -1,17 +1,23 @@
-// Package loginpage serves a browser login form that POSTs to /login
-// and sets a shadow cookie on the parent domain.
+// Package loginpage serves a browser login form and handles
+// authentication with server-side cookie setting.
 package loginpage
 
 import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"html/template"
 	"net"
 	"net/http"
-	"strings"
+	"time"
+
+	"golang.org/x/net/publicsuffix"
 
 	"github.com/funinthecloud/protosource"
+	"github.com/funinthecloud/protosource-auth/service"
 )
 
 //go:embed login.html
@@ -19,46 +25,34 @@ var loginHTML string
 
 var loginTmpl = template.Must(template.New("login").Parse(loginHTML))
 
-// Page serves the login form and implements [protosource.RouteRegistrar].
+// Page serves the login form, handles authentication, and sets the
+// shadow cookie server-side. Implements [protosource.RouteRegistrar].
 type Page struct {
 	issuerID string
+	loginer  *service.Loginer
 }
 
-// New returns a Page that injects issuerID into the login form template.
-func New(issuerID string) *Page {
-	return &Page{issuerID: issuerID}
+// New returns a Page that serves the login form and handles
+// authentication via the provided Loginer.
+func New(issuerID string, loginer *service.Loginer) *Page {
+	return &Page{issuerID: issuerID, loginer: loginer}
 }
 
-// RegisterRoutes registers GET / on the router.
+// RegisterRoutes registers GET / (form) and POST / (login) on the router.
 func (p *Page) RegisterRoutes(router *protosource.Router) {
-	router.Handle("GET", "/", p.handle)
+	router.Handle("GET", "/", p.handlePage)
+	router.Handle("POST", "/", p.handleLogin)
 }
 
-type templateData struct {
-	IssuerID     string
-	CookieDomain string
-}
-
-func (p *Page) handle(_ context.Context, req protosource.Request) protosource.Response {
-	host := req.Headers["host"]
-	if host == "" {
-		host = req.Headers["Host"]
-	}
-
-	data := templateData{
-		IssuerID:     p.issuerID,
-		CookieDomain: parentDomain(host),
-	}
-
+func (p *Page) handlePage(_ context.Context, _ protosource.Request) protosource.Response {
 	var buf bytes.Buffer
-	if err := loginTmpl.Execute(&buf, data); err != nil {
+	if err := loginTmpl.Execute(&buf, nil); err != nil {
 		return protosource.Response{
 			StatusCode: http.StatusInternalServerError,
 			Body:       "internal error",
 			Headers:    map[string]string{"Content-Type": "text/plain"},
 		}
 	}
-
 	return protosource.Response{
 		StatusCode: http.StatusOK,
 		Body:       buf.String(),
@@ -66,30 +60,118 @@ func (p *Page) handle(_ context.Context, req protosource.Request) protosource.Re
 	}
 }
 
-// parentDomain derives the cookie domain from a Host header value.
-//
-//	auth.drhayt.com   -> .drhayt.com
-//	drhayt.com        -> .drhayt.com
-//	localhost:8080    -> ""  (omit Domain attribute)
-//	localhost         -> ""
-func parentDomain(host string) string {
-	// Strip port if present.
-	h := host
-	if i := strings.LastIndex(h, ":"); i != -1 {
-		h = h[:i]
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protosource.Response {
+	var in loginRequest
+	if err := json.Unmarshal([]byte(req.Body), &in); err != nil || in.Email == "" || in.Password == "" {
+		return jsonError(http.StatusBadRequest, "email and password are required")
 	}
 
-	// IP addresses: no domain attribute.
+	result, err := p.loginer.Login(ctx, service.LoginRequest{
+		Email:    in.Email,
+		Password: in.Password,
+		IssuerID: p.issuerID,
+	})
+	if err != nil {
+		return mapLoginError(err)
+	}
+
+	host := reqHost(req)
+	domain := parentDomain(host)
+	maxAge := result.ExpiresAt - time.Now().Unix()
+
+	cookie := fmt.Sprintf("shadow=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d", result.ShadowToken, maxAge)
+	if domain != "" {
+		cookie += "; Domain=" + domain
+	}
+	if isSecure(req) {
+		cookie += "; Secure"
+	}
+
+	body, _ := json.Marshal(map[string]bool{"ok": true})
+	return protosource.Response{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+			"Set-Cookie":   cookie,
+		},
+	}
+}
+
+func mapLoginError(err error) protosource.Response {
+	switch {
+	case errors.Is(err, service.ErrInvalidCredentials):
+		return jsonError(http.StatusUnauthorized, "invalid email or password")
+	case errors.Is(err, service.ErrUserNotActive):
+		return jsonError(http.StatusForbidden, "account is locked")
+	default:
+		return jsonError(http.StatusServiceUnavailable, "service unavailable, please try again")
+	}
+}
+
+func jsonError(status int, message string) protosource.Response {
+	body, _ := json.Marshal(map[string]string{"error": message})
+	return protosource.Response{
+		StatusCode: status,
+		Body:       string(body),
+		Headers:    map[string]string{"Content-Type": "application/json"},
+	}
+}
+
+// reqHost extracts the host from the request, checking common header casings.
+func reqHost(req protosource.Request) string {
+	if h := req.Headers["host"]; h != "" {
+		return h
+	}
+	return req.Headers["Host"]
+}
+
+// isSecure returns true if the request arrived over HTTPS, as indicated
+// by the X-Forwarded-Proto header set by API Gateway / load balancers.
+func isSecure(req protosource.Request) bool {
+	proto := req.Headers["x-forwarded-proto"]
+	if proto == "" {
+		proto = req.Headers["X-Forwarded-Proto"]
+	}
+	return proto == "https"
+}
+
+// parentDomain derives the cookie domain from a Host header value using
+// the public suffix list to find the registrable domain (eTLD+1).
+//
+//	auth.drhayt.com      -> .drhayt.com
+//	drhayt.com           -> .drhayt.com
+//	auth.example.co.uk   -> .example.co.uk
+//	localhost:8080       -> ""
+//	[::1]:8080           -> ""
+func parentDomain(host string) string {
+	h, _, err := net.SplitHostPort(host)
+	if err != nil {
+		h = host // no port
+	}
+
+	// Trim IPv6 brackets (SplitHostPort handles this, but the
+	// fallback path might not).
+	if len(h) > 0 && h[0] == '[' {
+		h = h[1:]
+		if i := len(h) - 1; i >= 0 && h[i] == ']' {
+			h = h[:i]
+		}
+	}
+
 	if net.ParseIP(h) != nil {
 		return ""
 	}
 
-	parts := strings.Split(h, ".")
-	if len(parts) < 2 {
-		return "" // localhost or single-label
+	etld1, err := publicsuffix.EffectiveTLDPlusOne(h)
+	if err != nil {
+		return "" // localhost, single-label, or invalid
 	}
 
-	// For "drhayt.com" (2 parts) -> ".drhayt.com"
-	// For "auth.drhayt.com" (3+ parts) -> ".drhayt.com"
-	return "." + strings.Join(parts[len(parts)-2:], ".")
+	return "." + etld1
 }

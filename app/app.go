@@ -109,7 +109,7 @@ func Run(ctx context.Context, cfg *Config) (*App, error) {
 	checker := service.NewChecker(bundle.TokenRepo, bundle.UserRepo, bundle.RoleRepo)
 	svc := service.NewService(loginer, checker)
 
-	lp := loginpage.New(cfg.IssuerID)
+	lp := loginpage.New(cfg.IssuerID, loginer)
 	router := protosource.NewRouter(svc, lp)
 	handler := httpstandard.WrapRouter(router, func(*http.Request) string { return "" })
 
