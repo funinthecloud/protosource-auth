@@ -138,6 +138,10 @@ func TestIsSecure(t *testing.T) {
 	}{
 		{"https lowercase", map[string]string{"x-forwarded-proto": "https"}, true},
 		{"https titlecase", map[string]string{"X-Forwarded-Proto": "https"}, true},
+		{"https uppercase", map[string]string{"x-forwarded-proto": "HTTPS"}, true},
+		{"comma separated https first", map[string]string{"x-forwarded-proto": "https,http"}, true},
+		{"comma separated with spaces", map[string]string{"x-forwarded-proto": "https , http"}, true},
+		{"comma separated http first", map[string]string{"x-forwarded-proto": "http,https"}, false},
 		{"http", map[string]string{"x-forwarded-proto": "http"}, false},
 		{"missing", map[string]string{}, false},
 	}
@@ -295,21 +299,31 @@ func TestHandleLoginExpiredToken(t *testing.T) {
 	tokenRepo := tokenv1.NewRepository(memorystore.New(0), serializer)
 	keyRepo := keyv1.NewRepository(memorystore.New(0), serializer)
 
-	hash, _ := credentials.Hash("testpass")
-	userRepo.Apply(ctx, &userv1.Create{
+	hash, err := credentials.Hash("testpass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := userRepo.Apply(ctx, &userv1.Create{
 		Id: "user-1", Actor: "test",
 		Email: "test@example.com", PasswordHash: hash,
-	})
-	issuerRepo.Apply(ctx, &issuerv1.Register{
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := issuerRepo.Apply(ctx, &issuerv1.Register{
 		Id: "default", Actor: "test",
 		Iss: "https://test.example.com", DisplayName: "test",
 		Kind: issuerv1.Kind_KIND_SELF, DefaultAlgorithm: ed25519signer.Algorithm,
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 	dir := service.NewMapDirectory()
 	dir.Add("test@example.com", "user-1")
 
 	masterKey := make([]byte, 32)
-	provider, _ := local.New(masterKey)
+	provider, err := local.New(masterKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 	resolver := keys.NewResolver(keyRepo, provider, "test-master", map[string]signers.Signer{
 		ed25519signer.Algorithm: ed25519signer.Signer{},
 	})

@@ -58,6 +58,26 @@ export PROTOSOURCE_AUTH_BOOTSTRAP_PASSWORD="hunter2"
 go run ./cmd/protosource-auth      # :8080
 ```
 
+### Login page local dev
+
+The login page (`GET /`) requires HTTPS (it refuses `POST /` without `X-Forwarded-Proto: https`). To test the full browser flow locally, use a reverse proxy with a self-signed cert, or add hosts file aliases and use `mkcert`:
+
+```bash
+# /etc/hosts — point subdomains at loopback
+127.0.0.1  auth.local.dev  todoapp.local.dev
+
+# Generate certs (one-time)
+mkcert -install
+mkcert auth.local.dev todoapp.local.dev
+
+# Run behind caddy, nginx, or similar with the certs
+# Then visit https://auth.local.dev/
+```
+
+This gives you real subdomain cookie scoping (`.local.dev`) so the shadow cookie flows between `auth.local.dev` and `todoapp.local.dev` exactly as it does in production.
+
+For API-only testing (curl), bypass the login page and POST to `/login` directly — no HTTPS requirement on that endpoint.
+
 See `README.md` for the DynamoDB Local flow and curl examples for `/login` + `/authz/check`.
 
 ## mgr CLI

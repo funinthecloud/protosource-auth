@@ -11,6 +11,7 @@ import (
 	"html/template"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"golang.org/x/net/publicsuffix"
@@ -143,12 +144,21 @@ func reqHost(req protosource.Request) string {
 
 // isSecure returns true if the request arrived over HTTPS, as indicated
 // by the X-Forwarded-Proto header set by API Gateway / load balancers.
+// Handles comma-separated values from chained proxies (e.g. "https,http")
+// and case-insensitive comparison.
 func isSecure(req protosource.Request) bool {
 	proto := req.Headers["x-forwarded-proto"]
 	if proto == "" {
 		proto = req.Headers["X-Forwarded-Proto"]
 	}
-	return proto == "https"
+	if proto == "" {
+		return false
+	}
+	// Take the first value (leftmost proxy = client-facing hop).
+	if i := strings.IndexByte(proto, ','); i != -1 {
+		proto = proto[:i]
+	}
+	return strings.EqualFold(strings.TrimSpace(proto), "https")
 }
 
 // parentDomain derives the cookie domain from a Host header value using
