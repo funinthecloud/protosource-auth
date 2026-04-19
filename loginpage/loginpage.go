@@ -8,7 +8,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"html/template"
 	"net"
 	"net/http"
@@ -33,8 +32,11 @@ type Page struct {
 }
 
 // New returns a Page that serves the login form and handles
-// authentication via the provided Loginer.
+// authentication via the provided Loginer. Panics if loginer is nil.
 func New(issuerID string, loginer *service.Loginer) *Page {
+	if loginer == nil {
+		panic("loginpage.New: loginer must not be nil")
+	}
 	return &Page{issuerID: issuerID, loginer: loginer}
 }
 
@@ -66,6 +68,10 @@ type loginRequest struct {
 }
 
 func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protosource.Response {
+	if !isSecure(req) {
+		return jsonError(http.StatusForbidden, "HTTPS is required")
+	}
+
 	var in loginRequest
 	if err := json.Unmarshal([]byte(req.Body), &in); err != nil || in.Email == "" || in.Password == "" {
 		return jsonError(http.StatusBadRequest, "email and password are required")
@@ -80,16 +86,20 @@ func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protoso
 		return mapLoginError(err)
 	}
 
-	host := reqHost(req)
-	domain := parentDomain(host)
-	maxAge := result.ExpiresAt - time.Now().Unix()
-
-	cookie := fmt.Sprintf("shadow=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d", result.ShadowToken, maxAge)
-	if domain != "" {
-		cookie += "; Domain=" + domain
+	maxAge := int(time.Until(time.Unix(result.ExpiresAt, 0)).Seconds())
+	if maxAge <= 0 {
+		return jsonError(http.StatusServiceUnavailable, "token already expired")
 	}
-	if isSecure(req) {
-		cookie += "; Secure"
+
+	c := &http.Cookie{
+		Name:     "shadow",
+		Value:    result.ShadowToken,
+		Path:     "/",
+		Domain:   parentDomain(reqHost(req)),
+		MaxAge:   maxAge,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
 	}
 
 	body, _ := json.Marshal(map[string]bool{"ok": true})
@@ -98,7 +108,7 @@ func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protoso
 		Body:       string(body),
 		Headers: map[string]string{
 			"Content-Type": "application/json",
-			"Set-Cookie":   cookie,
+			"Set-Cookie":   c.String(),
 		},
 	}
 }
