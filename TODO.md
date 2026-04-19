@@ -9,7 +9,7 @@
 
 ## KeyProvider ecosystem
 
-- [ ] **AWS KMS provider.** `keyproviders/awskms` using `GenerateDataKey` + `Decrypt`. First cloud provider.
+- [x] **AWS KMS provider.** `keyproviders/awskms` using direct KMS Encrypt/Decrypt (no envelope — signing keys are under 4KB).
 - [ ] **GCP Cloud KMS provider.** `keyproviders/gcpkms` — no `GenerateDataKey` equivalent, use `Encrypt(random)` to produce the wrapped blob.
 - [ ] **Azure Key Vault provider.** `keyproviders/azurekv` using wrap/unwrap key operations.
 - [ ] **OCI Vault provider.** `keyproviders/ocivault`.
@@ -29,15 +29,21 @@
 - [ ] **MFA enrollment.** TOTP first (per-user secret on the User aggregate); WebAuthn later.
 - [ ] **Device grants / session management.** List active tokens per user + mass-revoke.
 
+## Browser / cookie auth
+
+- [ ] **Browser login page.** HTML form or SPA that posts credentials to `/login` and sets a `shadow` cookie with the returned token. Needed for browser-based consumers that can't set Authorization headers on every request.
+- [ ] **Cookie-based token source in downstream authorizers.** The `httpauthz` and `directauthz` authorizers already support `Cookie(name)` token source — consuming apps need to wire `WithTokenSource(httpauthz.Chain(httpauthz.Cookie("shadow"), httpauthz.AuthorizationHeader()))` so both cookies and Bearer headers work.
+
 ## Deployment
 
-- [ ] **Lambda deployment target** for the auth service itself. Mirrors `todoapp/backend-lambda` — wrap `app.Run`'s handler in `adapters/awslambda.WrapRouter` and ship as a SAM/CloudFormation stack.
-- [ ] **CloudFormation template** for the events + aggregates tables. `app.EnsureTables` does this for tests and local dev; production deploys should use CF.
+- [x] **Lambda deployment target.** `cmd/protosource-auth-lambda` with wire-based DI, `awslambda.WrapRouter`, SAM template at `template.yaml`.
+- [x] **Table creation via framework.** Uses `dynamodbstore.EnsureTables` from protosource v0.1.5 (deletion protection + PITR enabled).
 - [ ] **Health check endpoint.** `GET /healthz` that pings the KeyProvider, the default Issuer's current signing key, and DynamoDB (DescribeTable). Useful for load balancer probes.
 
 ## Observability
 
-- [ ] **Structured logging.** Currently `log.Printf`; switch to `log/slog` with per-request trace ids.
+- [x] **Structured logging for error paths.** `LOGIN_UNAVAILABLE`, `LOGIN_ISSUER_NOT_ACTIVE`, and `CHECK_UNAVAILABLE` log with `slog.ErrorContext` including email, issuer_id, required_function, and full error chain.
+- [ ] **Structured logging everywhere.** Remaining `log.Printf` calls should migrate to `log/slog` with per-request trace ids.
 - [ ] **Metrics.** Login success/fail rate, `/authz/check` p50/p99, cache hit rate, KMS call counts per day. Prometheus endpoint or CloudWatch Embedded Metrics.
 - [ ] **Audit log.** Every Token.Issue / Token.Revoke / User.Lock / Role mutation should be derivable from the event store already, but a SIEM-friendly emission path (Kinesis/EventBridge) would simplify integrations.
 
@@ -47,3 +53,10 @@
 - [x] End-to-end integration with [todoapp](https://github.com/funinthecloud/todoapp) verified against DynamoDB Local
 - [x] Bumped to protosource v0.1.3 — picks up the `authz.UserIDFromContext` precedence in generated handlers + 503 mapping for transient authorizer errors
 - [x] Own `/login` + `/authz/check` error mappers aligned: unknown errors return 503 instead of 500
+- [x] Lambda deployment with wire-based DI (`cmd/protosource-auth-lambda`, SAM template, API Gateway)
+- [x] AWS KMS key provider (`keyproviders/awskms`) — direct Encrypt/Decrypt, no envelope
+- [x] Direct in-process authorizer (`authz/directauthz`) wrapping `service.Checker` — no HTTP round-trip for co-deployed Lambdas
+- [x] Moved MasterKey validation out of Normalize so mgr CLI works without a master key
+- [x] Table creation delegated to `dynamodbstore.EnsureTables` from protosource v0.1.5 (deletion protection + PITR)
+- [x] slog error logging on LOGIN_UNAVAILABLE / CHECK_UNAVAILABLE paths
+- [x] Bumped to protosource v0.1.5
