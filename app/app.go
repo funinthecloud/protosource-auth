@@ -21,6 +21,7 @@ import (
 
 	"github.com/funinthecloud/protosource-auth/keyproviders/local"
 	"github.com/funinthecloud/protosource-auth/keys"
+	"github.com/funinthecloud/protosource-auth/loginpage"
 	"github.com/funinthecloud/protosource-auth/service"
 	"github.com/funinthecloud/protosource-auth/signers"
 	"github.com/funinthecloud/protosource-auth/signers/ed25519signer"
@@ -108,7 +109,8 @@ func Run(ctx context.Context, cfg *Config) (*App, error) {
 	checker := service.NewChecker(bundle.TokenRepo, bundle.UserRepo, bundle.RoleRepo)
 	svc := service.NewService(loginer, checker)
 
-	router := protosource.NewRouter(svc)
+	lp := loginpage.New(cfg.IssuerID)
+	router := protosource.NewRouter(svc, lp)
 	handler := httpstandard.WrapRouter(router, func(*http.Request) string { return "" })
 
 	app := &App{
