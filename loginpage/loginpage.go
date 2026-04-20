@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"html/template"
+	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -73,6 +75,10 @@ func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protoso
 		return jsonError(http.StatusForbidden, "HTTPS is required")
 	}
 
+	if !isSameOrigin(req) {
+		return jsonError(http.StatusForbidden, "cross-origin request rejected")
+	}
+
 	var in loginRequest
 	if err := json.Unmarshal([]byte(req.Body), &in); err != nil || in.Email == "" || in.Password == "" {
 		return jsonError(http.StatusBadRequest, "email and password are required")
@@ -84,7 +90,7 @@ func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protoso
 		IssuerID: p.issuerID,
 	})
 	if err != nil {
-		return mapLoginError(err)
+		return mapLoginError(ctx, err, in.Email)
 	}
 
 	maxAge := int(time.Until(time.Unix(result.ExpiresAt, 0)).Seconds())
@@ -114,13 +120,25 @@ func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protoso
 	}
 }
 
-func mapLoginError(err error) protosource.Response {
+func mapLoginError(ctx context.Context, err error, email string) protosource.Response {
 	switch {
 	case errors.Is(err, service.ErrInvalidCredentials):
 		return jsonError(http.StatusUnauthorized, "invalid email or password")
 	case errors.Is(err, service.ErrUserNotActive):
 		return jsonError(http.StatusForbidden, "account is locked")
+	case errors.Is(err, service.ErrIssuerNotActive):
+		slog.ErrorContext(ctx, "loginpage: issuer not active",
+			"code", "LOGINPAGE_ISSUER_NOT_ACTIVE",
+			"email", email,
+			"error", err,
+		)
+		return jsonError(http.StatusServiceUnavailable, "service unavailable, please try again")
 	default:
+		slog.ErrorContext(ctx, "loginpage: unexpected error",
+			"code", "LOGINPAGE_UNAVAILABLE",
+			"email", email,
+			"error", err,
+		)
 		return jsonError(http.StatusServiceUnavailable, "service unavailable, please try again")
 	}
 }
@@ -140,6 +158,69 @@ func reqHost(req protosource.Request) string {
 		return h
 	}
 	return req.Headers["Host"]
+}
+
+// reqHeader returns the first non-empty value for the given header,
+// trying lowercase then title-case.
+func reqHeader(req protosource.Request, name string) string {
+	if v := req.Headers[strings.ToLower(name)]; v != "" {
+		return v
+	}
+	return req.Headers[name]
+}
+
+// isSameOrigin validates that the request originates from the same
+// registrable domain as the Host header. This prevents login CSRF
+// (session swapping) by rejecting POSTs from third-party sites.
+//
+// Checks the Origin header first (preferred, set by browsers on
+// same-origin and cross-origin requests), then falls back to Referer.
+// If neither header is present, the request is rejected.
+func isSameOrigin(req protosource.Request) bool {
+	host := reqHost(req)
+	hostDomain := registrableDomain(host)
+	if hostDomain == "" {
+		return false
+	}
+
+	// Prefer Origin (always present on POSTs from modern browsers).
+	if origin := reqHeader(req, "Origin"); origin != "" {
+		return matchesRegistrableDomain(origin, hostDomain)
+	}
+
+	// Fall back to Referer.
+	if referer := reqHeader(req, "Referer"); referer != "" {
+		return matchesRegistrableDomain(referer, hostDomain)
+	}
+
+	return false
+}
+
+// matchesRegistrableDomain checks whether a URL string's host shares
+// the same registrable domain as the expected domain.
+func matchesRegistrableDomain(rawURL, expectedDomain string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	return registrableDomain(u.Host) == expectedDomain
+}
+
+// registrableDomain extracts the eTLD+1 from a host (with optional
+// port). Returns "" for IPs, localhost, and unparseable hosts.
+func registrableDomain(host string) string {
+	h, _, err := net.SplitHostPort(host)
+	if err != nil {
+		h = host
+	}
+	if net.ParseIP(h) != nil {
+		return ""
+	}
+	etld1, err := publicsuffix.EffectiveTLDPlusOne(h)
+	if err != nil {
+		return ""
+	}
+	return etld1
 }
 
 // isSecure returns true if the request arrived over HTTPS, as indicated

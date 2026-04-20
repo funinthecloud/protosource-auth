@@ -155,6 +155,43 @@ func TestIsSecure(t *testing.T) {
 	}
 }
 
+// -- isSameOrigin tests --
+
+func TestIsSameOrigin(t *testing.T) {
+	tests := []struct {
+		name    string
+		host    string
+		origin  string
+		referer string
+		want    bool
+	}{
+		{"same host origin", "auth.drhayt.com", "https://auth.drhayt.com", "", true},
+		{"sibling subdomain origin", "auth.drhayt.com", "https://todoapp.drhayt.com", "", true},
+		{"bare domain origin", "auth.drhayt.com", "https://drhayt.com", "", true},
+		{"cross-domain origin", "auth.drhayt.com", "https://evil.com", "", false},
+		{"no origin uses referer", "auth.drhayt.com", "", "https://todoapp.drhayt.com/page", true},
+		{"cross-domain referer", "auth.drhayt.com", "", "https://evil.com/page", false},
+		{"no origin or referer", "auth.drhayt.com", "", "", false},
+		{"co.uk same domain", "auth.example.co.uk", "https://app.example.co.uk", "", true},
+		{"co.uk cross domain", "auth.example.co.uk", "https://other.co.uk", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			headers := map[string]string{"host": tt.host}
+			if tt.origin != "" {
+				headers["origin"] = tt.origin
+			}
+			if tt.referer != "" {
+				headers["referer"] = tt.referer
+			}
+			req := protosource.Request{Headers: headers}
+			if got := isSameOrigin(req); got != tt.want {
+				t.Errorf("isSameOrigin() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // -- New nil panic test --
 
 func TestNewPanicsOnNilLoginer(t *testing.T) {
@@ -175,9 +212,10 @@ func TestNewPanicsOnNilLoginer(t *testing.T) {
 
 func secureHeaders(host string) map[string]string {
 	return map[string]string{
-		"host":               host,
-		"x-forwarded-proto":  "https",
-		"Content-Type":       "application/json",
+		"host":              host,
+		"x-forwarded-proto": "https",
+		"origin":            "https://" + host,
+		"Content-Type":      "application/json",
 	}
 }
 
@@ -192,6 +230,24 @@ func TestHandleLoginRequiresHTTPS(t *testing.T) {
 	}
 	if !strings.Contains(resp.Body, "HTTPS is required") {
 		t.Errorf("body = %q, want HTTPS error", resp.Body)
+	}
+}
+
+func TestHandleLoginRejectsCrossOrigin(t *testing.T) {
+	env := newTestEnv(t)
+	resp := env.page.handleLogin(context.Background(), protosource.Request{
+		Headers: map[string]string{
+			"host":              "auth.drhayt.com",
+			"x-forwarded-proto": "https",
+			"origin":            "https://evil.com",
+		},
+		Body: `{"email":"test@example.com","password":"testpass"}`,
+	})
+	if resp.StatusCode != 403 {
+		t.Fatalf("status = %d, want 403", resp.StatusCode)
+	}
+	if !strings.Contains(resp.Body, "cross-origin") {
+		t.Errorf("body = %q, want cross-origin error", resp.Body)
 	}
 }
 
