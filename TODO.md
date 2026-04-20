@@ -31,8 +31,9 @@
 
 ## Browser / cookie auth
 
-- [ ] **Browser login page.** HTML form or SPA that posts credentials to `/login` and sets a `shadow` cookie with the returned token. Needed for browser-based consumers that can't set Authorization headers on every request.
+- [x] **Browser login page.** `loginpage/` package serves `GET /` (HTML form) and `POST /` (authenticates + sets `shadow` cookie server-side). Cookie domain auto-derived from Host via publicsuffix eTLD+1. CSRF protection via Origin/Referer same-domain check. Requires HTTPS. Deployed at `auth.drhayt.com`.
 - [ ] **Cookie-based token source in downstream authorizers.** The `httpauthz` and `directauthz` authorizers already support `Cookie(name)` token source — consuming apps need to wire `WithTokenSource(httpauthz.Chain(httpauthz.Cookie("shadow"), httpauthz.AuthorizationHeader()))` so both cookies and Bearer headers work.
+- [ ] **Logout endpoint.** `POST /logout` or `DELETE /` that revokes the shadow token and clears the cookie (Max-Age=0). Currently users must wait for token expiry.
 
 ## Deployment
 
@@ -60,3 +61,5 @@
 - [x] Table creation delegated to `dynamodbstore.EnsureTables` from protosource v0.1.5 (deletion protection + PITR)
 - [x] slog error logging on LOGIN_UNAVAILABLE / CHECK_UNAVAILABLE paths
 - [x] Bumped to protosource v0.1.5
+- [x] Browser login page (`loginpage/`) with server-side cookie, CSRF protection, publicsuffix domain derivation, HTTPS enforcement
+- [x] SAM template updated with root path (`/`) route for login page

@@ -26,6 +26,7 @@ Five, all defined as protosource protos and code-generated under `gen/auth/`:
 - **`keyproviders/`** — `KeyProvider` interface for envelope-encryption of signing keys. `keyproviders/local` uses XChaCha20-Poly1305 with a 32-byte master key from env. `keyproviders/awskms` uses direct AWS KMS Encrypt/Decrypt (no envelope — signing keys are under 4KB). GCP KMS / Azure / OCI planned.
 - **`keys/`** — `Resolver` for lazy per-day key materialization. First call for an (issuer, algorithm, today) generates a keypair, wraps via the KeyProvider, persists the Key aggregate, and caches the plaintext in memory. Race-safe via deterministic kid + `ErrAlreadyCreated` fallback. `VerificationKey` returns a stripped clone with no private material.
 - **`service/`** — hand-written `Loginer` and `Checker` + `Service` HTTP adapter registering `POST /login` and `POST /authz/check`. Orchestrates the generated aggregates that cannot be a single protosource command (credential verify spans User + Issuer + Key + Token). Includes `MapDirectory` (in-memory) and `functionCache` (TTL-bounded user→function-set).
+- **`loginpage/`** — browser login page served at `GET /` + `POST /` handler that calls Loginer and sets a `shadow` cookie (HttpOnly, Secure, SameSite=Lax) on the parent domain (eTLD+1 via `publicsuffix`). CSRF protection via Origin/Referer validation. Cookie domain auto-derived from Host header. Requires HTTPS.
 - **`authz/httpauthz/`** — HTTP-based `authz.Authorizer` for downstream consumers. POSTs to `/authz/check` with a shadow token and required function, enriches `ctx` with `authz.WithUserID` / `authz.WithJWT` on success. Pluggable `TokenSource` (AuthorizationHeader, Cookie, Chain).
 - **`authz/directauthz/`** — in-process `authz.Authorizer` that wraps `*service.Checker` directly against the aggregate repos. No HTTP round-trip — for Lambdas sharing the same DynamoDB tables. Reuses `httpauthz.TokenSource`.
 - **`app/`** — `Config` + `Run(ctx, cfg) → *App` assembling everything into an `http.Handler`. `Backend` dispatch for memory or DynamoDB. Startup bootstrap. Public `NewBundle`, `Bootstrap`, `RegisterDefaultIssuer` for the mgr CLI. Table creation uses `dynamodbstore.EnsureTables` from protosource.
@@ -99,7 +100,7 @@ sam build && sam deploy --guided   # first time
 sam build && sam deploy            # subsequent
 ```
 
-`template.yaml` deploys `provided.al2023` / `arm64` behind API Gateway `{proxy+}`. Config via `samconfig.toml`:
+`template.yaml` deploys `provided.al2023` / `arm64` behind API Gateway (`/` for login page + `/{proxy+}` for API). Config via `samconfig.toml`:
 - `KmsKeyArn` — full ARN of the KMS key for signing key encryption (not an alias)
 - `EventsTableName` / `AggregatesTableName` — default `events` / `aggregates`
 - `DomainName` / `CertificateArn` / `HostedZoneId` — custom domain + Route53
