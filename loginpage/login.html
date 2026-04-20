@@ -95,6 +95,7 @@
 </div>
 <script>
 (function() {
+  var redirect = "{{.Redirect}}";
   var referrer = document.referrer;
   var form = document.getElementById("loginForm");
   var errEl = document.getElementById("error");
@@ -123,7 +124,9 @@
       if (!result.ok) {
         throw new Error(result.data.error || "Sign in failed.");
       }
-      if (referrer && referrer !== location.href) {
+      if (redirect) {
+        location.href = redirect;
+      } else if (referrer && referrer !== location.href) {
         location.href = referrer;
       } else {
         document.querySelector(".card").innerHTML = '<div class="success">Signed in successfully.</div>';
