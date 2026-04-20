@@ -13,7 +13,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.50.4
 	github.com/funinthecloud/protosource v0.1.5
 	github.com/goforj/wire v1.1.0
-	golang.org/x/crypto v0.49.0
+	golang.org/x/crypto v0.50.0
+	golang.org/x/net v0.53.0
 	google.golang.org/protobuf v1.36.11
 )
 
@@ -41,8 +42,8 @@ require (
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
 	golang.org/x/mod v0.34.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260319201613-d00831a3d3e7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260319201613-d00831a3d3e7 // indirect

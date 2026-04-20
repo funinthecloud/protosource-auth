@@ -54,6 +54,7 @@ func InitializeRouter(
 		provideLoginer,
 		provideChecker,
 		provideService,
+		providePage,
 		provideRouter,
 	)
 	return nil, nil

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign In</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 2rem;
+    width: 100%;
+    max-width: 380px;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    color: #333;
+  }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    color: #555;
+    margin-bottom: 0.3rem;
+  }
+  input[type="email"],
+  input[type="password"] {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+  }
+  input:focus {
+    outline: none;
+    border-color: #4a90d9;
+    box-shadow: 0 0 0 2px rgba(74,144,217,0.2);
+  }
+  button {
+    width: 100%;
+    padding: 0.7rem;
+    background: #4a90d9;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  button:hover { background: #3a7bc8; }
+  button:disabled { background: #999; cursor: not-allowed; }
+  .error {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    border-radius: 4px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    display: none;
+  }
+  .success {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+    border-radius: 4px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.85rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Sign In</h1>
+  <div id="error" class="error"></div>
+  <form id="loginForm">
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" required autofocus>
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required>
+    <button type="submit" id="submit">Sign In</button>
+  </form>
+</div>
+<script>
+(function() {
+  var referrer = document.referrer;
+  var form = document.getElementById("loginForm");
+  var errEl = document.getElementById("error");
+  var btn = document.getElementById("submit");
+
+  form.addEventListener("submit", function(e) {
+    e.preventDefault();
+    errEl.style.display = "none";
+    btn.disabled = true;
+    btn.textContent = "Signing in...";
+
+    fetch("/", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        email: document.getElementById("email").value,
+        password: document.getElementById("password").value
+      })
+    })
+    .then(function(resp) {
+      return resp.json().then(function(data) {
+        return {ok: resp.ok, status: resp.status, data: data};
+      });
+    })
+    .then(function(result) {
+      if (!result.ok) {
+        throw new Error(result.data.error || "Sign in failed.");
+      }
+      if (referrer && referrer !== location.href) {
+        location.href = referrer;
+      } else {
+        document.querySelector(".card").innerHTML = '<div class="success">Signed in successfully.</div>';
+      }
+    })
+    .catch(function(err) {
+      errEl.textContent = err.message;
+      errEl.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Sign In";
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -42,6 +42,7 @@ func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsT
 	rolev1dynamodbRepository := rolev1dynamodb.ProvideRepository(dynamoDBStore, serializer)
 	checker := provideChecker(tokenv1dynamodbRepository, repository, rolev1dynamodbRepository)
 	service := provideService(loginer, checker)
-	router := provideRouter(service)
+	page := providePage(loginer)
+	router := provideRouter(service, page)
 	return router, nil
 }
