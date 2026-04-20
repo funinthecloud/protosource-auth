@@ -41,7 +41,7 @@ message Key {
   };
   string id              = 1;
   int64  version         = 2;
-  int64  create_at       = 3;
+  int64  create_at       = 3 [(funinthecloud.protosource.options.v1.protosource_opaque_field) = { attributes: [ { type: OPAQUE_KEY_TYPE_GSI2SK } ] }];
   string create_by       = 4;
   int64  modify_at       = 5;
   string modify_by       = 6;
@@ -54,7 +54,7 @@ message Key {
   int64  effective_at    = 13;
   int64  signing_until   = 14;
   int64  verify_until    = 15;
-  State  state           = 16;
+  State  state           = 16 [(funinthecloud.protosource.options.v1.protosource_opaque_field) = { attributes: [ { type: OPAQUE_KEY_TYPE_GSI2PK } ] }];
 }
 
 message KeyList {

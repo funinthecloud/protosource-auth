@@ -582,11 +582,12 @@ var File_auth_token_v1_token_proto protoreflect.FileDescriptor
 
 const file_auth_token_v1_token_proto_rawDesc = "" +
 	"\n" +
-	"\x19auth/token/v1/token.proto\x12\rauth.token.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\xe0\x02\n" +
+	"\x19auth/token/v1/token.proto\x12\rauth.token.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\xf2\x02\n" +
 	"\x05Token\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x1b\n" +
-	"\tcreate_at\x18\x03 \x01(\x03R\bcreateAt\x12\x1b\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12$\n" +
+	"\tcreate_at\x18\x03 \x01(\x03B\a\x82Q\x04\n" +
+	"\x02\b\x06R\bcreateAt\x12\x1b\n" +
 	"\tcreate_by\x18\x04 \x01(\tR\bcreateBy\x12\x1b\n" +
 	"\tmodify_at\x18\x05 \x01(\x03R\bmodifyAt\x12\x1b\n" +
 	"\tmodify_by\x18\x06 \x01(\tR\bmodifyBy\x12\x17\n" +
@@ -596,8 +597,9 @@ const file_auth_token_v1_token_proto_rawDesc = "" +
 	"\tissued_at\x18\n" +
 	" \x01(\x03R\bissuedAt\x12\x1d\n" +
 	"\n" +
-	"expires_at\x18\v \x01(\x03R\texpiresAt\x12*\n" +
-	"\x05state\x18\f \x01(\x0e2\x14.auth.token.v1.StateR\x05state:\t\x8aQ\x06\x1a\x04\x10\xa0\x99\x02\"7\n" +
+	"expires_at\x18\v \x01(\x03R\texpiresAt\x123\n" +
+	"\x05state\x18\f \x01(\x0e2\x14.auth.token.v1.StateB\a\x82Q\x04\n" +
+	"\x02\b\x05R\x05state:\t\x8aQ\x06\x1a\x04\x10\xa0\x99\x02\"7\n" +
 	"\tTokenList\x12*\n" +
 	"\x05items\x18\x01 \x03(\v2\x14.auth.token.v1.TokenR\x05items\"\xdd\x01\n" +
 	"\x05Issue\x12\x0e\n" +

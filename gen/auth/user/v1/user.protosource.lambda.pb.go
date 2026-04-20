@@ -71,6 +71,7 @@ func (h *Handler) RegisterRoutes(router *protosource.Router) {
 	router.Handle("GET", "auth/user/v1/{id}/history", h.HandleHistory)
 
 	router.Handle("GET", "auth/user/v1/query/by-email", h.HandleQueryByEmail)
+	router.Handle("GET", "auth/user/v1/query/by-state", h.HandleQueryByState)
 
 }
 
@@ -557,6 +558,72 @@ func (h *Handler) HandleQueryByEmail(ctx context.Context, request protosource.Re
 	}
 
 	results, err := h.client.SelectUserByEmailWithCreateAt(ctx, email, op, skVal)
+	if err != nil {
+		return errorResponse(http.StatusInternalServerError, "QUERY_EXEC", "query failed", err)
+	}
+	return queryResponse(request, results)
+
+}
+
+// HandleQueryByState queries GSI2 by partition key with optional sort key condition.
+func (h *Handler) HandleQueryByState(ctx context.Context, request protosource.Request) protosource.Response {
+	stateRaw := request.QueryParameters["state"]
+	if stateRaw == "" {
+		return errorResponse(http.StatusBadRequest, "QUERY_MISSING_PK", "missing required parameter: state", nil)
+	}
+	state, stateErr := parseQueryParamEnum[State](stateRaw)
+	if stateErr != nil {
+		return errorResponse(http.StatusBadRequest, "QUERY_BAD_PARAM", fmt.Sprintf("invalid value for state: %v", stateErr), nil)
+	}
+
+	skOp := request.QueryParameters["sk_op"]
+
+	if skOp == "" {
+		results, err := h.client.SelectUserByState(ctx, state)
+		if err != nil {
+			return errorResponse(http.StatusInternalServerError, "QUERY_EXEC", "query failed", err)
+		}
+		return queryResponse(request, results)
+	}
+
+	op, ok := parseSortOperator(skOp)
+	if !ok {
+		return errorResponse(http.StatusBadRequest, "QUERY_BAD_OP", fmt.Sprintf("invalid sort operator: %s", skOp), nil)
+	}
+
+	create_atRaw := request.QueryParameters["create_at"]
+	if create_atRaw == "" {
+		return errorResponse(http.StatusBadRequest, "QUERY_MISSING_SK", "missing required parameter: create_at", nil)
+	}
+	create_atVal, create_atErr := parseQueryParamInt64(create_atRaw)
+	if create_atErr != nil {
+		return errorResponse(http.StatusBadRequest, "QUERY_BAD_PARAM", fmt.Sprintf("invalid value for create_at: %v", create_atErr), nil)
+	}
+
+	skVal := UserGSI2SK{
+		CreateAt: create_atVal,
+	}
+
+	if op == opaquedata.Between {
+		create_atRaw2 := request.QueryParameters["create_at2"]
+		if create_atRaw2 == "" {
+			return errorResponse(http.StatusBadRequest, "QUERY_MISSING_SK", "missing required parameter: create_at2 (required for between)", nil)
+		}
+		create_atVal2, create_atErr2 := parseQueryParamInt64(create_atRaw2)
+		if create_atErr2 != nil {
+			return errorResponse(http.StatusBadRequest, "QUERY_BAD_PARAM", fmt.Sprintf("invalid value for create_at2: %v", create_atErr2), nil)
+		}
+		skVal2 := UserGSI2SK{
+			CreateAt: create_atVal2,
+		}
+		results, err := h.client.SelectUserByStateWithCreateAt(ctx, state, op, skVal, skVal2)
+		if err != nil {
+			return errorResponse(http.StatusInternalServerError, "QUERY_EXEC", "query failed", err)
+		}
+		return queryResponse(request, results)
+	}
+
+	results, err := h.client.SelectUserByStateWithCreateAt(ctx, state, op, skVal)
 	if err != nil {
 		return errorResponse(http.StatusInternalServerError, "QUERY_EXEC", "query failed", err)
 	}

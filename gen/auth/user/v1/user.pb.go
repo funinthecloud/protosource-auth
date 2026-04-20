@@ -1309,19 +1309,21 @@ var File_auth_user_v1_user_proto protoreflect.FileDescriptor
 
 const file_auth_user_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x17auth/user/v1/user.proto\x12\fauth.user.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\xab\x03\n" +
+	"\x17auth/user/v1/user.proto\x12\fauth.user.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\xb8\x03\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\x03R\aversion\x12$\n" +
-	"\tcreate_at\x18\x03 \x01(\x03B\a\x82Q\x04\n" +
-	"\x02\b\x04R\bcreateAt\x12\x1b\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12(\n" +
+	"\tcreate_at\x18\x03 \x01(\x03B\v\x82Q\b\n" +
+	"\x02\b\x04\n" +
+	"\x02\b\x06R\bcreateAt\x12\x1b\n" +
 	"\tcreate_by\x18\x04 \x01(\tR\bcreateBy\x12\x1b\n" +
 	"\tmodify_at\x18\x05 \x01(\x03R\bmodifyAt\x12\x1b\n" +
 	"\tmodify_by\x18\x06 \x01(\tR\bmodifyBy\x12\x1d\n" +
 	"\x05email\x18\a \x01(\tB\a\x82Q\x04\n" +
 	"\x02\b\x03R\x05email\x12#\n" +
-	"\rpassword_hash\x18\b \x01(\fR\fpasswordHash\x12)\n" +
-	"\x05state\x18\t \x01(\x0e2\x13.auth.user.v1.StateR\x05state\x123\n" +
+	"\rpassword_hash\x18\b \x01(\fR\fpasswordHash\x122\n" +
+	"\x05state\x18\t \x01(\x0e2\x13.auth.user.v1.StateB\a\x82Q\x04\n" +
+	"\x02\b\x05R\x05state\x123\n" +
 	"\x05roles\x18\n" +
 	" \x03(\v2\x1d.auth.user.v1.User.RolesEntryR\x05roles\x1aQ\n" +
 	"\n" +

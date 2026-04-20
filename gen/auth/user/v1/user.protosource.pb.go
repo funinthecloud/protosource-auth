@@ -178,8 +178,22 @@ func (m *User) GSI1SK() string {
 	fields += fmt.Sprintf("#create_at#%v", m.GetCreateAt())
 	return fmt.Sprintf("auth_user_v1#user%s", fields)
 }
-func (m *User) GSI2PK() string  { return "NA" }
-func (m *User) GSI2SK() string  { return "NA" }
+func (m *User) GSI2PK() string {
+	if m == nil {
+		return ""
+	}
+	var fields string
+	fields += fmt.Sprintf("#state#%v", m.GetState())
+	return fmt.Sprintf("auth_user_v1#user%s", fields)
+}
+func (m *User) GSI2SK() string {
+	if m == nil {
+		return ""
+	}
+	var fields string
+	fields += fmt.Sprintf("#create_at#%v", m.GetCreateAt())
+	return fmt.Sprintf("auth_user_v1#user%s", fields)
+}
 func (m *User) GSI3PK() string  { return "NA" }
 func (m *User) GSI3SK() string  { return "NA" }
 func (m *User) GSI4PK() string  { return "NA" }
@@ -230,6 +244,16 @@ type UserGSI1SK struct {
 }
 
 func (v UserGSI1SK) String() string {
+	var fields string
+	fields += fmt.Sprintf("#create_at#%v", v.CreateAt)
+	return fmt.Sprintf("auth_user_v1#user%s", fields)
+}
+
+type UserGSI2SK struct {
+	CreateAt int64
+}
+
+func (v UserGSI2SK) String() string {
 	var fields string
 	fields += fmt.Sprintf("#create_at#%v", v.CreateAt)
 	return fmt.Sprintf("auth_user_v1#user%s", fields)
@@ -315,6 +339,46 @@ func (c *UserClient) SelectUserByEmailWithCreateAt(ctx context.Context, email st
 	results, err := c.store.Query(ctx, "gsi1pk", pkValue, "gsi1sk", sort, opaquedata.WithGSIIndex(1))
 	if err != nil {
 		return nil, fmt.Errorf("UserClient.SelectUserByEmailWithCreateAt: %w", err)
+	}
+	return rehydrateUser(results)
+}
+
+// SelectUserByState queries GSI2 by partition key.
+func (c *UserClient) SelectUserByState(ctx context.Context, state State) ([]*User, error) {
+	pk := &User{
+		State: state,
+	}
+	pkValue := pk.GSI2PK()
+	results, err := c.store.Query(ctx, "gsi2pk", pkValue, "gsi2sk", nil, opaquedata.WithGSIIndex(2))
+	if err != nil {
+		return nil, fmt.Errorf("UserClient.SelectUserByState: %w", err)
+	}
+	return rehydrateUser(results)
+}
+
+// SelectUserByStateWithCreateAt queries GSI2 with a sort key condition.
+func (c *UserClient) SelectUserByStateWithCreateAt(ctx context.Context, state State, op opaquedata.SortOperator, vals ...UserGSI2SK) ([]*User, error) {
+	if op == opaquedata.Between {
+		if len(vals) != 2 {
+			return nil, fmt.Errorf("UserClient.SelectUserByStateWithCreateAt: Between requires exactly 2 values, got %d", len(vals))
+		}
+	} else if len(vals) != 1 {
+		return nil, fmt.Errorf("UserClient.SelectUserByStateWithCreateAt: operator %d requires exactly 1 value, got %d", op, len(vals))
+	}
+	pk := &User{
+		State: state,
+	}
+	pkValue := pk.GSI2PK()
+	sort := &opaquedata.SortCondition{
+		Operator: op,
+		Value:    vals[0].String(),
+	}
+	if op == opaquedata.Between {
+		sort.Value2 = vals[1].String()
+	}
+	results, err := c.store.Query(ctx, "gsi2pk", pkValue, "gsi2sk", sort, opaquedata.WithGSIIndex(2))
+	if err != nil {
+		return nil, fmt.Errorf("UserClient.SelectUserByStateWithCreateAt: %w", err)
 	}
 	return rehydrateUser(results)
 }

@@ -113,6 +113,51 @@ func (c *HTTPClient) History(ctx context.Context, id string) (*historyv1.History
 	return c.c.History(ctx, routePath, id)
 }
 
+// QueryByState queries by state via GSI2.
+func (c *HTTPClient) QueryByState(ctx context.Context, state State) ([]*Issuer, error) {
+	params := map[string]string{
+		"state": strconv.FormatInt(int64(state), 10),
+	}
+	list := &IssuerList{}
+	if err := c.c.Query(ctx, routePath, "by-state", params, list); err != nil {
+		return nil, err
+	}
+	return list.Items, nil
+}
+
+// QueryByStateWithCreateAt queries with a sort key condition (eq, lt, le, gt, ge, begins_with).
+// For between queries, use QueryByStateBetweenCreateAt instead.
+func (c *HTTPClient) QueryByStateWithCreateAt(ctx context.Context, state State, skOp string, createAt int64) ([]*Issuer, error) {
+	if skOp == "between" {
+		return nil, fmt.Errorf("use QueryByStateBetweenCreateAt for between queries")
+	}
+	params := map[string]string{
+		"state":     strconv.FormatInt(int64(state), 10),
+		"sk_op":     skOp,
+		"create_at": strconv.FormatInt(createAt, 10),
+	}
+	list := &IssuerList{}
+	if err := c.c.Query(ctx, routePath, "by-state", params, list); err != nil {
+		return nil, err
+	}
+	return list.Items, nil
+}
+
+// QueryByStateBetweenCreateAt queries with a between sort key condition (inclusive range).
+func (c *HTTPClient) QueryByStateBetweenCreateAt(ctx context.Context, state State, createAtFrom int64, createAtTo int64) ([]*Issuer, error) {
+	params := map[string]string{
+		"state":      strconv.FormatInt(int64(state), 10),
+		"sk_op":      "between",
+		"create_at":  strconv.FormatInt(createAtFrom, 10),
+		"create_at2": strconv.FormatInt(createAtTo, 10),
+	}
+	list := &IssuerList{}
+	if err := c.c.Query(ctx, routePath, "by-state", params, list); err != nil {
+		return nil, err
+	}
+	return list.Items, nil
+}
+
 // Ensure strconv and fmt are used.
 var _ = strconv.FormatInt
 var _ = fmt.Errorf

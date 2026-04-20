@@ -109,10 +109,24 @@ func (m *Token) PK() string {
 
 func (m *Token) SK() string { return "AGG" }
 
-func (m *Token) GSI1PK() string  { return "NA" }
-func (m *Token) GSI1SK() string  { return "NA" }
-func (m *Token) GSI2PK() string  { return "NA" }
-func (m *Token) GSI2SK() string  { return "NA" }
+func (m *Token) GSI1PK() string { return "NA" }
+func (m *Token) GSI1SK() string { return "NA" }
+func (m *Token) GSI2PK() string {
+	if m == nil {
+		return ""
+	}
+	var fields string
+	fields += fmt.Sprintf("#state#%v", m.GetState())
+	return fmt.Sprintf("auth_token_v1#token%s", fields)
+}
+func (m *Token) GSI2SK() string {
+	if m == nil {
+		return ""
+	}
+	var fields string
+	fields += fmt.Sprintf("#create_at#%v", m.GetCreateAt())
+	return fmt.Sprintf("auth_token_v1#token%s", fields)
+}
 func (m *Token) GSI3PK() string  { return "NA" }
 func (m *Token) GSI3SK() string  { return "NA" }
 func (m *Token) GSI4PK() string  { return "NA" }
@@ -158,6 +172,16 @@ func (m *Token) Hydrate(body []byte) error {
 
 // ── Typed GSI SK value structs for Token ──
 
+type TokenGSI2SK struct {
+	CreateAt int64
+}
+
+func (v TokenGSI2SK) String() string {
+	var fields string
+	fields += fmt.Sprintf("#create_at#%v", v.CreateAt)
+	return fmt.Sprintf("auth_token_v1#token%s", fields)
+}
+
 // ── Client for Token ──
 
 type TokenClient struct {
@@ -200,6 +224,46 @@ func (c *TokenClient) DeleteToken(ctx context.Context, id string) error {
 		Id: id,
 	}
 	return c.store.Delete(ctx, key.PK(), key.SK())
+}
+
+// SelectTokenByState queries GSI2 by partition key.
+func (c *TokenClient) SelectTokenByState(ctx context.Context, state State) ([]*Token, error) {
+	pk := &Token{
+		State: state,
+	}
+	pkValue := pk.GSI2PK()
+	results, err := c.store.Query(ctx, "gsi2pk", pkValue, "gsi2sk", nil, opaquedata.WithGSIIndex(2))
+	if err != nil {
+		return nil, fmt.Errorf("TokenClient.SelectTokenByState: %w", err)
+	}
+	return rehydrateToken(results)
+}
+
+// SelectTokenByStateWithCreateAt queries GSI2 with a sort key condition.
+func (c *TokenClient) SelectTokenByStateWithCreateAt(ctx context.Context, state State, op opaquedata.SortOperator, vals ...TokenGSI2SK) ([]*Token, error) {
+	if op == opaquedata.Between {
+		if len(vals) != 2 {
+			return nil, fmt.Errorf("TokenClient.SelectTokenByStateWithCreateAt: Between requires exactly 2 values, got %d", len(vals))
+		}
+	} else if len(vals) != 1 {
+		return nil, fmt.Errorf("TokenClient.SelectTokenByStateWithCreateAt: operator %d requires exactly 1 value, got %d", op, len(vals))
+	}
+	pk := &Token{
+		State: state,
+	}
+	pkValue := pk.GSI2PK()
+	sort := &opaquedata.SortCondition{
+		Operator: op,
+		Value:    vals[0].String(),
+	}
+	if op == opaquedata.Between {
+		sort.Value2 = vals[1].String()
+	}
+	results, err := c.store.Query(ctx, "gsi2pk", pkValue, "gsi2sk", sort, opaquedata.WithGSIIndex(2))
+	if err != nil {
+		return nil, fmt.Errorf("TokenClient.SelectTokenByStateWithCreateAt: %w", err)
+	}
+	return rehydrateToken(results)
 }
 
 func rehydrateToken(results []*opaquedatav1.OpaqueData) ([]*Token, error) {

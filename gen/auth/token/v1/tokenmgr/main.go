@@ -25,6 +25,7 @@ var usage = "Usage: tokenmgr [-json] <command> [args]\n\nFlags:\n" +
 	"  get      <id>\n" +
 	"  load     <id>\n" +
 	"  history  <id>\n" +
+	"  query by-state <state> [--sk-op=OP --create_at=VAL [--create_at2=VAL]]\n" +
 	"\nActor is derived automatically from the current user and hostname.\n\n" +
 	"Environment variables:\n" +
 	"  API_DOMAIN      Base domain for API endpoint (pattern: token-v1.API_DOMAIN)\n" +
@@ -122,6 +123,50 @@ func main() {
 			fatal(fmt.Sprintf("error: %v", err))
 		}
 		printHistory(history)
+
+	case "query":
+		if len(os.Args) < 3 {
+			fatal("usage: tokenmgr query <query-name> <pk-values...> [--sk-op=OP --field=VAL]")
+		}
+		queryName := os.Args[2]
+		flags := parseFlags(os.Args[3:])
+
+		switch queryName {
+
+		case "by-state":
+			state := flags.positional(0, "state")
+			skOp := flags.get("sk-op")
+
+			if skOp == "" {
+				// Validate no stray SK flags when no --sk-op is provided.
+				if flags.has("create_at") || flags.has("create_at2") {
+					fatal("--create_at requires --sk-op to be set")
+				}
+				results, err := client.QueryByState(ctx, pkg.State(mustParseInt32(state, "state")))
+				if err != nil {
+					fatal(fmt.Sprintf("error: %v", err))
+				}
+				printResults(results)
+			} else if skOp == "between" {
+				create_atVal := flags.require("create_at")
+				create_atVal2 := flags.require("create_at2")
+				results, err := client.QueryByStateBetweenCreateAt(ctx, pkg.State(mustParseInt32(state, "state")), mustParseInt64(create_atVal, "create_at"), mustParseInt64(create_atVal2, "create_at2"))
+				if err != nil {
+					fatal(fmt.Sprintf("error: %v", err))
+				}
+				printResults(results)
+			} else {
+				create_atVal := flags.require("create_at")
+				results, err := client.QueryByStateWithCreateAt(ctx, pkg.State(mustParseInt32(state, "state")), skOp, mustParseInt64(create_atVal, "create_at"))
+				if err != nil {
+					fatal(fmt.Sprintf("error: %v", err))
+				}
+				printResults(results)
+			}
+
+		default:
+			fatal(fmt.Sprintf("unknown query: %s", queryName))
+		}
 
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n%s\n", subcmd, usage)
@@ -231,6 +276,69 @@ func mustParseBool(s, field string) bool {
 	v, err := strconv.ParseBool(s)
 	if err != nil {
 		fatal(fmt.Sprintf("invalid value for %s: %v", field, err))
+	}
+	return v
+}
+
+func printResults(results []*pkg.Token) {
+	fmt.Println("[")
+	for i, r := range results {
+		b, err := jsonFormatter.Marshal(r)
+		if err != nil {
+			fatal(fmt.Sprintf("error formatting result: %v", err))
+		}
+		if i < len(results)-1 {
+			fmt.Printf("  %s,\n", string(b))
+		} else {
+			fmt.Printf("  %s\n", string(b))
+		}
+	}
+	fmt.Println("]")
+}
+
+// cliFlags parses --key=value flags and positional args from CLI arguments.
+type cliFlags struct {
+	positionals []string
+	named       map[string]string
+}
+
+func parseFlags(args []string) cliFlags {
+	f := cliFlags{named: make(map[string]string)}
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--") {
+			kv := strings.TrimPrefix(arg, "--")
+			i := strings.IndexByte(kv, '=')
+			if i < 0 {
+				fatal(fmt.Sprintf("flag --%s requires a value (use --%s=VALUE)", kv, kv))
+			}
+			f.named[kv[:i]] = kv[i+1:]
+		} else {
+			f.positionals = append(f.positionals, arg)
+		}
+	}
+	return f
+}
+
+func (f cliFlags) positional(i int, name string) string {
+	if i >= len(f.positionals) {
+		fatal(fmt.Sprintf("missing required positional argument: %s", name))
+	}
+	return f.positionals[i]
+}
+
+func (f cliFlags) get(key string) string {
+	return f.named[key]
+}
+
+func (f cliFlags) has(key string) bool {
+	_, ok := f.named[key]
+	return ok
+}
+
+func (f cliFlags) require(key string) string {
+	v, ok := f.named[key]
+	if !ok || v == "" {
+		fatal(fmt.Sprintf("missing required flag: --%s", key))
 	}
 	return v
 }

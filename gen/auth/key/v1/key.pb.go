@@ -810,11 +810,12 @@ var File_auth_key_v1_key_proto protoreflect.FileDescriptor
 
 const file_auth_key_v1_key_proto_rawDesc = "" +
 	"\n" +
-	"\x15auth/key/v1/key.proto\x12\vauth.key.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\x8b\x04\n" +
+	"\x15auth/key/v1/key.proto\x12\vauth.key.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\x9d\x04\n" +
 	"\x03Key\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x1b\n" +
-	"\tcreate_at\x18\x03 \x01(\x03R\bcreateAt\x12\x1b\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12$\n" +
+	"\tcreate_at\x18\x03 \x01(\x03B\a\x82Q\x04\n" +
+	"\x02\b\x06R\bcreateAt\x12\x1b\n" +
 	"\tcreate_by\x18\x04 \x01(\tR\bcreateBy\x12\x1b\n" +
 	"\tmodify_at\x18\x05 \x01(\x03R\bmodifyAt\x12\x1b\n" +
 	"\tmodify_by\x18\x06 \x01(\tR\bmodifyBy\x12\x1b\n" +
@@ -828,8 +829,9 @@ const file_auth_key_v1_key_proto_rawDesc = "" +
 	"\x0emaster_key_ref\x18\f \x01(\tR\fmasterKeyRef\x12!\n" +
 	"\feffective_at\x18\r \x01(\x03R\veffectiveAt\x12#\n" +
 	"\rsigning_until\x18\x0e \x01(\x03R\fsigningUntil\x12!\n" +
-	"\fverify_until\x18\x0f \x01(\x03R\vverifyUntil\x12(\n" +
-	"\x05state\x18\x10 \x01(\x0e2\x12.auth.key.v1.StateR\x05state:\x05\x8aQ\x02\x1a\x00\"1\n" +
+	"\fverify_until\x18\x0f \x01(\x03R\vverifyUntil\x121\n" +
+	"\x05state\x18\x10 \x01(\x0e2\x12.auth.key.v1.StateB\a\x82Q\x04\n" +
+	"\x02\b\x05R\x05state:\x05\x8aQ\x02\x1a\x00\"1\n" +
 	"\aKeyList\x12&\n" +
 	"\x05items\x18\x01 \x03(\v2\x10.auth.key.v1.KeyR\x05items\"\xa8\x03\n" +
 	"\bGenerate\x12\x0e\n" +

@@ -35,7 +35,7 @@ message Issuer {
   };
   string id                = 1;
   int64  version           = 2;
-  int64  create_at         = 3;
+  int64  create_at         = 3 [(funinthecloud.protosource.options.v1.protosource_opaque_field) = { attributes: [ { type: OPAQUE_KEY_TYPE_GSI2SK } ] }];
   string create_by         = 4;
   int64  modify_at         = 5;
   string modify_by         = 6;
@@ -44,7 +44,7 @@ message Issuer {
   Kind   kind              = 9;
   string default_algorithm = 10;
   string jwks_url          = 11;
-  State  state             = 12;
+  State  state             = 12 [(funinthecloud.protosource.options.v1.protosource_opaque_field) = { attributes: [ { type: OPAQUE_KEY_TYPE_GSI2PK } ] }];
 }
 
 message IssuerList {
