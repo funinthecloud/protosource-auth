@@ -26,6 +26,10 @@ Parameters:
   HostedZoneId:
     Type: String
     Description: Route 53 hosted zone ID for the domain
+  CorsOrigin:
+    Type: String
+    Default: ""
+    Description: Allowed CORS origin for admin frontend (e.g. https://auth-admin.drhayt.com)
 
 Resources:
   AuthFunction:
@@ -43,6 +47,7 @@ Resources:
           PROTOSOURCE_AUTH_EVENTS_TABLE: !Ref EventsTableName
           PROTOSOURCE_AUTH_AGGREGATES_TABLE: !Ref AggregatesTableName
           PROTOSOURCE_AUTH_KMS_KEY_ARN: !Ref KmsKeyArn
+          PROTOSOURCE_AUTH_CORS_ORIGIN: !Ref CorsOrigin
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref EventsTableName

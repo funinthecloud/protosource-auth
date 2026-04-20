@@ -9,9 +9,13 @@ package main
 import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/funinthecloud/protosource"
+	"github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1"
 	"github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1/issuerv1dynamodb"
+	"github.com/funinthecloud/protosource-auth/gen/auth/key/v1"
 	"github.com/funinthecloud/protosource-auth/gen/auth/key/v1/keyv1dynamodb"
+	"github.com/funinthecloud/protosource-auth/gen/auth/role/v1"
 	"github.com/funinthecloud/protosource-auth/gen/auth/role/v1/rolev1dynamodb"
+	"github.com/funinthecloud/protosource-auth/gen/auth/token/v1"
 	"github.com/funinthecloud/protosource-auth/gen/auth/token/v1/tokenv1dynamodb"
 	"github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
 	"github.com/funinthecloud/protosource-auth/gen/auth/user/v1/userv1dynamodb"
@@ -43,6 +47,18 @@ func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsT
 	checker := provideChecker(tokenv1dynamodbRepository, repository, rolev1dynamodbRepository)
 	service := provideService(loginer, checker)
 	page := providePage(loginer)
-	router := provideRouter(service, page)
+	whoami := provideWhoami(tokenv1dynamodbRepository, repository)
+	authorizer := provideAuthorizer(checker)
+	handler := provideUserHandler(repository, userClient, authorizer)
+	roleClient := rolev1.NewRoleClient(store)
+	rolev1Handler := provideRoleHandler(rolev1dynamodbRepository, roleClient, authorizer)
+	issuerClient := issuerv1.NewIssuerClient(store)
+	issuerv1Handler := provideIssuerHandler(issuerv1dynamodbRepository, issuerClient, authorizer)
+	keyClient := keyv1.NewKeyClient(store)
+	keyv1Handler := provideKeyHandler(keyv1dynamodbRepository, keyClient, authorizer)
+	tokenClient := tokenv1.NewTokenClient(store)
+	tokenv1Handler := provideTokenHandler(tokenv1dynamodbRepository, tokenClient, authorizer)
+	corsOrigin := provideCORSOrigin()
+	router := provideRouter(service, page, whoami, handler, rolev1Handler, issuerv1Handler, keyv1Handler, tokenv1Handler, corsOrigin)
 	return router, nil
 }

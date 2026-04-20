@@ -13,10 +13,14 @@ import (
 	"github.com/funinthecloud/protosource/serializers/protobinaryserializer"
 	"github.com/funinthecloud/protosource/stores/dynamodbstore"
 
+	issuerv1 "github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1"
 	issuerv1dynamodb "github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1/issuerv1dynamodb"
+	keyv1 "github.com/funinthecloud/protosource-auth/gen/auth/key/v1"
 	keyv1dynamodb "github.com/funinthecloud/protosource-auth/gen/auth/key/v1/keyv1dynamodb"
 	"github.com/funinthecloud/protosource-auth/keyproviders"
+	rolev1 "github.com/funinthecloud/protosource-auth/gen/auth/role/v1"
 	rolev1dynamodb "github.com/funinthecloud/protosource-auth/gen/auth/role/v1/rolev1dynamodb"
+	tokenv1 "github.com/funinthecloud/protosource-auth/gen/auth/token/v1"
 	tokenv1dynamodb "github.com/funinthecloud/protosource-auth/gen/auth/token/v1/tokenv1dynamodb"
 	userv1 "github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
 	userv1dynamodb "github.com/funinthecloud/protosource-auth/gen/auth/user/v1/userv1dynamodb"
@@ -45,16 +49,28 @@ func InitializeRouter(
 		keyv1dynamodb.ProviderSet,
 		tokenv1dynamodb.ProviderSet,
 
-		// Generated client for GSI queries.
+		// Generated clients for GSI queries.
 		userv1.NewUserClient,
+		rolev1.NewRoleClient,
+		issuerv1.NewIssuerClient,
+		keyv1.NewKeyClient,
+		tokenv1.NewTokenClient,
 
 		// Auth-service provider functions.
 		provideResolver,
 		provideDirectory,
 		provideLoginer,
 		provideChecker,
+		provideAuthorizer,
 		provideService,
 		providePage,
+		provideWhoami,
+		provideUserHandler,
+		provideRoleHandler,
+		provideIssuerHandler,
+		provideKeyHandler,
+		provideTokenHandler,
+		provideCORSOrigin,
 		provideRouter,
 	)
 	return nil, nil
