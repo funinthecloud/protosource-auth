@@ -254,13 +254,14 @@ func TestHandleLoginRejectsCrossOrigin(t *testing.T) {
 func TestHandleLoginBadBody(t *testing.T) {
 	env := newTestEnv(t)
 	tests := []struct {
-		name string
-		body string
+		name    string
+		body    string
+		wantMsg string
 	}{
-		{"invalid json", `{bad`},
-		{"missing email", `{"password":"x"}`},
-		{"missing password", `{"email":"x"}`},
-		{"empty fields", `{"email":"","password":""}`},
+		{"invalid json", `{bad`, "invalid request body"},
+		{"missing email", `{"password":"x"}`, "email and password are required"},
+		{"missing password", `{"email":"x"}`, "email and password are required"},
+		{"empty fields", `{"email":"","password":""}`, "email and password are required"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -270,6 +271,9 @@ func TestHandleLoginBadBody(t *testing.T) {
 			})
 			if resp.StatusCode != 400 {
 				t.Errorf("status = %d, want 400", resp.StatusCode)
+			}
+			if !strings.Contains(resp.Body, tt.wantMsg) {
+				t.Errorf("body = %q, want %q", resp.Body, tt.wantMsg)
 			}
 		})
 	}

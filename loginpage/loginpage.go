@@ -80,7 +80,10 @@ func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protoso
 	}
 
 	var in loginRequest
-	if err := json.Unmarshal([]byte(req.Body), &in); err != nil || in.Email == "" || in.Password == "" {
+	if err := json.Unmarshal([]byte(req.Body), &in); err != nil {
+		return jsonError(http.StatusBadRequest, "invalid request body")
+	}
+	if in.Email == "" || in.Password == "" {
 		return jsonError(http.StatusBadRequest, "email and password are required")
 	}
 
