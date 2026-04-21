@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.14
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.57.1
 	github.com/aws/aws-sdk-go-v2/service/kms v1.50.4
-	github.com/funinthecloud/protosource v0.1.6
+	github.com/funinthecloud/protosource v0.1.7
 	github.com/goforj/wire v1.1.0
 	golang.org/x/crypto v0.50.0
 	golang.org/x/net v0.53.0

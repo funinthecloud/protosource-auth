@@ -114,7 +114,7 @@ func provideRouter(
 	r := protosource.NewRouter(svc, page, whoami, userH, roleH, issuerH, keyH, tokenH)
 	if cors != "" {
 		r.SetCORS(protosource.CORSConfig{
-			AllowOrigin:      string(cors),
+			AllowOrigins:     []string{string(cors)},
 			AllowMethods:     "GET,POST,OPTIONS",
 			AllowHeaders:     "Content-Type,Accept",
 			AllowCredentials: true,
