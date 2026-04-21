@@ -93,9 +93,8 @@ export default function UserDetail() {
             <Btn
               disabled={busy || !newPass}
               onClick={async () => {
-                const hash = new TextEncoder().encode(newPass);
-                await exec("auth/user/v1/changepassword", {
-                  password_hash: btoa(String.fromCharCode(...hash)),
+                await exec("admin/user/changepassword", {
+                  password: newPass,
                 });
                 setNewPass("");
               }}
@@ -103,9 +102,6 @@ export default function UserDetail() {
               Update
             </Btn>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
-            Note: password will be hashed server-side via argon2id.
-          </p>
         </div>
       </Card>
 

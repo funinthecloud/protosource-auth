@@ -44,7 +44,10 @@ Parameters:
     Description: Route 53 hosted zone ID for admin domain
 
 Conditions:
-  HasAdminDomain: !Not [!Equals [!Ref AdminDomainName, ""]]
+  HasAdminDomain: !And
+    - !Not [!Equals [!Ref AdminDomainName, ""]]
+    - !Not [!Equals [!Ref AdminCertificateArn, ""]]
+    - !Not [!Equals [!Ref AdminHostedZoneId, ""]]
 
 Resources:
   AuthFunction:

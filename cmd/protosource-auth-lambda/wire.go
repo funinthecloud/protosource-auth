@@ -62,6 +62,7 @@ func InitializeRouter(
 		provideLoginer,
 		provideChecker,
 		provideAuthorizer,
+		provideAdminUser,
 		provideService,
 		providePage,
 		provideWhoami,

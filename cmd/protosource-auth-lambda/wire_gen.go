@@ -49,6 +49,7 @@ func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsT
 	page := providePage(loginer)
 	whoami := provideWhoami(tokenv1dynamodbRepository, repository)
 	authorizer := provideAuthorizer(checker)
+	adminUser := provideAdminUser(repository, authorizer)
 	handler := provideUserHandler(repository, userClient, authorizer)
 	roleClient := rolev1.NewRoleClient(store)
 	rolev1Handler := provideRoleHandler(rolev1dynamodbRepository, roleClient, authorizer)
@@ -59,6 +60,6 @@ func InitializeRouter(client *dynamodb.Client, eventsTable dynamodbstore.EventsT
 	tokenClient := tokenv1.NewTokenClient(store)
 	tokenv1Handler := provideTokenHandler(tokenv1dynamodbRepository, tokenClient, authorizer)
 	corsOrigin := provideCORSOrigin()
-	router := provideRouter(service, page, whoami, handler, rolev1Handler, issuerv1Handler, keyv1Handler, tokenv1Handler, corsOrigin)
+	router := provideRouter(service, page, whoami, adminUser, handler, rolev1Handler, issuerv1Handler, keyv1Handler, tokenv1Handler, corsOrigin)
 	return router, nil
 }

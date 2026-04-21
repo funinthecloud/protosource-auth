@@ -80,6 +80,10 @@ func provideWhoami(tokenRepo tokenv1.Repo, userRepo userv1.Repo) *service.Whoami
 	return service.NewWhoami(tokenRepo, userRepo)
 }
 
+func provideAdminUser(userRepo userv1.Repo, az authz.Authorizer) *service.AdminUser {
+	return service.NewAdminUser(userRepo, az)
+}
+
 func provideUserHandler(repo userv1.Repo, client *userv1.UserClient, az authz.Authorizer) *userv1.Handler {
 	return userv1.NewHandler(repo, client, az)
 }
@@ -104,6 +108,7 @@ func provideRouter(
 	svc *service.Service,
 	page *loginpage.Page,
 	whoami *service.Whoami,
+	adminUser *service.AdminUser,
 	userH *userv1.Handler,
 	roleH *rolev1.Handler,
 	issuerH *issuerv1.Handler,
@@ -111,7 +116,7 @@ func provideRouter(
 	tokenH *tokenv1.Handler,
 	cors CORSOrigin,
 ) *protosource.Router {
-	r := protosource.NewRouter(svc, page, whoami, userH, roleH, issuerH, keyH, tokenH)
+	r := protosource.NewRouter(svc, page, whoami, adminUser, userH, roleH, issuerH, keyH, tokenH)
 	if cors != "" {
 		r.SetCORS(protosource.CORSConfig{
 			AllowOrigins:     []string{string(cors)},

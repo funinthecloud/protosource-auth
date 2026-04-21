@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/funinthecloud/protosource"
@@ -130,11 +130,10 @@ func (w *Whoami) handle(ctx context.Context, req protosource.Request) protosourc
 }
 
 // cookieValue extracts a named cookie from the Cookie header.
+// It checks lowercase then title-case to handle different
+// header canonicalization across adapters.
 func cookieValue(req protosource.Request, name string) string {
-	raw := req.Headers["cookie"]
-	if raw == "" {
-		raw = req.Headers["Cookie"]
-	}
+	raw := reqHeader(req, "Cookie")
 	if raw == "" {
 		return ""
 	}
@@ -159,5 +158,11 @@ func whoamiError(status int, message string) protosource.Response {
 // Ensure Whoami satisfies RouteRegistrar.
 var _ protosource.RouteRegistrar = (*Whoami)(nil)
 
-// Ensure fmt is used.
-var _ = fmt.Errorf
+// reqHeader returns the first non-empty value for the given header,
+// trying lowercase then the original form.
+func reqHeader(req protosource.Request, name string) string {
+	if v := req.Headers[strings.ToLower(name)]; v != "" {
+		return v
+	}
+	return req.Headers[name]
+}

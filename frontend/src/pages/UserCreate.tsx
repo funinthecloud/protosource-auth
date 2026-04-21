@@ -18,12 +18,11 @@ export default function UserCreate() {
     setError(null);
     try {
       const id = `user-${crypto.randomUUID()}`;
-      const hash = new TextEncoder().encode(password);
-      await post("auth/user/v1/create", {
+      await post("admin/user/create", {
         id,
         actor: me.user_id,
         email,
-        password_hash: btoa(String.fromCharCode(...hash)),
+        password,
       });
       navigate(`/users/${id}`);
     } catch (e) {
