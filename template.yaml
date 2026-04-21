@@ -123,7 +123,6 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: HasAdminDomain
     Properties:
-      BucketName: !Sub "${AdminDomainName}-site"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true

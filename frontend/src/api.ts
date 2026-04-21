@@ -16,7 +16,7 @@ export async function api<T>(
   const res = await fetch(`${API_BASE}/${path}`, {
     credentials: "include",
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: { ...init?.headers },
   });
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
@@ -28,7 +28,11 @@ export async function api<T>(
 }
 
 export function post<T>(path: string, body: unknown): Promise<T> {
-  return api(path, { method: "POST", body: JSON.stringify(body) });
+  return api(path, {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 // ---- Types ----

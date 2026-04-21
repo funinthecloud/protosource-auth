@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/funinthecloud/protosource"
@@ -16,6 +18,11 @@ import (
 // It accepts plaintext passwords, hashes them server-side with argon2id,
 // and delegates to the generated aggregate commands. This prevents
 // plaintext passwords from ever reaching the event store.
+//
+// Authorization uses the admin.user.v1.* function namespace so that
+// raw auth.user.v1.Create/ChangePassword can remain ungranted.
+// The actor on commands is derived from the authenticated context,
+// not from client-supplied values.
 type AdminUser struct {
 	userRepo   AggregateRepo
 	authorizer authz.Authorizer
@@ -34,36 +41,38 @@ func (a *AdminUser) RegisterRoutes(router *protosource.Router) {
 
 type adminCreateRequest struct {
 	ID       string `json:"id"`
-	Actor    string `json:"actor"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
 func (a *AdminUser) handleCreate(ctx context.Context, req protosource.Request) protosource.Response {
-	if _, err := a.authorizer.Authorize(ctx, req, "admin.user.v1.Create"); err != nil {
-		return adminError(http.StatusUnauthorized, "unauthorized")
+	ctx, err := a.authorizer.Authorize(ctx, req, "admin.user.v1.Create")
+	if err != nil {
+		return authzError(err)
 	}
+	actor := authz.UserIDFromContext(ctx)
 
 	var in adminCreateRequest
 	if err := json.Unmarshal([]byte(req.Body), &in); err != nil {
 		return adminError(http.StatusBadRequest, "invalid request body")
 	}
-	if in.ID == "" || in.Email == "" || in.Password == "" || in.Actor == "" {
-		return adminError(http.StatusBadRequest, "id, actor, email, and password are required")
+	if in.ID == "" || in.Email == "" || in.Password == "" {
+		return adminError(http.StatusBadRequest, "id, email, and password are required")
 	}
 
 	hash, err := credentials.Hash(in.Password)
 	if err != nil {
-		return adminError(http.StatusInternalServerError, "failed to hash password")
+		slog.ErrorContext(ctx, "admin: hash password", "error", err)
+		return adminError(http.StatusInternalServerError, "internal error")
 	}
 
 	if _, err := a.userRepo.Apply(ctx, &userv1.Create{
 		Id:           in.ID,
-		Actor:        in.Actor,
+		Actor:        actor,
 		Email:        in.Email,
 		PasswordHash: hash,
 	}); err != nil {
-		return adminError(http.StatusConflict, err.Error())
+		return applyError(ctx, err)
 	}
 
 	return adminJSON(http.StatusCreated, map[string]string{"id": in.ID})
@@ -71,37 +80,70 @@ func (a *AdminUser) handleCreate(ctx context.Context, req protosource.Request) p
 
 type adminChangePasswordRequest struct {
 	ID       string `json:"id"`
-	Actor    string `json:"actor"`
 	Password string `json:"password"`
 }
 
 func (a *AdminUser) handleChangePassword(ctx context.Context, req protosource.Request) protosource.Response {
-	if _, err := a.authorizer.Authorize(ctx, req, "admin.user.v1.ChangePassword"); err != nil {
-		return adminError(http.StatusUnauthorized, "unauthorized")
+	ctx, err := a.authorizer.Authorize(ctx, req, "admin.user.v1.ChangePassword")
+	if err != nil {
+		return authzError(err)
 	}
+	actor := authz.UserIDFromContext(ctx)
 
 	var in adminChangePasswordRequest
 	if err := json.Unmarshal([]byte(req.Body), &in); err != nil {
 		return adminError(http.StatusBadRequest, "invalid request body")
 	}
-	if in.ID == "" || in.Password == "" || in.Actor == "" {
-		return adminError(http.StatusBadRequest, "id, actor, and password are required")
+	if in.ID == "" || in.Password == "" {
+		return adminError(http.StatusBadRequest, "id and password are required")
 	}
 
 	hash, err := credentials.Hash(in.Password)
 	if err != nil {
-		return adminError(http.StatusInternalServerError, "failed to hash password")
+		slog.ErrorContext(ctx, "admin: hash password", "error", err)
+		return adminError(http.StatusInternalServerError, "internal error")
 	}
 
 	if _, err := a.userRepo.Apply(ctx, &userv1.ChangePassword{
 		Id:           in.ID,
-		Actor:        in.Actor,
+		Actor:        actor,
 		PasswordHash: hash,
 	}); err != nil {
-		return adminError(http.StatusConflict, err.Error())
+		return applyError(ctx, err)
 	}
 
 	return adminJSON(http.StatusOK, map[string]string{"ok": "true"})
+}
+
+// authzError maps authorization errors to HTTP responses, matching
+// the generated handlers' authzErrorResponse pattern.
+func authzError(err error) protosource.Response {
+	switch {
+	case errors.Is(err, authz.ErrUnauthenticated):
+		return adminError(http.StatusUnauthorized, "unauthenticated")
+	case errors.Is(err, authz.ErrForbidden):
+		return adminError(http.StatusForbidden, "forbidden")
+	default:
+		return adminError(http.StatusServiceUnavailable, "authorization service unavailable")
+	}
+}
+
+// applyError maps aggregate Apply errors to stable HTTP responses.
+func applyError(ctx context.Context, err error) protosource.Response {
+	switch {
+	case errors.Is(err, protosource.ErrAlreadyCreated):
+		return adminError(http.StatusConflict, "already exists")
+	case errors.Is(err, protosource.ErrAggregateNotFound),
+		errors.Is(err, protosource.ErrNotCreatedYet):
+		return adminError(http.StatusNotFound, "not found")
+	case errors.Is(err, protosource.ErrStateNotAllowed):
+		return adminError(http.StatusConflict, "operation not allowed in current state")
+	case errors.Is(err, protosource.ErrValidationFailed):
+		return adminError(http.StatusBadRequest, "validation failed")
+	default:
+		slog.ErrorContext(ctx, "admin: apply command", "error", err)
+		return adminError(http.StatusInternalServerError, "internal error")
+	}
 }
 
 func adminError(status int, message string) protosource.Response {

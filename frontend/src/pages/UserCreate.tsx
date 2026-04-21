@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { post } from "../api";
-import { useAuth } from "../auth";
 import { PageHeader, Btn, Card, ErrorBox } from "../ui";
 
 export default function UserCreate() {
-  const { user: me } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,12 +16,7 @@ export default function UserCreate() {
     setError(null);
     try {
       const id = `user-${crypto.randomUUID()}`;
-      await post("admin/user/create", {
-        id,
-        actor: me.user_id,
-        email,
-        password,
-      });
+      await post("admin/user/create", { id, email, password });
       navigate(`/users/${id}`);
     } catch (e) {
       setError(String(e));
