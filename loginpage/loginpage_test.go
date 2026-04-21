@@ -128,6 +128,78 @@ func TestHandlePage(t *testing.T) {
 	}
 }
 
+func TestHandlePageWithRedirect(t *testing.T) {
+	p := &Page{issuerID: "test-issuer"}
+	resp := p.handlePage(context.Background(), protosource.Request{
+		Headers:         map[string]string{"host": "auth.drhayt.com"},
+		QueryParameters: map[string]string{"redirect": "https://auth-admin.drhayt.com/"},
+	})
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	// html/template JS-escapes the URL, so check for the escaped form.
+	if !strings.Contains(resp.Body, "auth-admin.drhayt.com") {
+		t.Errorf("redirect URL not embedded in response; body snippet: %s", resp.Body[len(resp.Body)-300:])
+	}
+}
+
+func TestHandlePageRejectsCrossdomainRedirect(t *testing.T) {
+	p := &Page{issuerID: "test-issuer"}
+	resp := p.handlePage(context.Background(), protosource.Request{
+		Headers:         map[string]string{"host": "auth.drhayt.com"},
+		QueryParameters: map[string]string{"redirect": "https://evil.com/phish"},
+	})
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if strings.Contains(resp.Body, "evil.com") {
+		t.Error("cross-domain redirect should be rejected")
+	}
+}
+
+func TestHandlePageRejectsHTTPRedirect(t *testing.T) {
+	p := &Page{issuerID: "test-issuer"}
+	resp := p.handlePage(context.Background(), protosource.Request{
+		Headers:         map[string]string{"host": "auth.drhayt.com"},
+		QueryParameters: map[string]string{"redirect": "http://auth-admin.drhayt.com/"},
+	})
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	// HTTP redirect should be stripped
+	if strings.Contains(resp.Body, "http://auth-admin.drhayt.com") {
+		t.Error("HTTP redirect should be rejected")
+	}
+}
+
+// -- isAllowedRedirect tests --
+
+func TestIsAllowedRedirect(t *testing.T) {
+	tests := []struct {
+		name     string
+		redirect string
+		host     string
+		want     bool
+	}{
+		{"same eTLD+1", "https://auth-admin.drhayt.com/", "auth.drhayt.com", true},
+		{"bare domain", "https://drhayt.com/admin", "auth.drhayt.com", true},
+		{"cross domain", "https://evil.com/", "auth.drhayt.com", false},
+		{"http not allowed", "http://auth-admin.drhayt.com/", "auth.drhayt.com", false},
+		{"invalid URL", "://bad", "auth.drhayt.com", false},
+		{"localhost host", "https://localhost/", "localhost:8080", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isAllowedRedirect(tt.redirect, tt.host); got != tt.want {
+				t.Errorf("isAllowedRedirect(%q, %q) = %v, want %v", tt.redirect, tt.host, got, tt.want)
+			}
+		})
+	}
+}
+
 // -- isSecure tests --
 
 func TestIsSecure(t *testing.T) {

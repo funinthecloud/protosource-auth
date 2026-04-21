@@ -49,9 +49,16 @@ func (p *Page) RegisterRoutes(router *protosource.Router) {
 	router.Handle("POST", "/", p.handleLogin)
 }
 
-func (p *Page) handlePage(_ context.Context, _ protosource.Request) protosource.Response {
+func (p *Page) handlePage(_ context.Context, req protosource.Request) protosource.Response {
+	redirect := queryParam(req, "redirect")
+	// Validate redirect URL: must be HTTPS and share the same eTLD+1
+	// as the request host to prevent open-redirect attacks.
+	if redirect != "" && !isAllowedRedirect(redirect, reqHost(req)) {
+		redirect = ""
+	}
+
 	var buf bytes.Buffer
-	if err := loginTmpl.Execute(&buf, nil); err != nil {
+	if err := loginTmpl.Execute(&buf, map[string]string{"Redirect": redirect}); err != nil {
 		return protosource.Response{
 			StatusCode: http.StatusInternalServerError,
 			Body:       "internal error",
@@ -224,6 +231,28 @@ func registrableDomain(host string) string {
 		return ""
 	}
 	return etld1
+}
+
+// queryParam extracts a single query parameter from the request.
+func queryParam(req protosource.Request, key string) string {
+	return req.QueryParameters[key]
+}
+
+// isAllowedRedirect validates that a redirect URL is HTTPS and shares
+// the same eTLD+1 as the host to prevent open-redirect attacks.
+func isAllowedRedirect(redirect, host string) bool {
+	u, err := url.Parse(redirect)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "https" {
+		return false
+	}
+	hostDomain := registrableDomain(host)
+	if hostDomain == "" {
+		return false
+	}
+	return registrableDomain(u.Host) == hostDomain
 }
 
 // isSecure returns true if the request arrived over HTTPS, as indicated

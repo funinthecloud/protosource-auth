@@ -109,10 +109,24 @@ func (m *Key) PK() string {
 
 func (m *Key) SK() string { return "AGG" }
 
-func (m *Key) GSI1PK() string  { return "NA" }
-func (m *Key) GSI1SK() string  { return "NA" }
-func (m *Key) GSI2PK() string  { return "NA" }
-func (m *Key) GSI2SK() string  { return "NA" }
+func (m *Key) GSI1PK() string { return "NA" }
+func (m *Key) GSI1SK() string { return "NA" }
+func (m *Key) GSI2PK() string {
+	if m == nil {
+		return ""
+	}
+	var fields string
+	fields += fmt.Sprintf("#state#%v", m.GetState())
+	return fmt.Sprintf("auth_key_v1#key%s", fields)
+}
+func (m *Key) GSI2SK() string {
+	if m == nil {
+		return ""
+	}
+	var fields string
+	fields += fmt.Sprintf("#create_at#%v", m.GetCreateAt())
+	return fmt.Sprintf("auth_key_v1#key%s", fields)
+}
 func (m *Key) GSI3PK() string  { return "NA" }
 func (m *Key) GSI3SK() string  { return "NA" }
 func (m *Key) GSI4PK() string  { return "NA" }
@@ -158,6 +172,16 @@ func (m *Key) Hydrate(body []byte) error {
 
 // ── Typed GSI SK value structs for Key ──
 
+type KeyGSI2SK struct {
+	CreateAt int64
+}
+
+func (v KeyGSI2SK) String() string {
+	var fields string
+	fields += fmt.Sprintf("#create_at#%v", v.CreateAt)
+	return fmt.Sprintf("auth_key_v1#key%s", fields)
+}
+
 // ── Client for Key ──
 
 type KeyClient struct {
@@ -200,6 +224,46 @@ func (c *KeyClient) DeleteKey(ctx context.Context, id string) error {
 		Id: id,
 	}
 	return c.store.Delete(ctx, key.PK(), key.SK())
+}
+
+// SelectKeyByState queries GSI2 by partition key.
+func (c *KeyClient) SelectKeyByState(ctx context.Context, state State) ([]*Key, error) {
+	pk := &Key{
+		State: state,
+	}
+	pkValue := pk.GSI2PK()
+	results, err := c.store.Query(ctx, "gsi2pk", pkValue, "gsi2sk", nil, opaquedata.WithGSIIndex(2))
+	if err != nil {
+		return nil, fmt.Errorf("KeyClient.SelectKeyByState: %w", err)
+	}
+	return rehydrateKey(results)
+}
+
+// SelectKeyByStateWithCreateAt queries GSI2 with a sort key condition.
+func (c *KeyClient) SelectKeyByStateWithCreateAt(ctx context.Context, state State, op opaquedata.SortOperator, vals ...KeyGSI2SK) ([]*Key, error) {
+	if op == opaquedata.Between {
+		if len(vals) != 2 {
+			return nil, fmt.Errorf("KeyClient.SelectKeyByStateWithCreateAt: Between requires exactly 2 values, got %d", len(vals))
+		}
+	} else if len(vals) != 1 {
+		return nil, fmt.Errorf("KeyClient.SelectKeyByStateWithCreateAt: operator %d requires exactly 1 value, got %d", op, len(vals))
+	}
+	pk := &Key{
+		State: state,
+	}
+	pkValue := pk.GSI2PK()
+	sort := &opaquedata.SortCondition{
+		Operator: op,
+		Value:    vals[0].String(),
+	}
+	if op == opaquedata.Between {
+		sort.Value2 = vals[1].String()
+	}
+	results, err := c.store.Query(ctx, "gsi2pk", pkValue, "gsi2sk", sort, opaquedata.WithGSIIndex(2))
+	if err != nil {
+		return nil, fmt.Errorf("KeyClient.SelectKeyByStateWithCreateAt: %w", err)
+	}
+	return rehydrateKey(results)
 }
 
 func rehydrateKey(results []*opaquedatav1.OpaqueData) ([]*Key, error) {

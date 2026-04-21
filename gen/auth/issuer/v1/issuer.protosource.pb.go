@@ -117,10 +117,24 @@ func (m *Issuer) PK() string {
 
 func (m *Issuer) SK() string { return "AGG" }
 
-func (m *Issuer) GSI1PK() string  { return "NA" }
-func (m *Issuer) GSI1SK() string  { return "NA" }
-func (m *Issuer) GSI2PK() string  { return "NA" }
-func (m *Issuer) GSI2SK() string  { return "NA" }
+func (m *Issuer) GSI1PK() string { return "NA" }
+func (m *Issuer) GSI1SK() string { return "NA" }
+func (m *Issuer) GSI2PK() string {
+	if m == nil {
+		return ""
+	}
+	var fields string
+	fields += fmt.Sprintf("#state#%v", m.GetState())
+	return fmt.Sprintf("auth_issuer_v1#issuer%s", fields)
+}
+func (m *Issuer) GSI2SK() string {
+	if m == nil {
+		return ""
+	}
+	var fields string
+	fields += fmt.Sprintf("#create_at#%v", m.GetCreateAt())
+	return fmt.Sprintf("auth_issuer_v1#issuer%s", fields)
+}
 func (m *Issuer) GSI3PK() string  { return "NA" }
 func (m *Issuer) GSI3SK() string  { return "NA" }
 func (m *Issuer) GSI4PK() string  { return "NA" }
@@ -166,6 +180,16 @@ func (m *Issuer) Hydrate(body []byte) error {
 
 // ── Typed GSI SK value structs for Issuer ──
 
+type IssuerGSI2SK struct {
+	CreateAt int64
+}
+
+func (v IssuerGSI2SK) String() string {
+	var fields string
+	fields += fmt.Sprintf("#create_at#%v", v.CreateAt)
+	return fmt.Sprintf("auth_issuer_v1#issuer%s", fields)
+}
+
 // ── Client for Issuer ──
 
 type IssuerClient struct {
@@ -208,6 +232,46 @@ func (c *IssuerClient) DeleteIssuer(ctx context.Context, id string) error {
 		Id: id,
 	}
 	return c.store.Delete(ctx, key.PK(), key.SK())
+}
+
+// SelectIssuerByState queries GSI2 by partition key.
+func (c *IssuerClient) SelectIssuerByState(ctx context.Context, state State) ([]*Issuer, error) {
+	pk := &Issuer{
+		State: state,
+	}
+	pkValue := pk.GSI2PK()
+	results, err := c.store.Query(ctx, "gsi2pk", pkValue, "gsi2sk", nil, opaquedata.WithGSIIndex(2))
+	if err != nil {
+		return nil, fmt.Errorf("IssuerClient.SelectIssuerByState: %w", err)
+	}
+	return rehydrateIssuer(results)
+}
+
+// SelectIssuerByStateWithCreateAt queries GSI2 with a sort key condition.
+func (c *IssuerClient) SelectIssuerByStateWithCreateAt(ctx context.Context, state State, op opaquedata.SortOperator, vals ...IssuerGSI2SK) ([]*Issuer, error) {
+	if op == opaquedata.Between {
+		if len(vals) != 2 {
+			return nil, fmt.Errorf("IssuerClient.SelectIssuerByStateWithCreateAt: Between requires exactly 2 values, got %d", len(vals))
+		}
+	} else if len(vals) != 1 {
+		return nil, fmt.Errorf("IssuerClient.SelectIssuerByStateWithCreateAt: operator %d requires exactly 1 value, got %d", op, len(vals))
+	}
+	pk := &Issuer{
+		State: state,
+	}
+	pkValue := pk.GSI2PK()
+	sort := &opaquedata.SortCondition{
+		Operator: op,
+		Value:    vals[0].String(),
+	}
+	if op == opaquedata.Between {
+		sort.Value2 = vals[1].String()
+	}
+	results, err := c.store.Query(ctx, "gsi2pk", pkValue, "gsi2sk", sort, opaquedata.WithGSIIndex(2))
+	if err != nil {
+		return nil, fmt.Errorf("IssuerClient.SelectIssuerByStateWithCreateAt: %w", err)
+	}
+	return rehydrateIssuer(results)
 }
 
 func rehydrateIssuer(results []*opaquedatav1.OpaqueData) ([]*Issuer, error) {

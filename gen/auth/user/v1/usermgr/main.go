@@ -31,6 +31,7 @@ var usage = "Usage: usermgr [-json] <command> [args]\n\nFlags:\n" +
 	"  load     <id>\n" +
 	"  history  <id>\n" +
 	"  query by-email <email> [--sk-op=OP --create_at=VAL [--create_at2=VAL]]\n" +
+	"  query by-state <state> [--sk-op=OP --create_at=VAL [--create_at2=VAL]]\n" +
 	"\nActor is derived automatically from the current user and hostname.\n\n" +
 	"Environment variables:\n" +
 	"  API_DOMAIN      Base domain for API endpoint (pattern: user-v1.API_DOMAIN)\n" +
@@ -213,6 +214,37 @@ func main() {
 			} else {
 				create_atVal := flags.require("create_at")
 				results, err := client.QueryByEmailWithCreateAt(ctx, email, skOp, mustParseInt64(create_atVal, "create_at"))
+				if err != nil {
+					fatal(fmt.Sprintf("error: %v", err))
+				}
+				printResults(results)
+			}
+
+		case "by-state":
+			state := flags.positional(0, "state")
+			skOp := flags.get("sk-op")
+
+			if skOp == "" {
+				// Validate no stray SK flags when no --sk-op is provided.
+				if flags.has("create_at") || flags.has("create_at2") {
+					fatal("--create_at requires --sk-op to be set")
+				}
+				results, err := client.QueryByState(ctx, pkg.State(mustParseInt32(state, "state")))
+				if err != nil {
+					fatal(fmt.Sprintf("error: %v", err))
+				}
+				printResults(results)
+			} else if skOp == "between" {
+				create_atVal := flags.require("create_at")
+				create_atVal2 := flags.require("create_at2")
+				results, err := client.QueryByStateBetweenCreateAt(ctx, pkg.State(mustParseInt32(state, "state")), mustParseInt64(create_atVal, "create_at"), mustParseInt64(create_atVal2, "create_at2"))
+				if err != nil {
+					fatal(fmt.Sprintf("error: %v", err))
+				}
+				printResults(results)
+			} else {
+				create_atVal := flags.require("create_at")
+				results, err := client.QueryByStateWithCreateAt(ctx, pkg.State(mustParseInt32(state, "state")), skOp, mustParseInt64(create_atVal, "create_at"))
 				if err != nil {
 					fatal(fmt.Sprintf("error: %v", err))
 				}

@@ -1188,17 +1188,19 @@ var File_auth_role_v1_role_proto protoreflect.FileDescriptor
 
 const file_auth_role_v1_role_proto_rawDesc = "" +
 	"\n" +
-	"\x17auth/role/v1/role.proto\x12\fauth.role.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\xa8\x03\n" +
+	"\x17auth/role/v1/role.proto\x12\fauth.role.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\xba\x03\n" +
 	"\x04Role\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x1b\n" +
-	"\tcreate_at\x18\x03 \x01(\x03R\bcreateAt\x12\x1b\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12$\n" +
+	"\tcreate_at\x18\x03 \x01(\x03B\a\x82Q\x04\n" +
+	"\x02\b\x06R\bcreateAt\x12\x1b\n" +
 	"\tcreate_by\x18\x04 \x01(\tR\bcreateBy\x12\x1b\n" +
 	"\tmodify_at\x18\x05 \x01(\x03R\bmodifyAt\x12\x1b\n" +
 	"\tmodify_by\x18\x06 \x01(\tR\bmodifyBy\x12\x12\n" +
 	"\x04name\x18\a \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\b \x01(\tR\vdescription\x12)\n" +
-	"\x05state\x18\t \x01(\x0e2\x13.auth.role.v1.StateR\x05state\x12?\n" +
+	"\vdescription\x18\b \x01(\tR\vdescription\x122\n" +
+	"\x05state\x18\t \x01(\x0e2\x13.auth.role.v1.StateB\a\x82Q\x04\n" +
+	"\x02\b\x05R\x05state\x12?\n" +
 	"\tfunctions\x18\n" +
 	" \x03(\v2!.auth.role.v1.Role.FunctionsEntryR\tfunctions\x1aY\n" +
 	"\x0eFunctionsEntry\x12\x10\n" +
