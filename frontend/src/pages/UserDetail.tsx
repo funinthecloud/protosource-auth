@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { getUser, post } from "../api";
 import { useAuth } from "../auth";
 import { useAsync, fmtTime, stateName, userStates } from "../hooks";
@@ -8,7 +8,6 @@ import { PageHeader, Btn, Badge, Card, DetailRow, Table, Td, Loading, ErrorBox }
 export default function UserDetail() {
   const { id } = useParams<{ id: string }>();
   const { user: me } = useAuth();
-  const navigate = useNavigate();
   const { data, error, loading, reload } = useAsync(() => getUser(id!), [id]);
   const [busy, setBusy] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);

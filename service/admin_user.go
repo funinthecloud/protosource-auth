@@ -30,6 +30,12 @@ type AdminUser struct {
 
 // NewAdminUser constructs an AdminUser handler.
 func NewAdminUser(userRepo AggregateRepo, authorizer authz.Authorizer) *AdminUser {
+	if userRepo == nil {
+		panic("service.NewAdminUser: userRepo must not be nil")
+	}
+	if authorizer == nil {
+		panic("service.NewAdminUser: authorizer must not be nil")
+	}
 	return &AdminUser{userRepo: userRepo, authorizer: authorizer}
 }
 

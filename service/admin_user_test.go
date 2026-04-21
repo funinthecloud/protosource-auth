@@ -76,7 +76,7 @@ func TestAdminCreateUserActorDerivedFromContext(t *testing.T) {
 	// Send a spoofed actor in the body -- it should be ignored.
 	got := router.Dispatch(ctx, "POST", "/admin/user/create", protosource.Request{
 		Headers: map[string]string{"Cookie": "shadow=" + token},
-		Body:    `{"id":"user-spoofed","email":"spoofed@example.com","password":"pass123"}`,
+		Body:    `{"id":"user-spoofed","email":"spoofed@example.com","password":"pass123","actor":"evil-spoofer"}`,
 	})
 
 	if got.StatusCode != http.StatusCreated {
@@ -177,7 +177,9 @@ func TestAdminCreateDuplicateReturnsConflict(t *testing.T) {
 
 	// Verify the error message is stable (not leaking internals).
 	var body map[string]string
-	json.Unmarshal([]byte(got.Body), &body)
+	if err := json.Unmarshal([]byte(got.Body), &body); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
 	if body["error"] != "already exists" {
 		t.Fatalf("error = %q, want 'already exists'", body["error"])
 	}
