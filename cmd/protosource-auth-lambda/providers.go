@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"github.com/funinthecloud/protosource"
 	"github.com/funinthecloud/protosource/authz"
@@ -117,15 +118,25 @@ func provideRouter(
 	cors CORSOrigin,
 ) *protosource.Router {
 	r := protosource.NewRouter(svc, page, whoami, adminUser, userH, roleH, issuerH, keyH, tokenH)
-	if cors != "" {
+	if origins := splitOrigins(string(cors)); len(origins) > 0 {
 		r.SetCORS(protosource.CORSConfig{
-			AllowOrigins:     []string{string(cors)},
+			AllowOrigins:     origins,
 			AllowMethods:     "GET,POST,OPTIONS",
 			AllowHeaders:     "Content-Type,Accept",
 			AllowCredentials: true,
 		})
 	}
 	return r
+}
+
+func splitOrigins(raw string) []string {
+	out := make([]string, 0)
+	for _, part := range strings.Split(raw, ",") {
+		if s := strings.TrimSpace(part); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func provideCORSOrigin() CORSOrigin {
