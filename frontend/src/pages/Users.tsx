@@ -1,15 +1,16 @@
 import { Link } from "react-router-dom";
-import { listUsers } from "../api";
+import { userClient } from "../clients";
+import { State } from "../gen/auth/user/v1/user_pb.js";
 import { useAsync, fmtTime, stateName, userStates } from "../hooks";
 import { PageHeader, LinkBtn, Table, Td, Badge, Loading, ErrorBox } from "../ui";
 
-function stateBadge(state: number) {
-  const color = state === 1 ? "green" : state === 2 ? "yellow" : "red";
+function stateBadge(state: State) {
+  const color = state === State.ACTIVE ? "green" : state === State.LOCKED ? "yellow" : "red";
   return <Badge color={color}>{stateName(state, userStates)}</Badge>;
 }
 
 export default function Users() {
-  const { data, error, loading } = useAsync(listUsers);
+  const { data, error, loading } = useAsync(() => userClient.queryByState(State.ACTIVE));
 
   return (
     <>
@@ -26,8 +27,8 @@ export default function Users() {
                 </Link>
               </Td>
               <Td>{stateBadge(u.state)}</Td>
-              <Td>{Object.keys(u.roles ?? {}).length}</Td>
-              <Td>{fmtTime(u.create_at)}</Td>
+              <Td>{Object.keys(u.roles).length}</Td>
+              <Td>{fmtTime(u.createAt)}</Td>
               <Td>
                 <Link to={`/users/${u.id}`} className="text-zinc-500 hover:text-zinc-900 text-xs">
                   View

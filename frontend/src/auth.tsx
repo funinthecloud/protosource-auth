@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { whoami, ApiError, type WhoamiResponse } from "./api";
+import { setActor } from "./clients";
 
 interface AuthCtx {
   user: WhoamiResponse;
@@ -38,7 +39,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     whoami()
-      .then(setUser)
+      .then((u) => {
+        setActor(u.user_id);
+        setUser(u);
+      })
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) {
           redirectToLogin();
