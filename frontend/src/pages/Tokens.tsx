@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { listTokens, post } from "../api";
-import { useAuth } from "../auth";
+import { tokenClient } from "../clients";
+import { State } from "../gen/auth/token/v1/token_pb.js";
 import { useAsync, fmtTime, stateName, tokenStates } from "../hooks";
 import { PageHeader, Btn, Table, Td, Badge, Loading, ErrorBox } from "../ui";
 
 export default function Tokens() {
-  const { user: me } = useAuth();
-  const { data, error, loading, reload } = useAsync(listTokens);
+  const { data, error, loading, reload } = useAsync(() => tokenClient.queryByState(State.ISSUED));
   const [busy, setBusy] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
 
@@ -14,10 +13,10 @@ export default function Tokens() {
     setBusy(true);
     setActionErr(null);
     try {
-      await post("auth/token/v1/revoke", { id, actor: me.user_id });
+      await tokenClient.revoke(id);
       reload();
     } catch (e) {
-      setActionErr(String(e));
+      setActionErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -38,17 +37,17 @@ export default function Tokens() {
                 </code>
               </Td>
               <Td>
-                <code className="text-xs bg-zinc-100 px-1.5 py-0.5 rounded">{t.user_id}</code>
+                <code className="text-xs bg-zinc-100 px-1.5 py-0.5 rounded">{t.userId}</code>
               </Td>
               <Td>
-                <Badge color={t.state === 1 ? "green" : "red"}>
+                <Badge color={t.state === State.ISSUED ? "green" : "red"}>
                   {stateName(t.state, tokenStates)}
                 </Badge>
               </Td>
-              <Td>{fmtTime(t.issued_at)}</Td>
-              <Td>{fmtTime(t.expires_at)}</Td>
+              <Td>{fmtTime(t.issuedAt)}</Td>
+              <Td>{fmtTime(t.expiresAt)}</Td>
               <Td>
-                {t.state === 1 && (
+                {t.state === State.ISSUED && (
                   <Btn variant="danger" disabled={busy} onClick={() => revoke(t.id)}>
                     Revoke
                   </Btn>

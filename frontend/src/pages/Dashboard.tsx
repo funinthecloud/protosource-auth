@@ -1,5 +1,10 @@
 import { Link } from "react-router-dom";
-import { listUsers, listRoles, listIssuers, listKeys, listTokens } from "../api";
+import { userClient, roleClient, issuerClient, keyClient, tokenClient } from "../clients";
+import { State as UserState } from "../gen/auth/user/v1/user_pb.js";
+import { State as RoleState } from "../gen/auth/role/v1/role_pb.js";
+import { State as IssuerState } from "../gen/auth/issuer/v1/issuer_pb.js";
+import { State as KeyState } from "../gen/auth/key/v1/key_pb.js";
+import { State as TokenState } from "../gen/auth/token/v1/token_pb.js";
 import { useAsync } from "../hooks";
 import { PageHeader, Loading, ErrorBox } from "../ui";
 
@@ -18,11 +23,11 @@ function CountCard({ label, to, count, loading }: { label: string; to: string; c
 }
 
 export default function Dashboard() {
-  const users = useAsync(listUsers);
-  const roles = useAsync(listRoles);
-  const issuers = useAsync(listIssuers);
-  const keys = useAsync(listKeys);
-  const tokens = useAsync(listTokens);
+  const users = useAsync(() => userClient.queryByState(UserState.ACTIVE));
+  const roles = useAsync(() => roleClient.queryByState(RoleState.ACTIVE));
+  const issuers = useAsync(() => issuerClient.queryByState(IssuerState.ACTIVE));
+  const keys = useAsync(() => keyClient.queryByState(KeyState.SIGNING));
+  const tokens = useAsync(() => tokenClient.queryByState(TokenState.ISSUED));
 
   const anyError = users.error || roles.error || issuers.error || keys.error || tokens.error;
 

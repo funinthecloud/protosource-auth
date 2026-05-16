@@ -1,23 +1,22 @@
 import { useState } from "react";
-import { listKeys, post } from "../api";
-import { useAuth } from "../auth";
+import { keyClient } from "../clients";
+import { State } from "../gen/auth/key/v1/key_pb.js";
 import { useAsync, fmtTime, stateName, keyStates } from "../hooks";
 import { PageHeader, Btn, Table, Td, Badge, Loading, ErrorBox } from "../ui";
 
 export default function Keys() {
-  const { user: me } = useAuth();
-  const { data, error, loading, reload } = useAsync(listKeys);
+  const { data, error, loading, reload } = useAsync(() => keyClient.queryByState(State.SIGNING));
   const [busy, setBusy] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
 
-  async function exec(path: string, id: string) {
+  async function exec(action: () => Promise<unknown>) {
     setBusy(true);
     setActionErr(null);
     try {
-      await post(path, { id, actor: me.user_id });
+      await action();
       reload();
     } catch (e) {
-      setActionErr(String(e));
+      setActionErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -31,7 +30,7 @@ export default function Keys() {
       {data && (
         <Table headers={["KID", "Algorithm", "State", "Effective", "Signing Until", ""]}>
           {data.map((k) => {
-            const color = k.state === 1 ? "green" : k.state === 2 ? "blue" : "zinc";
+            const color = k.state === State.SIGNING ? "green" : k.state === State.VERIFY_ONLY ? "blue" : "zinc";
             return (
               <tr key={k.id} className="hover:bg-zinc-50">
                 <Td>
@@ -41,17 +40,17 @@ export default function Keys() {
                 <Td>
                   <Badge color={color}>{stateName(k.state, keyStates)}</Badge>
                 </Td>
-                <Td>{fmtTime(k.effective_at)}</Td>
-                <Td>{fmtTime(k.signing_until)}</Td>
+                <Td>{fmtTime(k.effectiveAt)}</Td>
+                <Td>{fmtTime(k.signingUntil)}</Td>
                 <Td>
                   <div className="flex gap-1">
-                    {k.state === 1 && (
-                      <Btn variant="secondary" disabled={busy} onClick={() => exec("auth/key/v1/retire", k.id)}>
+                    {k.state === State.SIGNING && (
+                      <Btn variant="secondary" disabled={busy} onClick={() => exec(() => keyClient.retire(k.id))}>
                         Retire
                       </Btn>
                     )}
-                    {k.state === 2 && (
-                      <Btn variant="secondary" disabled={busy} onClick={() => exec("auth/key/v1/expire", k.id)}>
+                    {k.state === State.VERIFY_ONLY && (
+                      <Btn variant="secondary" disabled={busy} onClick={() => exec(() => keyClient.expire(k.id))}>
                         Expire
                       </Btn>
                     )}

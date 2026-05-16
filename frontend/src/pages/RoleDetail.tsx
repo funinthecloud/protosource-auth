@@ -1,28 +1,27 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { getRole, post } from "../api";
-import { useAuth } from "../auth";
+import { roleClient } from "../clients";
+import { State } from "../gen/auth/role/v1/role_pb.js";
 import { useAsync, fmtTime, stateName, roleStates } from "../hooks";
 import { PageHeader, Btn, Badge, Card, DetailRow, Table, Td, Loading, ErrorBox } from "../ui";
 
 export default function RoleDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user: me } = useAuth();
-  const { data, error, loading, reload } = useAsync(() => getRole(id!), [id]);
+  const { data, error, loading, reload } = useAsync(() => roleClient.get(id!), [id]);
   const [busy, setBusy] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [funcName, setFuncName] = useState("");
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
 
-  async function exec(path: string, body: Record<string, unknown>) {
+  async function exec(action: () => Promise<unknown>) {
     setBusy(true);
     setActionErr(null);
     try {
-      await post(path, { id, actor: me.user_id, ...body });
+      await action();
       reload();
     } catch (e) {
-      setActionErr(String(e));
+      setActionErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -37,12 +36,12 @@ export default function RoleDetail() {
       <PageHeader
         title={data.name || data.id}
         action={
-          data.state === 1 ? (
+          data.state === State.ACTIVE ? (
             <Btn
               variant="danger"
               disabled={busy}
               onClick={() => {
-                if (confirm("Delete this role?")) exec("auth/role/v1/delete", {});
+                if (confirm("Delete this role?")) exec(() => roleClient.delete(id!));
               }}
             >
               Delete
@@ -58,12 +57,12 @@ export default function RoleDetail() {
           <DetailRow label="Name">{data.name}</DetailRow>
           <DetailRow label="Description">{data.description || "-"}</DetailRow>
           <DetailRow label="State">
-            <Badge color={data.state === 1 ? "green" : "red"}>
+            <Badge color={data.state === State.ACTIVE ? "green" : "red"}>
               {stateName(data.state, roleStates)}
             </Badge>
           </DetailRow>
-          <DetailRow label="Created">{fmtTime(data.create_at)}</DetailRow>
-          <DetailRow label="Modified">{fmtTime(data.modify_at)}</DetailRow>
+          <DetailRow label="Created">{fmtTime(data.createAt)}</DetailRow>
+          <DetailRow label="Modified">{fmtTime(data.modifyAt)}</DetailRow>
         </div>
       </Card>
 
@@ -77,7 +76,7 @@ export default function RoleDetail() {
               onChange={(e) => setNewName(e.target.value)}
               className="border border-zinc-300 rounded px-3 py-1.5 text-sm flex-1"
             />
-            <Btn disabled={busy || !newName} onClick={() => { exec("auth/role/v1/rename", { name: newName }); setNewName(""); }}>
+            <Btn disabled={busy || !newName} onClick={() => { exec(() => roleClient.rename(id!, newName)); setNewName(""); }}>
               Rename
             </Btn>
           </div>
@@ -88,7 +87,7 @@ export default function RoleDetail() {
               onChange={(e) => setNewDesc(e.target.value)}
               className="border border-zinc-300 rounded px-3 py-1.5 text-sm flex-1"
             />
-            <Btn disabled={busy || !newDesc} onClick={() => { exec("auth/role/v1/setdescription", { description: newDesc }); setNewDesc(""); }}>
+            <Btn disabled={busy || !newDesc} onClick={() => { exec(() => roleClient.setDescription(id!, newDesc)); setNewDesc(""); }}>
               Set
             </Btn>
           </div>
@@ -98,19 +97,19 @@ export default function RoleDetail() {
       <Card>
         <div className="p-4">
           <h2 className="text-sm font-semibold text-zinc-900 mb-3">Functions</h2>
-          {Object.keys(data.functions ?? {}).length > 0 ? (
+          {Object.keys(data.functions).length > 0 ? (
             <Table headers={["Function", "Granted", ""]}>
               {Object.values(data.functions).map((f) => (
                 <tr key={f.function}>
                   <Td>
                     <code className="text-xs bg-zinc-100 px-1.5 py-0.5 rounded">{f.function}</code>
                   </Td>
-                  <Td>{fmtTime(f.granted_at)}</Td>
+                  <Td>{fmtTime(f.grantedAt)}</Td>
                   <Td>
                     <Btn
                       variant="danger"
                       disabled={busy}
-                      onClick={() => exec("auth/role/v1/removefunction", { function: f.function })}
+                      onClick={() => exec(() => roleClient.removeFunction(id!, f.function))}
                     >
                       Remove
                     </Btn>
@@ -131,9 +130,13 @@ export default function RoleDetail() {
             <Btn
               disabled={busy || !funcName}
               onClick={() => {
-                exec("auth/role/v1/addfunction", {
-                  grant: { function: funcName, granted_at: Math.floor(Date.now() / 1000) },
-                });
+                exec(() =>
+                  roleClient.addFunction(id!, {
+                    $typeName: "auth.role.v1.FunctionGrant",
+                    function: funcName,
+                    grantedAt: BigInt(Math.floor(Date.now() / 1000)),
+                  }),
+                );
                 setFuncName("");
               }}
             >

@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
-import { listIssuers } from "../api";
+import { issuerClient } from "../clients";
+import { State } from "../gen/auth/issuer/v1/issuer_pb.js";
 import { useAsync, fmtTime, stateName, issuerStates, issuerKinds } from "../hooks";
 import { PageHeader, Table, Td, Badge, Loading, ErrorBox } from "../ui";
 
 export default function Issuers() {
-  const { data, error, loading } = useAsync(listIssuers);
+  const { data, error, loading } = useAsync(() => issuerClient.queryByState(State.ACTIVE));
 
   return (
     <>
@@ -17,7 +18,7 @@ export default function Issuers() {
             <tr key={i.id} className="hover:bg-zinc-50">
               <Td>
                 <Link to={`/issuers/${i.id}`} className="text-zinc-900 font-medium hover:underline">
-                  {i.display_name || i.id}
+                  {i.displayName || i.id}
                 </Link>
               </Td>
               <Td>
@@ -25,11 +26,11 @@ export default function Issuers() {
               </Td>
               <Td>{issuerKinds[i.kind] ?? i.kind}</Td>
               <Td>
-                <Badge color={i.state === 1 ? "green" : i.state === 2 ? "yellow" : "red"}>
+                <Badge color={i.state === State.ACTIVE ? "green" : i.state === State.DEACTIVATED ? "yellow" : "red"}>
                   {stateName(i.state, issuerStates)}
                 </Badge>
               </Td>
-              <Td>{fmtTime(i.create_at)}</Td>
+              <Td>{fmtTime(i.createAt)}</Td>
               <Td>
                 <Link to={`/issuers/${i.id}`} className="text-zinc-500 hover:text-zinc-900 text-xs">
                   View

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
+import { post } from "../api";
 import { userClient } from "../clients";
 import { State } from "../gen/auth/user/v1/user_pb.js";
 import { useAsync, fmtTime, stateName, userStates } from "../hooks";
@@ -12,6 +13,7 @@ export default function UserDetail() {
   const [actionErr, setActionErr] = useState<string | null>(null);
 
   const [roleId, setRoleId] = useState("");
+  const [newPass, setNewPass] = useState("");
 
   async function exec(action: () => Promise<unknown>) {
     setBusy(true);
@@ -73,6 +75,30 @@ export default function UserDetail() {
           </DetailRow>
           <DetailRow label="Created">{fmtTime(data.createAt)}</DetailRow>
           <DetailRow label="Modified">{fmtTime(data.modifyAt)}</DetailRow>
+        </div>
+      </Card>
+
+      <Card>
+        <div className="p-4">
+          <h2 className="text-sm font-semibold text-zinc-900 mb-3">Change Password</h2>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              placeholder="New password"
+              value={newPass}
+              onChange={(e) => setNewPass(e.target.value)}
+              className="border border-zinc-300 rounded px-3 py-1.5 text-sm flex-1"
+            />
+            <Btn
+              disabled={busy || !newPass}
+              onClick={async () => {
+                await exec(() => post("admin/user/changepassword", { id, password: newPass }));
+                setNewPass("");
+              }}
+            >
+              Update
+            </Btn>
+          </div>
         </div>
       </Card>
 
