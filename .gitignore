@@ -17,3 +17,6 @@
 
 # Claude
 .claude/
+
+# Terraform crap
+.terraform/
