@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from "react";
-import { ApiError } from "./api";
 
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -11,7 +10,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
     setError(null);
     fn()
       .then(setData)
-      .catch((e) => setError(e instanceof ApiError ? e.message : String(e)))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
@@ -21,9 +20,9 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
   return { data, error, loading, reload };
 }
 
-export function fmtTime(epoch: number): string {
+export function fmtTime(epoch: number | bigint): string {
   if (!epoch) return "-";
-  return new Date(epoch * 1000).toLocaleString();
+  return new Date(Number(epoch) * 1000).toLocaleString();
 }
 
 export function stateName(state: number, map: Record<number, string>): string {

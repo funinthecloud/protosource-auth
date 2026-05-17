@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { post } from "../api";
-import { useAuth } from "../auth";
+import { roleClient } from "../clients";
 import { PageHeader, Btn, Card, ErrorBox } from "../ui";
 
 export default function RoleCreate() {
-  const { user: me } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -18,10 +16,10 @@ export default function RoleCreate() {
     setError(null);
     try {
       const id = `role-${crypto.randomUUID()}`;
-      await post("auth/role/v1/create", { id, actor: me.user_id, name, description });
+      await roleClient.create(id, name, description);
       navigate(`/roles/${id}`);
     } catch (e) {
-      setError(String(e));
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }

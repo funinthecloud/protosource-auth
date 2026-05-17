@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
-import { listRoles } from "../api";
+import { roleClient } from "../clients";
+import { State } from "../gen/auth/role/v1/role_pb.js";
 import { useAsync, fmtTime, stateName, roleStates } from "../hooks";
 import { PageHeader, LinkBtn, Table, Td, Badge, Loading, ErrorBox } from "../ui";
 
 export default function Roles() {
-  const { data, error, loading } = useAsync(listRoles);
+  const { data, error, loading } = useAsync(() => roleClient.queryByState(State.ACTIVE));
 
   return (
     <>
@@ -21,12 +22,12 @@ export default function Roles() {
                 </Link>
               </Td>
               <Td>
-                <Badge color={r.state === 1 ? "green" : "red"}>
+                <Badge color={r.state === State.ACTIVE ? "green" : "red"}>
                   {stateName(r.state, roleStates)}
                 </Badge>
               </Td>
-              <Td>{Object.keys(r.functions ?? {}).length}</Td>
-              <Td>{fmtTime(r.create_at)}</Td>
+              <Td>{Object.keys(r.functions).length}</Td>
+              <Td>{fmtTime(r.createAt)}</Td>
               <Td>
                 <Link to={`/roles/${r.id}`} className="text-zinc-500 hover:text-zinc-900 text-xs">
                   View
