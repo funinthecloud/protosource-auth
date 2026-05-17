@@ -4,7 +4,7 @@
 // @ts-nocheck
 
 import type { ProtosourceClient, CommandResponse, History } from "@protosource/client";
-import { RegisterSchema, RenameSchema, SetDefaultAlgorithmSchema, SetJWKSURLSchema, DeactivateSchema, ReactivateSchema, DeleteSchema, IssuerSchema, IssuerListSchema, State } from "./issuer_pb.js";
+import { RegisterSchema, RenameSchema, SetDefaultAlgorithmSchema, SetJWKSURLSchema, DeactivateSchema, ReactivateSchema, DeleteSchema, IssuerSchema, IssuerListSchema, State, Kind } from "./issuer_pb.js";
 import type { Register, Rename, SetDefaultAlgorithm, SetJWKSURL, Deactivate, Reactivate, Delete, Issuer, IssuerList } from "./issuer_pb.js";
 
 const routePath = "auth/issuer/v1";
