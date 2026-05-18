@@ -25,6 +25,14 @@ export function fmtTime(epoch: number | bigint): string {
   return new Date(Number(epoch) * 1000).toLocaleString();
 }
 
+// fmtMicroTime renders a Unix-microsecond timestamp (what protosource stamps
+// onto create_at / modify_at via NowMicros). Domain-set timestamps like
+// issuedAt, expiresAt, effectiveAt are seconds — use fmtTime for those.
+export function fmtMicroTime(epoch: number | bigint): string {
+  if (!epoch) return "-";
+  return new Date(Number(epoch) / 1000).toLocaleString();
+}
+
 export function stateName(state: number, map: Record<number, string>): string {
   return map[state] ?? `Unknown (${state})`;
 }

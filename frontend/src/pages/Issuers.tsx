@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { issuerClient } from "../clients";
 import { State } from "../gen/auth/issuer/v1/issuer_pb.js";
-import { useAsync, fmtTime, stateName, issuerStates, issuerKinds } from "../hooks";
+import { useAsync, fmtMicroTime, stateName, issuerStates, issuerKinds } from "../hooks";
 import { PageHeader, Table, Td, Badge, Loading, ErrorBox } from "../ui";
 
 export default function Issuers() {
@@ -30,7 +30,7 @@ export default function Issuers() {
                   {stateName(i.state, issuerStates)}
                 </Badge>
               </Td>
-              <Td>{fmtTime(i.createAt)}</Td>
+              <Td>{fmtMicroTime(i.createAt)}</Td>
               <Td>
                 <Link to={`/issuers/${i.id}`} className="text-zinc-500 hover:text-zinc-900 text-xs">
                   View

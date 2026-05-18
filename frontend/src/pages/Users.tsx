@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { userClient } from "../clients";
 import { State } from "../gen/auth/user/v1/user_pb.js";
-import { useAsync, fmtTime, stateName, userStates } from "../hooks";
+import { useAsync, fmtMicroTime, stateName, userStates } from "../hooks";
 import { PageHeader, LinkBtn, Table, Td, Badge, Loading, ErrorBox } from "../ui";
 
 function stateBadge(state: State) {
@@ -28,7 +28,7 @@ export default function Users() {
               </Td>
               <Td>{stateBadge(u.state)}</Td>
               <Td>{Object.keys(u.roles).length}</Td>
-              <Td>{fmtTime(u.createAt)}</Td>
+              <Td>{fmtMicroTime(u.createAt)}</Td>
               <Td>
                 <Link to={`/users/${u.id}`} className="text-zinc-500 hover:text-zinc-900 text-xs">
                   View

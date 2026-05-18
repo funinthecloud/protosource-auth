@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { roleClient } from "../clients";
 import { State } from "../gen/auth/role/v1/role_pb.js";
-import { useAsync, fmtTime, stateName, roleStates } from "../hooks";
+import { useAsync, fmtMicroTime, stateName, roleStates } from "../hooks";
 import { PageHeader, LinkBtn, Table, Td, Badge, Loading, ErrorBox } from "../ui";
 
 export default function Roles() {
@@ -27,7 +27,7 @@ export default function Roles() {
                 </Badge>
               </Td>
               <Td>{Object.keys(r.functions).length}</Td>
-              <Td>{fmtTime(r.createAt)}</Td>
+              <Td>{fmtMicroTime(r.createAt)}</Td>
               <Td>
                 <Link to={`/roles/${r.id}`} className="text-zinc-500 hover:text-zinc-900 text-xs">
                   View

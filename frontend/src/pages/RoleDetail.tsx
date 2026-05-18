@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { roleClient } from "../clients";
 import { State } from "../gen/auth/role/v1/role_pb.js";
-import { useAsync, fmtTime, stateName, roleStates } from "../hooks";
+import { useAsync, fmtTime, fmtMicroTime, stateName, roleStates } from "../hooks";
 import { PageHeader, Btn, Badge, Card, DetailRow, Table, Td, Loading, ErrorBox } from "../ui";
 
 export default function RoleDetail() {
@@ -61,8 +61,8 @@ export default function RoleDetail() {
               {stateName(data.state, roleStates)}
             </Badge>
           </DetailRow>
-          <DetailRow label="Created">{fmtTime(data.createAt)}</DetailRow>
-          <DetailRow label="Modified">{fmtTime(data.modifyAt)}</DetailRow>
+          <DetailRow label="Created">{fmtMicroTime(data.createAt)}</DetailRow>
+          <DetailRow label="Modified">{fmtMicroTime(data.modifyAt)}</DetailRow>
         </div>
       </Card>
 

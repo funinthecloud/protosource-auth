@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { issuerClient } from "../clients";
 import { State } from "../gen/auth/issuer/v1/issuer_pb.js";
-import { useAsync, fmtTime, stateName, issuerStates, issuerKinds } from "../hooks";
+import { useAsync, fmtMicroTime, stateName, issuerStates, issuerKinds } from "../hooks";
 import { PageHeader, Btn, Badge, Card, DetailRow, Loading, ErrorBox } from "../ui";
 
 export default function IssuerDetail() {
@@ -75,8 +75,8 @@ export default function IssuerDetail() {
               {stateName(data.state, issuerStates)}
             </Badge>
           </DetailRow>
-          <DetailRow label="Created">{fmtTime(data.createAt)}</DetailRow>
-          <DetailRow label="Modified">{fmtTime(data.modifyAt)}</DetailRow>
+          <DetailRow label="Created">{fmtMicroTime(data.createAt)}</DetailRow>
+          <DetailRow label="Modified">{fmtMicroTime(data.modifyAt)}</DetailRow>
         </div>
       </Card>
     </>

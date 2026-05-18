@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { post } from "../api";
 import { userClient } from "../clients";
 import { State } from "../gen/auth/user/v1/user_pb.js";
-import { useAsync, fmtTime, stateName, userStates } from "../hooks";
+import { useAsync, fmtTime, fmtMicroTime, stateName, userStates } from "../hooks";
 import { PageHeader, Btn, Badge, Card, DetailRow, Table, Td, Loading, ErrorBox } from "../ui";
 
 export default function UserDetail() {
@@ -73,8 +73,8 @@ export default function UserDetail() {
           <DetailRow label="State">
             <Badge color={stateColor}>{stateName(data.state, userStates)}</Badge>
           </DetailRow>
-          <DetailRow label="Created">{fmtTime(data.createAt)}</DetailRow>
-          <DetailRow label="Modified">{fmtTime(data.modifyAt)}</DetailRow>
+          <DetailRow label="Created">{fmtMicroTime(data.createAt)}</DetailRow>
+          <DetailRow label="Modified">{fmtMicroTime(data.modifyAt)}</DetailRow>
         </div>
       </Card>
 
