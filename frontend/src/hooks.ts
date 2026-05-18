@@ -38,42 +38,8 @@ export function stateName(state: number, map: Record<number, string>): string {
   return map[state] ?? `Unknown (${state})`;
 }
 
-export const userStates: Record<number, string> = {
-  0: "Unspecified",
-  1: "Active",
-  2: "Locked",
-  3: "Deleted",
-};
-
-export const roleStates: Record<number, string> = {
-  0: "Unspecified",
-  1: "Active",
-  2: "Deleted",
-  3: "Inactive",
-};
-
-export const issuerStates: Record<number, string> = {
-  0: "Unspecified",
-  1: "Active",
-  2: "Deactivated",
-  3: "Deleted",
-};
-
-export const issuerKinds: Record<number, string> = {
-  0: "Unspecified",
-  1: "Self",
-  2: "External",
-};
-
-export const keyStates: Record<number, string> = {
-  0: "Unspecified",
-  1: "Signing",
-  2: "Verify Only",
-  3: "Expired",
-};
-
-export const tokenStates: Record<number, string> = {
-  0: "Unspecified",
-  1: "Issued",
-  2: "Revoked",
-};
+export { StateDisplay as userStates } from "./gen/auth/user/v1/user.protosource.enums.js";
+export { StateDisplay as roleStates } from "./gen/auth/role/v1/role.protosource.enums.js";
+export { StateDisplay as issuerStates, KindDisplay as issuerKinds } from "./gen/auth/issuer/v1/issuer.protosource.enums.js";
+export { StateDisplay as keyStates } from "./gen/auth/key/v1/key.protosource.enums.js";
+export { StateDisplay as tokenStates } from "./gen/auth/token/v1/token.protosource.enums.js";

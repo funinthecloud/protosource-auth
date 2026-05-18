@@ -418,3 +418,13 @@ func (b *Builder) Expired(Actor string) {
 	}
 	b.Events = append(b.Events, event)
 }
+
+// State_Display maps each State value to a human-readable label.
+// The keyed-by-enum-type form gives a compile error if a new value is added
+// without updating the map.
+var State_Display = map[State]string{
+	State_STATE_UNSPECIFIED: "Unspecified",
+	State_STATE_SIGNING:     "Signing",
+	State_STATE_VERIFY_ONLY: "Verify Only",
+	State_STATE_EXPIRED:     "Expired",
+}

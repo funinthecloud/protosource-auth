@@ -613,3 +613,22 @@ func (b *Builder) Deleted(Actor string) {
 	}
 	b.Events = append(b.Events, event)
 }
+
+// State_Display maps each State value to a human-readable label.
+// The keyed-by-enum-type form gives a compile error if a new value is added
+// without updating the map.
+var State_Display = map[State]string{
+	State_STATE_UNSPECIFIED: "Unspecified",
+	State_STATE_ACTIVE:      "Active",
+	State_STATE_DEACTIVATED: "Deactivated",
+	State_STATE_DELETED:     "Deleted",
+}
+
+// Kind_Display maps each Kind value to a human-readable label.
+// The keyed-by-enum-type form gives a compile error if a new value is added
+// without updating the map.
+var Kind_Display = map[Kind]string{
+	Kind_KIND_UNSPECIFIED: "Unspecified",
+	Kind_KIND_SELF:        "Self",
+	Kind_KIND_EXTERNAL:    "External",
+}
