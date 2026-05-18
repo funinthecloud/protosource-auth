@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { post } from "../api";
-import { userClient } from "../clients";
+import { userClient, roleClient } from "../clients";
 import { State } from "../gen/auth/user/v1/user_pb.js";
+import { State as RoleState } from "../gen/auth/role/v1/role_pb.js";
 import { useAsync, fmtTime, fmtMicroTime, stateName, userStates } from "../hooks";
 import { PageHeader, Btn, Badge, Card, DetailRow, Table, Td, Loading, ErrorBox } from "../ui";
 
 export default function UserDetail() {
   const { id } = useParams<{ id: string }>();
   const { data, error, loading, reload } = useAsync(() => userClient.get(id!), [id]);
+  const { data: roles } = useAsync(() => roleClient.queryByState(RoleState.ACTIVE), []);
   const [busy, setBusy] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
 
@@ -127,12 +129,21 @@ export default function UserDetail() {
             <p className="text-sm text-zinc-400">No roles assigned.</p>
           )}
           <div className="flex gap-2 mt-3">
-            <input
-              placeholder="Role ID"
+            <select
               value={roleId}
               onChange={(e) => setRoleId(e.target.value)}
               className="border border-zinc-300 rounded px-3 py-1.5 text-sm flex-1"
-            />
+              disabled={!roles}
+            >
+              <option value="">{roles ? "Select a role…" : "Loading roles…"}</option>
+              {roles
+                ?.filter((r) => !(r.id in data.roles))
+                .map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name ? `${r.name} (${r.id})` : r.id}
+                  </option>
+                ))}
+            </select>
             <Btn
               disabled={busy || !roleId}
               onClick={() => {
