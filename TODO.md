@@ -40,6 +40,7 @@
 - [x] **Lambda deployment target.** `cmd/protosource-auth-lambda` with wire-based DI, `awslambda.WrapRouter`, SAM template at `template.yaml`.
 - [x] **Table creation via framework.** Uses `dynamodbstore.EnsureTables` from protosource v0.1.5 (deletion protection + PITR enabled).
 - [ ] **Health check endpoint.** `GET /healthz` that pings the KeyProvider, the default Issuer's current signing key, and DynamoDB (DescribeTable). Useful for load balancer probes.
+- [ ] **Same-origin admin SPA + API via CloudFront.** Today the admin SPA is hosted at `admin-auth.<domain>` (CloudFront → S3) and the API at `auth.<domain>` (API Gateway → Lambda), so the SPA is built with `VITE_API_BASE=https://auth.<domain>` and depends on CORS being correct on the API. Cleaner: add a second origin on the admin CloudFront distribution pointing at the API Gateway and route `/auth/*`, `/admin/*`, `/whoami`, `/login` to it. Removes the CORS surface entirely, keeps the shadow cookie strictly first-party, and lets `VITE_API_BASE` drop to `""` (same-origin). Requires terraform changes in `tofu/aws/admin.tf` (additional origin + cache behaviors) and revisiting the cookie domain logic in `loginpage/` so the cookie lands on the admin host, not the auth host.
 
 ## Observability
 

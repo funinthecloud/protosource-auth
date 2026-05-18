@@ -14,6 +14,10 @@ help:
 	@echo "  deploy-backend   tofu apply (builds Lambda binary and ships it)"
 	@echo "  deploy-frontend  vite build + s3 sync + cloudfront invalidation"
 	@echo "  clean            Remove build artifacts"
+	@echo ""
+	@echo "Required env for frontend builds:"
+	@echo "  VITE_API_BASE    API origin (e.g. https://auth.example.com)"
+	@echo "  VITE_AUTH_URL    Login redirect origin (usually same as VITE_API_BASE)"
 
 .PHONY: tools
 tools:
@@ -37,9 +41,10 @@ build-backend: gen-go
 	go build ./...
 
 build-frontend: gen-ts
+	@test -n "$(VITE_API_BASE)" || (echo "VITE_API_BASE not set — e.g. VITE_API_BASE=https://auth.example.com make build-frontend" && exit 1)
 	cd frontend && npm install
 	cd frontend && npx tsc -b
-	cd frontend && npx vite build
+	cd frontend && VITE_API_BASE="$(VITE_API_BASE)" VITE_AUTH_URL="$(VITE_AUTH_URL)" npx vite build
 
 .PHONY: test test-backend test-frontend
 test: test-backend test-frontend
