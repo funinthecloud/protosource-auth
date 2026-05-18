@@ -45,6 +45,12 @@ go test -race ./...                    # under the race detector
 go vet ./...
 ```
 
+Frontend: prefer `npm --prefix frontend run build` over `npx tsc --noEmit` — the build uses `tsc -b` (composite mode) which catches errors the bare `--noEmit` skips.
+
+## Related repos (locally available)
+
+- `~/Developer/funinthecloud/protosource` — the framework. Indexed by jcodemunch (use `resolve_repo` for the current id). Edit + `go install ./cmd/protoc-gen-protosource{,-ts}` to test plugin changes here without publishing.
+
 ## Local dev
 
 ```bash

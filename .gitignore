@@ -6,6 +6,8 @@
 # Build artifacts
 /protosource-auth
 /protosource-authmgr
+# Aggregate-mgr CLIs built by `make gen` / `make build-backend`
+gen/**/*mgr/*mgr
 
 # IDE
 .idea/
