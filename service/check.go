@@ -134,8 +134,9 @@ func (c *Checker) Check(ctx context.Context, req CheckRequest) (*CheckResponse, 
 	userID := token.GetUserId()
 
 	functionSet, hit := c.cache.get(userID)
+	var diag resolveDiag
 	if !hit {
-		functionSet, err = c.resolveFunctions(ctx, userID)
+		functionSet, diag, err = c.resolveFunctions(ctx, userID)
 		if err != nil {
 			return nil, err
 		}
@@ -143,14 +144,23 @@ func (c *Checker) Check(ctx context.Context, req CheckRequest) (*CheckResponse, 
 	}
 
 	if !functions.MatchAny(functionSet, req.RequiredFunction) {
-		slog.WarnContext(ctx, "authz: forbidden",
+		attrs := []any{
 			"code", "AUTHZ_FORBIDDEN",
 			"user_id", userID,
 			"required_function", req.RequiredFunction,
 			"granted_functions", functionSet,
 			"granted_count", len(functionSet),
 			"cache_hit", hit,
-		)
+		}
+		if !hit {
+			attrs = append(attrs,
+				"role_ids", diag.roleIDs,
+				"role_count", len(diag.roleIDs),
+				"skipped_missing_roles", diag.skippedMissing,
+				"skipped_inactive_roles", diag.skippedInactive,
+			)
+		}
+		slog.WarnContext(ctx, "authz: forbidden", attrs...)
 		return nil, authz.ErrForbidden
 	}
 
@@ -160,55 +170,63 @@ func (c *Checker) Check(ctx context.Context, req CheckRequest) (*CheckResponse, 
 	}, nil
 }
 
+// resolveDiag captures information about how a function set was built so
+// callers can surface it in diagnostic logs (especially on forbidden).
+type resolveDiag struct {
+	roleIDs         []string
+	skippedMissing  []string
+	skippedInactive []string
+}
+
 // resolveFunctions walks User → Roles → FunctionGrants and returns the
 // deduplicated union of function strings.
-func (c *Checker) resolveFunctions(ctx context.Context, userID string) ([]string, error) {
+func (c *Checker) resolveFunctions(ctx context.Context, userID string) ([]string, resolveDiag, error) {
+	var diag resolveDiag
 	userAgg, err := c.userRepo.Load(ctx, userID)
 	if err != nil {
 		if errors.Is(err, protosource.ErrAggregateNotFound) {
 			// Token references a user that no longer exists. Treat as
 			// unauthenticated rather than forbidden — the identity is
 			// gone, not the authorization.
-			return nil, authz.ErrUnauthenticated
+			return nil, diag, authz.ErrUnauthenticated
 		}
-		return nil, fmt.Errorf("service: load user: %w", err)
+		return nil, diag, fmt.Errorf("service: load user: %w", err)
 	}
 	user, ok := userAgg.(*userv1.User)
 	if !ok {
-		return nil, fmt.Errorf("service: loaded user is %T, want *userv1.User", userAgg)
+		return nil, diag, fmt.Errorf("service: loaded user is %T, want *userv1.User", userAgg)
 	}
 
 	if user.GetState() != userv1.State_STATE_ACTIVE {
 		// Locked, deleted, or pending — revoke access regardless of what
 		// the token says.
-		return nil, authz.ErrUnauthenticated
+		return nil, diag, authz.ErrUnauthenticated
 	}
 
-	roleIDs := make([]string, 0, len(user.GetRoles()))
+	diag.roleIDs = make([]string, 0, len(user.GetRoles()))
 	for roleID := range user.GetRoles() {
-		roleIDs = append(roleIDs, roleID)
+		diag.roleIDs = append(diag.roleIDs, roleID)
 	}
 
 	seen := make(map[string]struct{})
 	var out []string
-	var skippedMissing, skippedInactive []string
-	for _, roleID := range roleIDs {
+	for _, roleID := range diag.roleIDs {
 		roleAgg, err := c.roleRepo.Load(ctx, roleID)
 		if err != nil {
 			if errors.Is(err, protosource.ErrAggregateNotFound) {
 				// Role was deleted after assignment. Skip silently — the
 				// user just loses that role's grants.
-				skippedMissing = append(skippedMissing, roleID)
+				diag.skippedMissing = append(diag.skippedMissing, roleID)
 				continue
 			}
-			return nil, fmt.Errorf("service: load role %q: %w", roleID, err)
+			return nil, diag, fmt.Errorf("service: load role %q: %w", roleID, err)
 		}
 		role, ok := roleAgg.(*rolev1.Role)
 		if !ok {
-			return nil, fmt.Errorf("service: loaded role is %T, want *rolev1.Role", roleAgg)
+			return nil, diag, fmt.Errorf("service: loaded role is %T, want *rolev1.Role", roleAgg)
 		}
 		if role.GetState() != rolev1.State_STATE_ACTIVE {
-			skippedInactive = append(skippedInactive, roleID)
+			diag.skippedInactive = append(diag.skippedInactive, roleID)
 			continue
 		}
 		for fn := range role.GetFunctions() {
@@ -220,15 +238,5 @@ func (c *Checker) resolveFunctions(ctx context.Context, userID string) ([]string
 		}
 	}
 
-	slog.DebugContext(ctx, "authz: resolved functions",
-		"user_id", userID,
-		"role_ids", roleIDs,
-		"role_count", len(roleIDs),
-		"skipped_missing_roles", skippedMissing,
-		"skipped_inactive_roles", skippedInactive,
-		"granted_functions", out,
-		"granted_count", len(out),
-	)
-
-	return out, nil
+	return out, diag, nil
 }
