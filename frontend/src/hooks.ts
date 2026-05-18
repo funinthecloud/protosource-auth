@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { fromMicros } from "@protosource/client";
 
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -30,7 +31,7 @@ export function fmtTime(epoch: number | bigint): string {
 // issuedAt, expiresAt, effectiveAt are seconds — use fmtTime for those.
 export function fmtMicroTime(epoch: number | bigint): string {
   if (!epoch) return "-";
-  return new Date(Number(epoch) / 1000).toLocaleString();
+  return fromMicros(epoch).toLocaleString();
 }
 
 export function stateName(state: number, map: Record<number, string>): string {
