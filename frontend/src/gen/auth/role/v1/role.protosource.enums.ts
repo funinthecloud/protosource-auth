@@ -6,8 +6,8 @@ import { State } from "./role_pb.js";
 // The Record<State, string> typing makes a missing entry a compile error
 // when a new enum value is added.
 export const StateDisplay: Record<State, string> = {
-  [State.STATE_UNSPECIFIED]: "Unspecified",
-  [State.STATE_ACTIVE]: "Active",
-  [State.STATE_DELETED]: "Deleted",
-  [State.STATE_INACTIVE]: "Inactive",
+  [State.UNSPECIFIED]: "Unspecified",
+  [State.ACTIVE]: "Active",
+  [State.DELETED]: "Deleted",
+  [State.INACTIVE]: "Inactive",
 };

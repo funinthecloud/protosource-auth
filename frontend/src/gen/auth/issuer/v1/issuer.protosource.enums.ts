@@ -6,17 +6,17 @@ import { State, Kind } from "./issuer_pb.js";
 // The Record<State, string> typing makes a missing entry a compile error
 // when a new enum value is added.
 export const StateDisplay: Record<State, string> = {
-  [State.STATE_UNSPECIFIED]: "Unspecified",
-  [State.STATE_ACTIVE]: "Active",
-  [State.STATE_DEACTIVATED]: "Deactivated",
-  [State.STATE_DELETED]: "Deleted",
+  [State.UNSPECIFIED]: "Unspecified",
+  [State.ACTIVE]: "Active",
+  [State.DEACTIVATED]: "Deactivated",
+  [State.DELETED]: "Deleted",
 };
 
 // KindDisplay maps each Kind value to a human-readable label.
 // The Record<Kind, string> typing makes a missing entry a compile error
 // when a new enum value is added.
 export const KindDisplay: Record<Kind, string> = {
-  [Kind.KIND_UNSPECIFIED]: "Unspecified",
-  [Kind.KIND_SELF]: "Self",
-  [Kind.KIND_EXTERNAL]: "External",
+  [Kind.UNSPECIFIED]: "Unspecified",
+  [Kind.SELF]: "Self",
+  [Kind.EXTERNAL]: "External",
 };

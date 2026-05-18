@@ -6,7 +6,7 @@ import { State } from "./token_pb.js";
 // The Record<State, string> typing makes a missing entry a compile error
 // when a new enum value is added.
 export const StateDisplay: Record<State, string> = {
-  [State.STATE_UNSPECIFIED]: "Unspecified",
-  [State.STATE_ISSUED]: "Issued",
-  [State.STATE_REVOKED]: "Revoked",
+  [State.UNSPECIFIED]: "Unspecified",
+  [State.ISSUED]: "Issued",
+  [State.REVOKED]: "Revoked",
 };

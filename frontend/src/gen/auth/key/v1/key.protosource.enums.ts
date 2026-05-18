@@ -6,8 +6,8 @@ import { State } from "./key_pb.js";
 // The Record<State, string> typing makes a missing entry a compile error
 // when a new enum value is added.
 export const StateDisplay: Record<State, string> = {
-  [State.STATE_UNSPECIFIED]: "Unspecified",
-  [State.STATE_SIGNING]: "Signing",
-  [State.STATE_VERIFY_ONLY]: "Verify Only",
-  [State.STATE_EXPIRED]: "Expired",
+  [State.UNSPECIFIED]: "Unspecified",
+  [State.SIGNING]: "Signing",
+  [State.VERIFY_ONLY]: "Verify Only",
+  [State.EXPIRED]: "Expired",
 };
