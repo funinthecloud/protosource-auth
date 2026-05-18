@@ -64,6 +64,10 @@ func main() {
 		if err := runRecoverAdmin(ctx, args); err != nil {
 			fatal(err)
 		}
+	case "diagnose-user":
+		if err := runDiagnoseUser(ctx, args); err != nil {
+			fatal(err)
+		}
 	case "-h", "--help", "help":
 		usage(os.Stdout)
 	default:
@@ -80,6 +84,7 @@ func usage(w *os.File) {
 	fmt.Fprintln(w, "  ensure-tables    Create the DynamoDB tables if they do not exist.")
 	fmt.Fprintln(w, "  bootstrap        Create default issuer + super-admin role + admin user.")
 	fmt.Fprintln(w, "  recover-admin    Create a fresh admin alongside existing ones (lost-admin recovery).")
+	fmt.Fprintln(w, "  diagnose-user    Print a user's role assignments and per-role resolution status.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "All subcommands read the PROTOSOURCE_AUTH_* environment variables shared with")
 	fmt.Fprintln(w, "cmd/protosource-auth. Bootstrap and recover-admin additionally require")
