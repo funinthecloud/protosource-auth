@@ -10,8 +10,8 @@ help:
 	@echo "  gen              Regenerate Go and TS protobuf code"
 	@echo "  build            Regen + build backend and frontend"
 	@echo "  test             go test + frontend tsc"
-	@echo "  deploy           Full release: regen, build, sam deploy, sync SPA, invalidate"
-	@echo "  deploy-backend   sam build + sam deploy"
+	@echo "  deploy           Full release: regen, build, tofu apply, sync SPA, invalidate"
+	@echo "  deploy-backend   tofu apply (builds Lambda binary and ships it)"
 	@echo "  deploy-frontend  vite build + s3 sync + cloudfront invalidation"
 	@echo "  clean            Remove build artifacts"
 
@@ -53,9 +53,8 @@ test-frontend:
 .PHONY: deploy deploy-backend deploy-frontend invalidate
 deploy: build deploy-backend deploy-frontend
 
-deploy-backend:
-	sam build
-	sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+deploy-backend: gen-go
+	tofu -chdir=$(TOFU_DIR) apply -auto-approve
 
 deploy-frontend: build-frontend
 	@test -n "$(ADMIN_BUCKET)" || (echo "ADMIN_BUCKET not set — run 'tofu apply' in $(TOFU_DIR) first" && exit 1)
@@ -68,4 +67,4 @@ invalidate:
 
 .PHONY: clean
 clean:
-	rm -rf .aws-sam frontend/dist frontend/src/gen
+	rm -rf frontend/dist frontend/src/gen tofu/aws/.build
