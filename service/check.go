@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/funinthecloud/protosource"
@@ -142,6 +143,14 @@ func (c *Checker) Check(ctx context.Context, req CheckRequest) (*CheckResponse, 
 	}
 
 	if !functions.MatchAny(functionSet, req.RequiredFunction) {
+		slog.WarnContext(ctx, "authz: forbidden",
+			"code", "AUTHZ_FORBIDDEN",
+			"user_id", userID,
+			"required_function", req.RequiredFunction,
+			"granted_functions", functionSet,
+			"granted_count", len(functionSet),
+			"cache_hit", hit,
+		)
 		return nil, authz.ErrForbidden
 	}
 
@@ -175,14 +184,21 @@ func (c *Checker) resolveFunctions(ctx context.Context, userID string) ([]string
 		return nil, authz.ErrUnauthenticated
 	}
 
+	roleIDs := make([]string, 0, len(user.GetRoles()))
+	for roleID := range user.GetRoles() {
+		roleIDs = append(roleIDs, roleID)
+	}
+
 	seen := make(map[string]struct{})
 	var out []string
-	for roleID := range user.GetRoles() {
+	var skippedMissing, skippedInactive []string
+	for _, roleID := range roleIDs {
 		roleAgg, err := c.roleRepo.Load(ctx, roleID)
 		if err != nil {
 			if errors.Is(err, protosource.ErrAggregateNotFound) {
 				// Role was deleted after assignment. Skip silently — the
 				// user just loses that role's grants.
+				skippedMissing = append(skippedMissing, roleID)
 				continue
 			}
 			return nil, fmt.Errorf("service: load role %q: %w", roleID, err)
@@ -192,6 +208,7 @@ func (c *Checker) resolveFunctions(ctx context.Context, userID string) ([]string
 			return nil, fmt.Errorf("service: loaded role is %T, want *rolev1.Role", roleAgg)
 		}
 		if role.GetState() != rolev1.State_STATE_ACTIVE {
+			skippedInactive = append(skippedInactive, roleID)
 			continue
 		}
 		for fn := range role.GetFunctions() {
@@ -202,6 +219,16 @@ func (c *Checker) resolveFunctions(ctx context.Context, userID string) ([]string
 			out = append(out, fn)
 		}
 	}
+
+	slog.DebugContext(ctx, "authz: resolved functions",
+		"user_id", userID,
+		"role_ids", roleIDs,
+		"role_count", len(roleIDs),
+		"skipped_missing_roles", skippedMissing,
+		"skipped_inactive_roles", skippedInactive,
+		"granted_functions", out,
+		"granted_count", len(out),
+	)
 
 	return out, nil
 }
