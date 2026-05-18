@@ -11,6 +11,7 @@ export default function UserDetail() {
   const { id } = useParams<{ id: string }>();
   const { data, error, loading, reload } = useAsync(() => userClient.get(id!), [id]);
   const { data: roles } = useAsync(() => roleClient.queryByState(RoleState.ACTIVE), []);
+  const roleNames = new Map(roles?.map((r) => [r.id, r.name]) ?? []);
   const [busy, setBusy] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
 
@@ -108,10 +109,21 @@ export default function UserDetail() {
         <div className="p-4">
           <h2 className="text-sm font-semibold text-zinc-900 mb-3">Roles</h2>
           {Object.keys(data.roles).length > 0 ? (
-            <Table headers={["Role ID", "Assigned", ""]}>
-              {Object.values(data.roles).map((r) => (
+            <Table headers={["Role", "Assigned", ""]}>
+              {Object.values(data.roles).map((r) => {
+                const name = roleNames.get(r.roleId);
+                return (
                 <tr key={r.roleId}>
-                  <Td>{r.roleId}</Td>
+                  <Td>
+                    {name ? (
+                      <>
+                        <div className="text-zinc-900">{name}</div>
+                        <div className="text-xs text-zinc-400 font-mono">{r.roleId}</div>
+                      </>
+                    ) : (
+                      <span className="font-mono text-zinc-500">{r.roleId}</span>
+                    )}
+                  </Td>
                   <Td>{fmtTime(r.assignedAt)}</Td>
                   <Td>
                     <Btn
@@ -123,7 +135,8 @@ export default function UserDetail() {
                     </Btn>
                   </Td>
                 </tr>
-              ))}
+                );
+              })}
             </Table>
           ) : (
             <p className="text-sm text-zinc-400">No roles assigned.</p>
