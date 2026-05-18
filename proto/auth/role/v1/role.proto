@@ -14,6 +14,7 @@ enum State {
   STATE_UNSPECIFIED = 0;
   STATE_ACTIVE      = 1;
   STATE_DELETED     = 2;
+  STATE_INACTIVE    = 3;
 }
 
 // Role is a named collection of function grants. Users are assigned zero or
@@ -105,11 +106,31 @@ message RemoveFunction {
   string function = 3 [(buf.validate.field).string.min_len = 1];
 }
 
+message Deactivate {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Deactivated" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
+message Activate {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "Activated" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_INACTIVE" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
 message Delete {
   option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
     produces_events: [ "Deleted" ]
     lifecycle: COMMAND_LIFECYCLE_MUTATION
-    allowed_states: [ "STATE_ACTIVE" ]
+    allowed_states: [ "STATE_ACTIVE", "STATE_INACTIVE" ]
   };
   string id    = 1;
   string actor = 2;
@@ -177,6 +198,26 @@ message FunctionRemoved {
   int64  at       = 3;
   string actor    = 4;
   string function = 5;
+}
+
+message Deactivated {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_INACTIVE"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}
+
+message Activated {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+    sets_state: "STATE_ACTIVE"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
 }
 
 message Deleted {

@@ -70,6 +70,10 @@ func (h *Handler) RegisterRoutes(router *protosource.Router) {
 
 	router.Handle("POST", "auth/role/v1/removefunction", h.HandleRemoveFunction)
 
+	router.Handle("POST", "auth/role/v1/deactivate", h.HandleDeactivate)
+
+	router.Handle("POST", "auth/role/v1/activate", h.HandleActivate)
+
 	router.Handle("POST", "auth/role/v1/delete", h.HandleDelete)
 
 	router.Handle("GET", "auth/role/v1/load/{id}", h.HandleLoad)
@@ -298,6 +302,104 @@ func (h *Handler) HandleRemoveFunction(ctx context.Context, request protosource.
 	}
 
 	cmd := &RemoveFunction{}
+	if err := unmarshalCommand(request, cmd); err != nil {
+		return errorResponse(http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
+	}
+
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above (context user id preferred,
+	// otherwise request.Actor). Never trust an actor field coming
+	// from the wire — it would let any caller spoof any identity.
+	cmd.Actor = actor
+
+	version, err := h.repo.Apply(ctx, cmd)
+	if err != nil {
+		return commandErrorResponse(err)
+	}
+
+	resp := &responsev1.CommandResponse{Id: cmd.GetId(), Version: version}
+	body, contentType, err := marshalResponse(request, resp)
+	if err != nil {
+		return errorResponse(http.StatusInternalServerError, "CMD_MARSHAL", "failed to serialize response", err)
+	}
+	return protosource.Response{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+		Headers:    map[string]string{"Content-Type": contentType},
+	}
+}
+
+// HandleDeactivate processes a Deactivate command.
+func (h *Handler) HandleDeactivate(ctx context.Context, request protosource.Request) protosource.Response {
+	ctx, err := h.authorizer.Authorize(ctx, request, "auth.role.v1.Deactivate")
+	if err != nil {
+		return authzErrorResponse(err)
+	}
+
+	// Prefer the authenticated user id stashed by the Authorizer
+	// (via authz.WithUserID) so the command's Actor field reflects
+	// the resolved identity — the raw bearer token in shadow-token
+	// flows is never written to the aggregate's audit trail. Falls
+	// back to request.Actor populated by the adapter's
+	// ActorExtractor for allowall / X-Actor developer flows.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		actor = request.Actor
+	}
+	if actor == "" {
+		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
+	}
+
+	cmd := &Deactivate{}
+	if err := unmarshalCommand(request, cmd); err != nil {
+		return errorResponse(http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
+	}
+
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above (context user id preferred,
+	// otherwise request.Actor). Never trust an actor field coming
+	// from the wire — it would let any caller spoof any identity.
+	cmd.Actor = actor
+
+	version, err := h.repo.Apply(ctx, cmd)
+	if err != nil {
+		return commandErrorResponse(err)
+	}
+
+	resp := &responsev1.CommandResponse{Id: cmd.GetId(), Version: version}
+	body, contentType, err := marshalResponse(request, resp)
+	if err != nil {
+		return errorResponse(http.StatusInternalServerError, "CMD_MARSHAL", "failed to serialize response", err)
+	}
+	return protosource.Response{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+		Headers:    map[string]string{"Content-Type": contentType},
+	}
+}
+
+// HandleActivate processes a Activate command.
+func (h *Handler) HandleActivate(ctx context.Context, request protosource.Request) protosource.Response {
+	ctx, err := h.authorizer.Authorize(ctx, request, "auth.role.v1.Activate")
+	if err != nil {
+		return authzErrorResponse(err)
+	}
+
+	// Prefer the authenticated user id stashed by the Authorizer
+	// (via authz.WithUserID) so the command's Actor field reflects
+	// the resolved identity — the raw bearer token in shadow-token
+	// flows is never written to the aggregate's audit trail. Falls
+	// back to request.Actor populated by the adapter's
+	// ActorExtractor for allowall / X-Actor developer flows.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		actor = request.Actor
+	}
+	if actor == "" {
+		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
+	}
+
+	cmd := &Activate{}
 	if err := unmarshalCommand(request, cmd); err != nil {
 		return errorResponse(http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
 	}

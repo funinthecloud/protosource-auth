@@ -36,17 +36,18 @@ export default function RoleDetail() {
       <PageHeader
         title={data.name || data.id}
         action={
-          data.state === State.ACTIVE ? (
-            <Btn
-              variant="danger"
-              disabled={busy}
-              onClick={() => {
-                if (confirm("Delete this role?")) exec(() => roleClient.delete(id!));
-              }}
-            >
-              Delete
-            </Btn>
-          ) : undefined
+          <div className="flex gap-2">
+            {data.state === State.ACTIVE && (
+              <Btn variant="secondary" disabled={busy} onClick={() => exec(() => roleClient.deactivate(id!))}>
+                Deactivate
+              </Btn>
+            )}
+            {data.state === State.INACTIVE && (
+              <Btn disabled={busy} onClick={() => exec(() => roleClient.activate(id!))}>
+                Activate
+              </Btn>
+            )}
+          </div>
         }
       />
       {actionErr && <ErrorBox message={actionErr} />}
@@ -57,7 +58,15 @@ export default function RoleDetail() {
           <DetailRow label="Name">{data.name}</DetailRow>
           <DetailRow label="Description">{data.description || "-"}</DetailRow>
           <DetailRow label="State">
-            <Badge color={data.state === State.ACTIVE ? "green" : "red"}>
+            <Badge
+              color={
+                data.state === State.ACTIVE
+                  ? "green"
+                  : data.state === State.INACTIVE
+                    ? "yellow"
+                    : "red"
+              }
+            >
               {stateName(data.state, roleStates)}
             </Badge>
           </DetailRow>
@@ -145,6 +154,28 @@ export default function RoleDetail() {
           </div>
         </div>
       </Card>
+
+      {data.state !== State.DELETED && (
+        <Card>
+          <div className="p-4 border-l-4 border-red-400">
+            <h2 className="text-sm font-semibold text-red-700 mb-2">Danger zone</h2>
+            <p className="text-xs text-zinc-500 mb-3">
+              Delete permanently removes this role. There is no undo — Deactivate is the reversible alternative.
+            </p>
+            <Btn
+              variant="danger"
+              disabled={busy}
+              onClick={() => {
+                if (confirm("Delete this role permanently? This cannot be undone.")) {
+                  exec(() => roleClient.delete(id!));
+                }
+              }}
+            >
+              Delete role
+            </Btn>
+          </div>
+        </Card>
+      )}
     </>
   );
 }

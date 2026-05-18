@@ -72,6 +72,22 @@ func (c *HTTPClient) RemoveFunction(ctx context.Context, id string, function str
 	return c.c.Apply(ctx, routePath, cmd)
 }
 
+// Deactivate sends the Deactivate command.
+func (c *HTTPClient) Deactivate(ctx context.Context, id string) (*responsev1.CommandResponse, error) {
+	cmd := &Deactivate{
+		Id: id,
+	}
+	return c.c.Apply(ctx, routePath, cmd)
+}
+
+// Activate sends the Activate command.
+func (c *HTTPClient) Activate(ctx context.Context, id string) (*responsev1.CommandResponse, error) {
+	cmd := &Activate{
+		Id: id,
+	}
+	return c.c.Apply(ctx, routePath, cmd)
+}
+
 // Delete sends the Delete command.
 func (c *HTTPClient) Delete(ctx context.Context, id string) (*responsev1.CommandResponse, error) {
 	cmd := &Delete{

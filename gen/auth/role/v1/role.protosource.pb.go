@@ -135,6 +135,12 @@ func (aggregate *Role) On(event protosource.Event) error {
 	case *FunctionRemoved:
 		aggregate.setModified(e)
 		delete(aggregate.Functions, e.GetFunction())
+	case *Deactivated:
+		aggregate.setModified(e)
+		aggregate.State = State_STATE_INACTIVE
+	case *Activated:
+		aggregate.setModified(e)
+		aggregate.State = State_STATE_ACTIVE
 	case *Deleted:
 		aggregate.setModified(e)
 		aggregate.State = State_STATE_DELETED
@@ -494,6 +500,76 @@ func (m *RemoveFunction) EmitEvents(aggregate protosource.Aggregate) []protosour
 	return b.Events
 }
 
+func (m *Deactivate) CommandName() string {
+	return "Deactivate"
+}
+
+func (m *Deactivate) ProtoValidate() error {
+	if err := validator().Validate(m); err != nil {
+		return fmt.Errorf("command %s: %w: %w", m.CommandName(), protosource.ErrValidationFailed, err)
+	}
+	return nil
+}
+
+func (m *Deactivate) ValidateVersion(version int64) error {
+	if version == 0 {
+		return fmt.Errorf("command %s requires an existing aggregate (version > 0), got version 0: %w", m.CommandName(), protosource.ErrNotCreatedYet)
+	}
+	return nil
+}
+func (m *Deactivate) GuardState(aggregate protosource.Aggregate) error {
+	a := aggregate.(*Role)
+	switch a.GetState() {
+	case State_STATE_ACTIVE:
+		return nil
+	default:
+		return fmt.Errorf("command %s not allowed in state %s: %w", m.CommandName(), a.GetState(), protosource.ErrStateNotAllowed)
+	}
+}
+func (m *Deactivate) EmitEvents(aggregate protosource.Aggregate) []protosource.Event {
+	b := NewBuilder(m.GetId(), aggregate.GetVersion())
+	a := proto.Clone(aggregate).(*Role)
+	b.Deactivated(m.GetActor())
+	_ = a.On(b.Events[len(b.Events)-1]) // safe: On only errors on unhandled event types, and we only emit events defined in this file
+	b.Snapshot(a)                       // Snapshot calls AfterOn() internally only when a snapshot is actually emitted
+	return b.Events
+}
+
+func (m *Activate) CommandName() string {
+	return "Activate"
+}
+
+func (m *Activate) ProtoValidate() error {
+	if err := validator().Validate(m); err != nil {
+		return fmt.Errorf("command %s: %w: %w", m.CommandName(), protosource.ErrValidationFailed, err)
+	}
+	return nil
+}
+
+func (m *Activate) ValidateVersion(version int64) error {
+	if version == 0 {
+		return fmt.Errorf("command %s requires an existing aggregate (version > 0), got version 0: %w", m.CommandName(), protosource.ErrNotCreatedYet)
+	}
+	return nil
+}
+func (m *Activate) GuardState(aggregate protosource.Aggregate) error {
+	a := aggregate.(*Role)
+	switch a.GetState() {
+	case State_STATE_INACTIVE:
+		return nil
+	default:
+		return fmt.Errorf("command %s not allowed in state %s: %w", m.CommandName(), a.GetState(), protosource.ErrStateNotAllowed)
+	}
+}
+func (m *Activate) EmitEvents(aggregate protosource.Aggregate) []protosource.Event {
+	b := NewBuilder(m.GetId(), aggregate.GetVersion())
+	a := proto.Clone(aggregate).(*Role)
+	b.Activated(m.GetActor())
+	_ = a.On(b.Events[len(b.Events)-1]) // safe: On only errors on unhandled event types, and we only emit events defined in this file
+	b.Snapshot(a)                       // Snapshot calls AfterOn() internally only when a snapshot is actually emitted
+	return b.Events
+}
+
 func (m *Delete) CommandName() string {
 	return "Delete"
 }
@@ -514,7 +590,7 @@ func (m *Delete) ValidateVersion(version int64) error {
 func (m *Delete) GuardState(aggregate protosource.Aggregate) error {
 	a := aggregate.(*Role)
 	switch a.GetState() {
-	case State_STATE_ACTIVE:
+	case State_STATE_ACTIVE, State_STATE_INACTIVE:
 		return nil
 	default:
 		return fmt.Errorf("command %s not allowed in state %s: %w", m.CommandName(), a.GetState(), protosource.ErrStateNotAllowed)
@@ -603,6 +679,36 @@ func (b *Builder) FunctionRemoved(Actor string, Function string) {
 		Id:       b.id,
 		Actor:    Actor,
 		Function: Function,
+
+		Version: b.nextVersion(),
+		At:      protosource.NowMicros(),
+	}
+	b.Events = append(b.Events, event)
+}
+
+func (m *Deactivated) EventName() string {
+	return "Deactivated"
+}
+
+func (b *Builder) Deactivated(Actor string) {
+	event := &Deactivated{
+		Id:    b.id,
+		Actor: Actor,
+
+		Version: b.nextVersion(),
+		At:      protosource.NowMicros(),
+	}
+	b.Events = append(b.Events, event)
+}
+
+func (m *Activated) EventName() string {
+	return "Activated"
+}
+
+func (b *Builder) Activated(Actor string) {
+	event := &Activated{
+		Id:    b.id,
+		Actor: Actor,
 
 		Version: b.nextVersion(),
 		At:      protosource.NowMicros(),

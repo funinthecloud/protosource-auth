@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file auth/role/v1/role.proto.
  */
 export const file_auth_role_v1_role: GenFile = /*@__PURE__*/
-  fileDesc("ChdhdXRoL3JvbGUvdjEvcm9sZS5wcm90bxIMYXV0aC5yb2xlLnYxItQCCgRSb2xlEgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSGgoJY3JlYXRlX2F0GAMgASgDQgeCUQQKAggGEhEKCWNyZWF0ZV9ieRgEIAEoCRIRCgltb2RpZnlfYXQYBSABKAMSEQoJbW9kaWZ5X2J5GAYgASgJEgwKBG5hbWUYByABKAkSEwoLZGVzY3JpcHRpb24YCCABKAkSKwoFc3RhdGUYCSABKA4yEy5hdXRoLnJvbGUudjEuU3RhdGVCB4JRBAoCCAUSNAoJZnVuY3Rpb25zGAogAygLMiEuYXV0aC5yb2xlLnYxLlJvbGUuRnVuY3Rpb25zRW50cnkaTQoORnVuY3Rpb25zRW50cnkSCwoDa2V5GAEgASgJEioKBXZhbHVlGAIgASgLMhsuYXV0aC5yb2xlLnYxLkZ1bmN0aW9uR3JhbnQ6AjgBOgWKUQIaACItCghSb2xlTGlzdBIhCgVpdGVtcxgBIAMoCzISLmF1dGgucm9sZS52MS5Sb2xlIjUKDUZ1bmN0aW9uR3JhbnQSEAoIZnVuY3Rpb24YASABKAkSEgoKZ3JhbnRlZF9hdBgCIAEoAyJhCgZDcmVhdGUSCgoCaWQYASABKAkSDQoFYWN0b3IYAiABKAkSFQoEbmFtZRgDIAEoCUIHukgEcgIQARITCgtkZXNjcmlwdGlvbhgEIAEoCToQilENCgsKB0NyZWF0ZWQQASJaCgZSZW5hbWUSCgoCaWQYASABKAkSDQoFYWN0b3IYAiABKAkSFQoEbmFtZRgDIAEoCUIHukgEcgIQAToeilEbChkKB1JlbmFtZWQQAhoMU1RBVEVfQUNUSVZFImcKDlNldERlc2NyaXB0aW9uEgoKAmlkGAEgASgJEg0KBWFjdG9yGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJOiWKUSIKIAoORGVzY3JpcHRpb25TZXQQAhoMU1RBVEVfQUNUSVZFInoKC0FkZEZ1bmN0aW9uEgoKAmlkGAEgASgJEg0KBWFjdG9yGAIgASgJEioKBWdyYW50GAMgASgLMhsuYXV0aC5yb2xlLnYxLkZ1bmN0aW9uR3JhbnQ6JIpRIQofCg1GdW5jdGlvbkFkZGVkEAIaDFNUQVRFX0FDVElWRSJuCg5SZW1vdmVGdW5jdGlvbhIKCgJpZBgBIAEoCRINCgVhY3RvchgCIAEoCRIZCghmdW5jdGlvbhgDIAEoCUIHukgEcgIQATomilEjCiEKD0Z1bmN0aW9uUmVtb3ZlZBACGgxTVEFURV9BQ1RJVkUiQwoGRGVsZXRlEgoKAmlkGAEgASgJEg0KBWFjdG9yGAIgASgJOh6KURsKGQoHRGVsZXRlZBACGgxTVEFURV9BQ1RJVkUieQoHQ3JlYXRlZBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJEgwKBG5hbWUYBSABKAkSEwoLZGVzY3JpcHRpb24YBiABKAk6E4pREBIOEgxTVEFURV9BQ1RJVkUiVgoHUmVuYW1lZBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJEgwKBG5hbWUYBSABKAk6BYpRAhIAImQKDkRlc2NyaXB0aW9uU2V0EgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSCgoCYXQYAyABKAMSDQoFYWN0b3IYBCABKAkSEwoLZGVzY3JpcHRpb24YBSABKAk6BYpRAhIAIpMBCg1GdW5jdGlvbkFkZGVkEgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSCgoCYXQYAyABKAMSDQoFYWN0b3IYBCABKAkSKgoFZ3JhbnQYBSABKAsyGy5hdXRoLnJvbGUudjEuRnVuY3Rpb25HcmFudDoeilEbEhkaFwoJZnVuY3Rpb25zEAEaCGZ1bmN0aW9uInsKD0Z1bmN0aW9uUmVtb3ZlZBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJEhAKCGZ1bmN0aW9uGAUgASgJOh6KURsSGRoXCglmdW5jdGlvbnMQAhoIZnVuY3Rpb24iVwoHRGVsZXRlZBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJOhSKURESDxINU1RBVEVfREVMRVRFRCJxCghTbmFwc2hvdBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJEiQKCHNuYXBzaG90GAUgASgLMhIuYXV0aC5yb2xlLnYxLlJvbGU6B4pRBCoCCDIqQwoFU3RhdGUSFQoRU1RBVEVfVU5TUEVDSUZJRUQQABIQCgxTVEFURV9BQ1RJVkUQARIRCg1TVEFURV9ERUxFVEVEEAJCtwEKEGNvbS5hdXRoLnJvbGUudjFCCVJvbGVQcm90b1ABWkFnaXRodWIuY29tL2Z1bmludGhlY2xvdWQvcHJvdG9zb3VyY2UtYXV0aC9nZW4vYXV0aC9yb2xlL3YxO3JvbGV2MaICA0FSWKoCDEF1dGguUm9sZS5WMcoCDEF1dGhcUm9sZVxWMeICGEF1dGhcUm9sZVxWMVxHUEJNZXRhZGF0YeoCDkF1dGg6OlJvbGU6OlYxklECCAFiBnByb3RvMw", [file_buf_validate_validate, file_funinthecloud_protosource_options_v1_options_v1]);
+  fileDesc("ChdhdXRoL3JvbGUvdjEvcm9sZS5wcm90bxIMYXV0aC5yb2xlLnYxItQCCgRSb2xlEgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSGgoJY3JlYXRlX2F0GAMgASgDQgeCUQQKAggGEhEKCWNyZWF0ZV9ieRgEIAEoCRIRCgltb2RpZnlfYXQYBSABKAMSEQoJbW9kaWZ5X2J5GAYgASgJEgwKBG5hbWUYByABKAkSEwoLZGVzY3JpcHRpb24YCCABKAkSKwoFc3RhdGUYCSABKA4yEy5hdXRoLnJvbGUudjEuU3RhdGVCB4JRBAoCCAUSNAoJZnVuY3Rpb25zGAogAygLMiEuYXV0aC5yb2xlLnYxLlJvbGUuRnVuY3Rpb25zRW50cnkaTQoORnVuY3Rpb25zRW50cnkSCwoDa2V5GAEgASgJEioKBXZhbHVlGAIgASgLMhsuYXV0aC5yb2xlLnYxLkZ1bmN0aW9uR3JhbnQ6AjgBOgWKUQIaACItCghSb2xlTGlzdBIhCgVpdGVtcxgBIAMoCzISLmF1dGgucm9sZS52MS5Sb2xlIjUKDUZ1bmN0aW9uR3JhbnQSEAoIZnVuY3Rpb24YASABKAkSEgoKZ3JhbnRlZF9hdBgCIAEoAyJhCgZDcmVhdGUSCgoCaWQYASABKAkSDQoFYWN0b3IYAiABKAkSFQoEbmFtZRgDIAEoCUIHukgEcgIQARITCgtkZXNjcmlwdGlvbhgEIAEoCToQilENCgsKB0NyZWF0ZWQQASJaCgZSZW5hbWUSCgoCaWQYASABKAkSDQoFYWN0b3IYAiABKAkSFQoEbmFtZRgDIAEoCUIHukgEcgIQAToeilEbChkKB1JlbmFtZWQQAhoMU1RBVEVfQUNUSVZFImcKDlNldERlc2NyaXB0aW9uEgoKAmlkGAEgASgJEg0KBWFjdG9yGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJOiWKUSIKIAoORGVzY3JpcHRpb25TZXQQAhoMU1RBVEVfQUNUSVZFInoKC0FkZEZ1bmN0aW9uEgoKAmlkGAEgASgJEg0KBWFjdG9yGAIgASgJEioKBWdyYW50GAMgASgLMhsuYXV0aC5yb2xlLnYxLkZ1bmN0aW9uR3JhbnQ6JIpRIQofCg1GdW5jdGlvbkFkZGVkEAIaDFNUQVRFX0FDVElWRSJuCg5SZW1vdmVGdW5jdGlvbhIKCgJpZBgBIAEoCRINCgVhY3RvchgCIAEoCRIZCghmdW5jdGlvbhgDIAEoCUIHukgEcgIQATomilEjCiEKD0Z1bmN0aW9uUmVtb3ZlZBACGgxTVEFURV9BQ1RJVkUiSwoKRGVhY3RpdmF0ZRIKCgJpZBgBIAEoCRINCgVhY3RvchgCIAEoCToiilEfCh0KC0RlYWN0aXZhdGVkEAIaDFNUQVRFX0FDVElWRSJJCghBY3RpdmF0ZRIKCgJpZBgBIAEoCRINCgVhY3RvchgCIAEoCToiilEfCh0KCUFjdGl2YXRlZBACGg5TVEFURV9JTkFDVElWRSJTCgZEZWxldGUSCgoCaWQYASABKAkSDQoFYWN0b3IYAiABKAk6LopRKwopCgdEZWxldGVkEAIaDFNUQVRFX0FDVElWRRoOU1RBVEVfSU5BQ1RJVkUieQoHQ3JlYXRlZBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJEgwKBG5hbWUYBSABKAkSEwoLZGVzY3JpcHRpb24YBiABKAk6E4pREBIOEgxTVEFURV9BQ1RJVkUiVgoHUmVuYW1lZBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJEgwKBG5hbWUYBSABKAk6BYpRAhIAImQKDkRlc2NyaXB0aW9uU2V0EgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSCgoCYXQYAyABKAMSDQoFYWN0b3IYBCABKAkSEwoLZGVzY3JpcHRpb24YBSABKAk6BYpRAhIAIpMBCg1GdW5jdGlvbkFkZGVkEgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSCgoCYXQYAyABKAMSDQoFYWN0b3IYBCABKAkSKgoFZ3JhbnQYBSABKAsyGy5hdXRoLnJvbGUudjEuRnVuY3Rpb25HcmFudDoeilEbEhkaFwoJZnVuY3Rpb25zEAEaCGZ1bmN0aW9uInsKD0Z1bmN0aW9uUmVtb3ZlZBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJEhAKCGZ1bmN0aW9uGAUgASgJOh6KURsSGRoXCglmdW5jdGlvbnMQAhoIZnVuY3Rpb24iXAoLRGVhY3RpdmF0ZWQSCgoCaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxIKCgJhdBgDIAEoAxINCgVhY3RvchgEIAEoCToVilESEhASDlNUQVRFX0lOQUNUSVZFIlgKCUFjdGl2YXRlZBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJOhOKURASDhIMU1RBVEVfQUNUSVZFIlcKB0RlbGV0ZWQSCgoCaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxIKCgJhdBgDIAEoAxINCgVhY3RvchgEIAEoCToUilEREg8SDVNUQVRFX0RFTEVURUQicQoIU25hcHNob3QSCgoCaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxIKCgJhdBgDIAEoAxINCgVhY3RvchgEIAEoCRIkCghzbmFwc2hvdBgFIAEoCzISLmF1dGgucm9sZS52MS5Sb2xlOgeKUQQqAggyKlcKBVN0YXRlEhUKEVNUQVRFX1VOU1BFQ0lGSUVEEAASEAoMU1RBVEVfQUNUSVZFEAESEQoNU1RBVEVfREVMRVRFRBACEhIKDlNUQVRFX0lOQUNUSVZFEANCtwEKEGNvbS5hdXRoLnJvbGUudjFCCVJvbGVQcm90b1ABWkFnaXRodWIuY29tL2Z1bmludGhlY2xvdWQvcHJvdG9zb3VyY2UtYXV0aC9nZW4vYXV0aC9yb2xlL3YxO3JvbGV2MaICA0FSWKoCDEF1dGguUm9sZS5WMcoCDEF1dGhcUm9sZVxWMeICGEF1dGhcUm9sZVxWMVxHUEJNZXRhZGF0YeoCDkF1dGg6OlJvbGU6OlYxklECCAFiBnByb3RvMw", [file_buf_validate_validate, file_funinthecloud_protosource_options_v1_options_v1]);
 
 /**
  * Role is a named collection of function grants. Users are assigned zero or
@@ -266,6 +266,50 @@ export const RemoveFunctionSchema: GenMessage<RemoveFunction> = /*@__PURE__*/
   messageDesc(file_auth_role_v1_role, 7);
 
 /**
+ * @generated from message auth.role.v1.Deactivate
+ */
+export type Deactivate = Message<"auth.role.v1.Deactivate"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string actor = 2;
+   */
+  actor: string;
+};
+
+/**
+ * Describes the message auth.role.v1.Deactivate.
+ * Use `create(DeactivateSchema)` to create a new message.
+ */
+export const DeactivateSchema: GenMessage<Deactivate> = /*@__PURE__*/
+  messageDesc(file_auth_role_v1_role, 8);
+
+/**
+ * @generated from message auth.role.v1.Activate
+ */
+export type Activate = Message<"auth.role.v1.Activate"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string actor = 2;
+   */
+  actor: string;
+};
+
+/**
+ * Describes the message auth.role.v1.Activate.
+ * Use `create(ActivateSchema)` to create a new message.
+ */
+export const ActivateSchema: GenMessage<Activate> = /*@__PURE__*/
+  messageDesc(file_auth_role_v1_role, 9);
+
+/**
  * @generated from message auth.role.v1.Delete
  */
 export type Delete = Message<"auth.role.v1.Delete"> & {
@@ -285,7 +329,7 @@ export type Delete = Message<"auth.role.v1.Delete"> & {
  * Use `create(DeleteSchema)` to create a new message.
  */
 export const DeleteSchema: GenMessage<Delete> = /*@__PURE__*/
-  messageDesc(file_auth_role_v1_role, 8);
+  messageDesc(file_auth_role_v1_role, 10);
 
 /**
  * @generated from message auth.role.v1.Created
@@ -327,7 +371,7 @@ export type Created = Message<"auth.role.v1.Created"> & {
  * Use `create(CreatedSchema)` to create a new message.
  */
 export const CreatedSchema: GenMessage<Created> = /*@__PURE__*/
-  messageDesc(file_auth_role_v1_role, 9);
+  messageDesc(file_auth_role_v1_role, 11);
 
 /**
  * @generated from message auth.role.v1.Renamed
@@ -364,7 +408,7 @@ export type Renamed = Message<"auth.role.v1.Renamed"> & {
  * Use `create(RenamedSchema)` to create a new message.
  */
 export const RenamedSchema: GenMessage<Renamed> = /*@__PURE__*/
-  messageDesc(file_auth_role_v1_role, 10);
+  messageDesc(file_auth_role_v1_role, 12);
 
 /**
  * @generated from message auth.role.v1.DescriptionSet
@@ -401,7 +445,7 @@ export type DescriptionSet = Message<"auth.role.v1.DescriptionSet"> & {
  * Use `create(DescriptionSetSchema)` to create a new message.
  */
 export const DescriptionSetSchema: GenMessage<DescriptionSet> = /*@__PURE__*/
-  messageDesc(file_auth_role_v1_role, 11);
+  messageDesc(file_auth_role_v1_role, 13);
 
 /**
  * @generated from message auth.role.v1.FunctionAdded
@@ -438,7 +482,7 @@ export type FunctionAdded = Message<"auth.role.v1.FunctionAdded"> & {
  * Use `create(FunctionAddedSchema)` to create a new message.
  */
 export const FunctionAddedSchema: GenMessage<FunctionAdded> = /*@__PURE__*/
-  messageDesc(file_auth_role_v1_role, 12);
+  messageDesc(file_auth_role_v1_role, 14);
 
 /**
  * @generated from message auth.role.v1.FunctionRemoved
@@ -475,7 +519,71 @@ export type FunctionRemoved = Message<"auth.role.v1.FunctionRemoved"> & {
  * Use `create(FunctionRemovedSchema)` to create a new message.
  */
 export const FunctionRemovedSchema: GenMessage<FunctionRemoved> = /*@__PURE__*/
-  messageDesc(file_auth_role_v1_role, 13);
+  messageDesc(file_auth_role_v1_role, 15);
+
+/**
+ * @generated from message auth.role.v1.Deactivated
+ */
+export type Deactivated = Message<"auth.role.v1.Deactivated"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: int64 version = 2;
+   */
+  version: bigint;
+
+  /**
+   * @generated from field: int64 at = 3;
+   */
+  at: bigint;
+
+  /**
+   * @generated from field: string actor = 4;
+   */
+  actor: string;
+};
+
+/**
+ * Describes the message auth.role.v1.Deactivated.
+ * Use `create(DeactivatedSchema)` to create a new message.
+ */
+export const DeactivatedSchema: GenMessage<Deactivated> = /*@__PURE__*/
+  messageDesc(file_auth_role_v1_role, 16);
+
+/**
+ * @generated from message auth.role.v1.Activated
+ */
+export type Activated = Message<"auth.role.v1.Activated"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: int64 version = 2;
+   */
+  version: bigint;
+
+  /**
+   * @generated from field: int64 at = 3;
+   */
+  at: bigint;
+
+  /**
+   * @generated from field: string actor = 4;
+   */
+  actor: string;
+};
+
+/**
+ * Describes the message auth.role.v1.Activated.
+ * Use `create(ActivatedSchema)` to create a new message.
+ */
+export const ActivatedSchema: GenMessage<Activated> = /*@__PURE__*/
+  messageDesc(file_auth_role_v1_role, 17);
 
 /**
  * @generated from message auth.role.v1.Deleted
@@ -507,7 +615,7 @@ export type Deleted = Message<"auth.role.v1.Deleted"> & {
  * Use `create(DeletedSchema)` to create a new message.
  */
 export const DeletedSchema: GenMessage<Deleted> = /*@__PURE__*/
-  messageDesc(file_auth_role_v1_role, 14);
+  messageDesc(file_auth_role_v1_role, 18);
 
 /**
  * @generated from message auth.role.v1.Snapshot
@@ -544,7 +652,7 @@ export type Snapshot = Message<"auth.role.v1.Snapshot"> & {
  * Use `create(SnapshotSchema)` to create a new message.
  */
 export const SnapshotSchema: GenMessage<Snapshot> = /*@__PURE__*/
-  messageDesc(file_auth_role_v1_role, 15);
+  messageDesc(file_auth_role_v1_role, 19);
 
 /**
  * @generated from enum auth.role.v1.State
@@ -564,6 +672,11 @@ export enum State {
    * @generated from enum value: STATE_DELETED = 2;
    */
   DELETED = 2,
+
+  /**
+   * @generated from enum value: STATE_INACTIVE = 3;
+   */
+  INACTIVE = 3,
 }
 
 /**

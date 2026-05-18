@@ -49,6 +49,7 @@ export const roleStates: Record<number, string> = {
   0: "Unspecified",
   1: "Active",
   2: "Deleted",
+  3: "Inactive",
 };
 
 export const issuerStates: Record<number, string> = {

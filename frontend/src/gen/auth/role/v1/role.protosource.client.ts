@@ -3,7 +3,7 @@
 /* eslint-disable */
 
 import type { ProtosourceClient, CommandResponse, History } from "@protosource/client";
-import { CreateSchema, RenameSchema, SetDescriptionSchema, AddFunctionSchema, RemoveFunctionSchema, DeleteSchema, RoleSchema, RoleListSchema, State } from "./role_pb.js";
+import { CreateSchema, RenameSchema, SetDescriptionSchema, AddFunctionSchema, RemoveFunctionSchema, DeactivateSchema, ActivateSchema, DeleteSchema, RoleSchema, RoleListSchema, State } from "./role_pb.js";
 import type { Role, FunctionGrant } from "./role_pb.js";
 
 const routePath = "auth/role/v1";
@@ -33,6 +33,14 @@ export class RoleHTTPClient {
 
   async removeFunction(id: string, function_: string): Promise<CommandResponse> {
     return this.client.apply(routePath, RemoveFunctionSchema, { id, function: function_ });
+  }
+
+  async deactivate(id: string): Promise<CommandResponse> {
+    return this.client.apply(routePath, DeactivateSchema, { id });
+  }
+
+  async activate(id: string): Promise<CommandResponse> {
+    return this.client.apply(routePath, ActivateSchema, { id });
   }
 
   async delete(id: string): Promise<CommandResponse> {

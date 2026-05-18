@@ -29,6 +29,7 @@ const (
 	State_STATE_UNSPECIFIED State = 0
 	State_STATE_ACTIVE      State = 1
 	State_STATE_DELETED     State = 2
+	State_STATE_INACTIVE    State = 3
 )
 
 // Enum value maps for State.
@@ -37,11 +38,13 @@ var (
 		0: "STATE_UNSPECIFIED",
 		1: "STATE_ACTIVE",
 		2: "STATE_DELETED",
+		3: "STATE_INACTIVE",
 	}
 	State_value = map[string]int32{
 		"STATE_UNSPECIFIED": 0,
 		"STATE_ACTIVE":      1,
 		"STATE_DELETED":     2,
+		"STATE_INACTIVE":    3,
 	}
 )
 
@@ -600,6 +603,110 @@ func (x *RemoveFunction) GetFunction() string {
 	return ""
 }
 
+type Deactivate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Actor         string                 `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Deactivate) Reset() {
+	*x = Deactivate{}
+	mi := &file_auth_role_v1_role_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Deactivate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Deactivate) ProtoMessage() {}
+
+func (x *Deactivate) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_role_v1_role_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Deactivate.ProtoReflect.Descriptor instead.
+func (*Deactivate) Descriptor() ([]byte, []int) {
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Deactivate) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Deactivate) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+type Activate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Actor         string                 `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Activate) Reset() {
+	*x = Activate{}
+	mi := &file_auth_role_v1_role_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Activate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Activate) ProtoMessage() {}
+
+func (x *Activate) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_role_v1_role_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Activate.ProtoReflect.Descriptor instead.
+func (*Activate) Descriptor() ([]byte, []int) {
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *Activate) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Activate) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
 type Delete struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -610,7 +717,7 @@ type Delete struct {
 
 func (x *Delete) Reset() {
 	*x = Delete{}
-	mi := &file_auth_role_v1_role_proto_msgTypes[8]
+	mi := &file_auth_role_v1_role_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -622,7 +729,7 @@ func (x *Delete) String() string {
 func (*Delete) ProtoMessage() {}
 
 func (x *Delete) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_role_v1_role_proto_msgTypes[8]
+	mi := &file_auth_role_v1_role_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -635,7 +742,7 @@ func (x *Delete) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Delete.ProtoReflect.Descriptor instead.
 func (*Delete) Descriptor() ([]byte, []int) {
-	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{8}
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Delete) GetId() string {
@@ -666,7 +773,7 @@ type Created struct {
 
 func (x *Created) Reset() {
 	*x = Created{}
-	mi := &file_auth_role_v1_role_proto_msgTypes[9]
+	mi := &file_auth_role_v1_role_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -678,7 +785,7 @@ func (x *Created) String() string {
 func (*Created) ProtoMessage() {}
 
 func (x *Created) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_role_v1_role_proto_msgTypes[9]
+	mi := &file_auth_role_v1_role_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -691,7 +798,7 @@ func (x *Created) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Created.ProtoReflect.Descriptor instead.
 func (*Created) Descriptor() ([]byte, []int) {
-	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{9}
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Created) GetId() string {
@@ -749,7 +856,7 @@ type Renamed struct {
 
 func (x *Renamed) Reset() {
 	*x = Renamed{}
-	mi := &file_auth_role_v1_role_proto_msgTypes[10]
+	mi := &file_auth_role_v1_role_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -761,7 +868,7 @@ func (x *Renamed) String() string {
 func (*Renamed) ProtoMessage() {}
 
 func (x *Renamed) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_role_v1_role_proto_msgTypes[10]
+	mi := &file_auth_role_v1_role_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -774,7 +881,7 @@ func (x *Renamed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Renamed.ProtoReflect.Descriptor instead.
 func (*Renamed) Descriptor() ([]byte, []int) {
-	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{10}
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Renamed) GetId() string {
@@ -825,7 +932,7 @@ type DescriptionSet struct {
 
 func (x *DescriptionSet) Reset() {
 	*x = DescriptionSet{}
-	mi := &file_auth_role_v1_role_proto_msgTypes[11]
+	mi := &file_auth_role_v1_role_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -837,7 +944,7 @@ func (x *DescriptionSet) String() string {
 func (*DescriptionSet) ProtoMessage() {}
 
 func (x *DescriptionSet) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_role_v1_role_proto_msgTypes[11]
+	mi := &file_auth_role_v1_role_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -850,7 +957,7 @@ func (x *DescriptionSet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescriptionSet.ProtoReflect.Descriptor instead.
 func (*DescriptionSet) Descriptor() ([]byte, []int) {
-	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{11}
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DescriptionSet) GetId() string {
@@ -901,7 +1008,7 @@ type FunctionAdded struct {
 
 func (x *FunctionAdded) Reset() {
 	*x = FunctionAdded{}
-	mi := &file_auth_role_v1_role_proto_msgTypes[12]
+	mi := &file_auth_role_v1_role_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -913,7 +1020,7 @@ func (x *FunctionAdded) String() string {
 func (*FunctionAdded) ProtoMessage() {}
 
 func (x *FunctionAdded) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_role_v1_role_proto_msgTypes[12]
+	mi := &file_auth_role_v1_role_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -926,7 +1033,7 @@ func (x *FunctionAdded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FunctionAdded.ProtoReflect.Descriptor instead.
 func (*FunctionAdded) Descriptor() ([]byte, []int) {
-	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{12}
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *FunctionAdded) GetId() string {
@@ -977,7 +1084,7 @@ type FunctionRemoved struct {
 
 func (x *FunctionRemoved) Reset() {
 	*x = FunctionRemoved{}
-	mi := &file_auth_role_v1_role_proto_msgTypes[13]
+	mi := &file_auth_role_v1_role_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -989,7 +1096,7 @@ func (x *FunctionRemoved) String() string {
 func (*FunctionRemoved) ProtoMessage() {}
 
 func (x *FunctionRemoved) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_role_v1_role_proto_msgTypes[13]
+	mi := &file_auth_role_v1_role_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1002,7 +1109,7 @@ func (x *FunctionRemoved) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FunctionRemoved.ProtoReflect.Descriptor instead.
 func (*FunctionRemoved) Descriptor() ([]byte, []int) {
-	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{13}
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *FunctionRemoved) GetId() string {
@@ -1040,6 +1147,142 @@ func (x *FunctionRemoved) GetFunction() string {
 	return ""
 }
 
+type Deactivated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	At            int64                  `protobuf:"varint,3,opt,name=at,proto3" json:"at,omitempty"`
+	Actor         string                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Deactivated) Reset() {
+	*x = Deactivated{}
+	mi := &file_auth_role_v1_role_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Deactivated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Deactivated) ProtoMessage() {}
+
+func (x *Deactivated) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_role_v1_role_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Deactivated.ProtoReflect.Descriptor instead.
+func (*Deactivated) Descriptor() ([]byte, []int) {
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *Deactivated) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Deactivated) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *Deactivated) GetAt() int64 {
+	if x != nil {
+		return x.At
+	}
+	return 0
+}
+
+func (x *Deactivated) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+type Activated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	At            int64                  `protobuf:"varint,3,opt,name=at,proto3" json:"at,omitempty"`
+	Actor         string                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Activated) Reset() {
+	*x = Activated{}
+	mi := &file_auth_role_v1_role_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Activated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Activated) ProtoMessage() {}
+
+func (x *Activated) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_role_v1_role_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Activated.ProtoReflect.Descriptor instead.
+func (*Activated) Descriptor() ([]byte, []int) {
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *Activated) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Activated) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *Activated) GetAt() int64 {
+	if x != nil {
+		return x.At
+	}
+	return 0
+}
+
+func (x *Activated) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
 type Deleted struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1052,7 +1295,7 @@ type Deleted struct {
 
 func (x *Deleted) Reset() {
 	*x = Deleted{}
-	mi := &file_auth_role_v1_role_proto_msgTypes[14]
+	mi := &file_auth_role_v1_role_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1064,7 +1307,7 @@ func (x *Deleted) String() string {
 func (*Deleted) ProtoMessage() {}
 
 func (x *Deleted) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_role_v1_role_proto_msgTypes[14]
+	mi := &file_auth_role_v1_role_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1077,7 +1320,7 @@ func (x *Deleted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Deleted.ProtoReflect.Descriptor instead.
 func (*Deleted) Descriptor() ([]byte, []int) {
-	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{14}
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Deleted) GetId() string {
@@ -1121,7 +1364,7 @@ type Snapshot struct {
 
 func (x *Snapshot) Reset() {
 	*x = Snapshot{}
-	mi := &file_auth_role_v1_role_proto_msgTypes[15]
+	mi := &file_auth_role_v1_role_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1133,7 +1376,7 @@ func (x *Snapshot) String() string {
 func (*Snapshot) ProtoMessage() {}
 
 func (x *Snapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_role_v1_role_proto_msgTypes[15]
+	mi := &file_auth_role_v1_role_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1146,7 +1389,7 @@ func (x *Snapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Snapshot.ProtoReflect.Descriptor instead.
 func (*Snapshot) Descriptor() ([]byte, []int) {
-	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{15}
+	return file_auth_role_v1_role_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Snapshot) GetId() string {
@@ -1242,12 +1485,23 @@ const file_auth_role_v1_role_proto_rawDesc = "" +
 	"\x05actor\x18\x02 \x01(\tR\x05actor\x12#\n" +
 	"\bfunction\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\bfunction:&\x8aQ#\n" +
 	"!\n" +
-	"\x0fFunctionRemoved\x10\x02\x1a\fSTATE_ACTIVE\"N\n" +
+	"\x0fFunctionRemoved\x10\x02\x1a\fSTATE_ACTIVE\"V\n" +
+	"\n" +
+	"Deactivate\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05actor\x18\x02 \x01(\tR\x05actor:\"\x8aQ\x1f\n" +
+	"\x1d\n" +
+	"\vDeactivated\x10\x02\x1a\fSTATE_ACTIVE\"T\n" +
+	"\bActivate\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05actor\x18\x02 \x01(\tR\x05actor:\"\x8aQ\x1f\n" +
+	"\x1d\n" +
+	"\tActivated\x10\x02\x1a\x0eSTATE_INACTIVE\"^\n" +
 	"\x06Delete\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
-	"\x05actor\x18\x02 \x01(\tR\x05actor:\x1e\x8aQ\x1b\n" +
-	"\x19\n" +
-	"\aDeleted\x10\x02\x1a\fSTATE_ACTIVE\"\xa4\x01\n" +
+	"\x05actor\x18\x02 \x01(\tR\x05actor:.\x8aQ+\n" +
+	")\n" +
+	"\aDeleted\x10\x02\x1a\fSTATE_ACTIVE\x1a\x0eSTATE_INACTIVE\"\xa4\x01\n" +
 	"\aCreated\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
@@ -1280,7 +1534,17 @@ const file_auth_role_v1_role_proto_rawDesc = "" +
 	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
 	"\x05actor\x18\x04 \x01(\tR\x05actor\x12\x1a\n" +
 	"\bfunction\x18\x05 \x01(\tR\bfunction:\x1e\x8aQ\x1b\x12\x19\x1a\x17\n" +
-	"\tfunctions\x10\x02\x1a\bfunction\"o\n" +
+	"\tfunctions\x10\x02\x1a\bfunction\"t\n" +
+	"\vDeactivated\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
+	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
+	"\x05actor\x18\x04 \x01(\tR\x05actor:\x15\x8aQ\x12\x12\x10\x12\x0eSTATE_INACTIVE\"p\n" +
+	"\tActivated\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
+	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
+	"\x05actor\x18\x04 \x01(\tR\x05actor:\x13\x8aQ\x10\x12\x0e\x12\fSTATE_ACTIVE\"o\n" +
 	"\aDeleted\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
@@ -1291,11 +1555,12 @@ const file_auth_role_v1_role_proto_rawDesc = "" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
 	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
 	"\x05actor\x18\x04 \x01(\tR\x05actor\x12.\n" +
-	"\bsnapshot\x18\x05 \x01(\v2\x12.auth.role.v1.RoleR\bsnapshot:\a\x8aQ\x04*\x02\b2*C\n" +
+	"\bsnapshot\x18\x05 \x01(\v2\x12.auth.role.v1.RoleR\bsnapshot:\a\x8aQ\x04*\x02\b2*W\n" +
 	"\x05State\x12\x15\n" +
 	"\x11STATE_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fSTATE_ACTIVE\x10\x01\x12\x11\n" +
-	"\rSTATE_DELETED\x10\x02B\xb7\x01\x92Q\x02\b\x01\n" +
+	"\rSTATE_DELETED\x10\x02\x12\x12\n" +
+	"\x0eSTATE_INACTIVE\x10\x03B\xb7\x01\x92Q\x02\b\x01\n" +
 	"\x10com.auth.role.v1B\tRoleProtoP\x01ZAgithub.com/funinthecloud/protosource-auth/gen/auth/role/v1;rolev1\xa2\x02\x03ARX\xaa\x02\fAuth.Role.V1\xca\x02\fAuth\\Role\\V1\xe2\x02\x18Auth\\Role\\V1\\GPBMetadata\xea\x02\x0eAuth::Role::V1b\x06proto3"
 
 var (
@@ -1311,7 +1576,7 @@ func file_auth_role_v1_role_proto_rawDescGZIP() []byte {
 }
 
 var file_auth_role_v1_role_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_auth_role_v1_role_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_auth_role_v1_role_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_auth_role_v1_role_proto_goTypes = []any{
 	(State)(0),              // 0: auth.role.v1.State
 	(*Role)(nil),            // 1: auth.role.v1.Role
@@ -1322,19 +1587,23 @@ var file_auth_role_v1_role_proto_goTypes = []any{
 	(*SetDescription)(nil),  // 6: auth.role.v1.SetDescription
 	(*AddFunction)(nil),     // 7: auth.role.v1.AddFunction
 	(*RemoveFunction)(nil),  // 8: auth.role.v1.RemoveFunction
-	(*Delete)(nil),          // 9: auth.role.v1.Delete
-	(*Created)(nil),         // 10: auth.role.v1.Created
-	(*Renamed)(nil),         // 11: auth.role.v1.Renamed
-	(*DescriptionSet)(nil),  // 12: auth.role.v1.DescriptionSet
-	(*FunctionAdded)(nil),   // 13: auth.role.v1.FunctionAdded
-	(*FunctionRemoved)(nil), // 14: auth.role.v1.FunctionRemoved
-	(*Deleted)(nil),         // 15: auth.role.v1.Deleted
-	(*Snapshot)(nil),        // 16: auth.role.v1.Snapshot
-	nil,                     // 17: auth.role.v1.Role.FunctionsEntry
+	(*Deactivate)(nil),      // 9: auth.role.v1.Deactivate
+	(*Activate)(nil),        // 10: auth.role.v1.Activate
+	(*Delete)(nil),          // 11: auth.role.v1.Delete
+	(*Created)(nil),         // 12: auth.role.v1.Created
+	(*Renamed)(nil),         // 13: auth.role.v1.Renamed
+	(*DescriptionSet)(nil),  // 14: auth.role.v1.DescriptionSet
+	(*FunctionAdded)(nil),   // 15: auth.role.v1.FunctionAdded
+	(*FunctionRemoved)(nil), // 16: auth.role.v1.FunctionRemoved
+	(*Deactivated)(nil),     // 17: auth.role.v1.Deactivated
+	(*Activated)(nil),       // 18: auth.role.v1.Activated
+	(*Deleted)(nil),         // 19: auth.role.v1.Deleted
+	(*Snapshot)(nil),        // 20: auth.role.v1.Snapshot
+	nil,                     // 21: auth.role.v1.Role.FunctionsEntry
 }
 var file_auth_role_v1_role_proto_depIdxs = []int32{
 	0,  // 0: auth.role.v1.Role.state:type_name -> auth.role.v1.State
-	17, // 1: auth.role.v1.Role.functions:type_name -> auth.role.v1.Role.FunctionsEntry
+	21, // 1: auth.role.v1.Role.functions:type_name -> auth.role.v1.Role.FunctionsEntry
 	1,  // 2: auth.role.v1.RoleList.items:type_name -> auth.role.v1.Role
 	3,  // 3: auth.role.v1.AddFunction.grant:type_name -> auth.role.v1.FunctionGrant
 	3,  // 4: auth.role.v1.FunctionAdded.grant:type_name -> auth.role.v1.FunctionGrant
@@ -1358,7 +1627,7 @@ func file_auth_role_v1_role_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_role_v1_role_proto_rawDesc), len(file_auth_role_v1_role_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

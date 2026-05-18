@@ -25,6 +25,8 @@ var usage = "Usage: rolemgr [-json] <command> [args]\n\nFlags:\n" +
 	"  setdescription  <id>  <description>\n" +
 	"  addfunction  <id>  <grant:json>\n" +
 	"  removefunction  <id>  <function>\n" +
+	"  deactivate  <id>\n" +
+	"  activate  <id>\n" +
 	"  delete  <id>\n" +
 	"  get      <id>\n" +
 	"  load     <id>\n" +
@@ -123,6 +125,26 @@ func main() {
 			fatal("usage: rolemgr removefunction <id> <function>")
 		}
 		result, err := client.RemoveFunction(ctx, os.Args[2], os.Args[3])
+		if err != nil {
+			fatal(fmt.Sprintf("error: %v", err))
+		}
+		fmt.Printf("{\"id\":%q,\"version\":%d}\n", result.GetId(), result.GetVersion())
+
+	case "deactivate":
+		if len(os.Args) != 3 {
+			fatal("usage: rolemgr deactivate <id>")
+		}
+		result, err := client.Deactivate(ctx, os.Args[2])
+		if err != nil {
+			fatal(fmt.Sprintf("error: %v", err))
+		}
+		fmt.Printf("{\"id\":%q,\"version\":%d}\n", result.GetId(), result.GetVersion())
+
+	case "activate":
+		if len(os.Args) != 3 {
+			fatal("usage: rolemgr activate <id>")
+		}
+		result, err := client.Activate(ctx, os.Args[2])
 		if err != nil {
 			fatal(fmt.Sprintf("error: %v", err))
 		}
