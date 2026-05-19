@@ -1,5 +1,13 @@
 PROTOSOURCE_VERSION := $(shell awk '/github.com\/funinthecloud\/protosource / {print $$2; exit}' go.mod)
 TOFU_DIR := tofu/aws
+TOFU_AZURE_DIR := tofu/azure
+
+# Azure container image — set CONTAINER_IMAGE on the make line, e.g.
+#   make deploy-azure CONTAINER_IMAGE=myacr.azurecr.io/protosource-auth:v1
+# After the first apply the upstream container-app-service module
+# emits acr_login_server as a tofu output that you can plumb back in.
+CONTAINER_IMAGE ?=
+AZURE_ACR_LOGIN_SERVER = $(shell tofu -chdir=$(TOFU_AZURE_DIR) output -raw acr_login_server 2>/dev/null)
 
 ADMIN_BUCKET = $(shell tofu -chdir=$(TOFU_DIR) output -raw admin_bucket_name 2>/dev/null)
 ADMIN_DIST   = $(shell tofu -chdir=$(TOFU_DIR) output -raw admin_distribution_id 2>/dev/null)
@@ -10,9 +18,15 @@ help:
 	@echo "  gen              Regenerate Go and TS protobuf code"
 	@echo "  build            Regen + build backend and frontend"
 	@echo "  test             go test + frontend tsc"
-	@echo "  deploy           Full release: regen, build, tofu apply, sync SPA, invalidate"
-	@echo "  deploy-backend   tofu apply (builds Lambda binary and ships it)"
+	@echo "  deploy           Full AWS release: regen, build, tofu apply, sync SPA, invalidate"
+	@echo "  deploy-backend   AWS tofu apply (builds Lambda binary and ships it)"
 	@echo "  deploy-frontend  vite build + s3 sync + cloudfront invalidation"
+	@echo ""
+	@echo "Azure:"
+	@echo "  build-container  Build the Container Apps image from cmd/protosource-auth/Dockerfile"
+	@echo "  push-azure       Build + push the image to the ACR created by tofu/azure"
+	@echo "  deploy-azure     tofu apply against tofu/azure with the pushed image"
+	@echo ""
 	@echo "  clean            Remove build artifacts"
 	@echo ""
 	@echo "Required env for frontend builds:"
@@ -69,6 +83,28 @@ deploy-frontend: build-frontend
 invalidate:
 	@test -n "$(ADMIN_DIST)" || (echo "ADMIN_DIST not set — run 'tofu apply' in $(TOFU_DIR) first" && exit 1)
 	aws cloudfront create-invalidation --distribution-id $(ADMIN_DIST) --paths '/*'
+
+.PHONY: build-container push-azure deploy-azure
+# Builds the Container Apps image. CONTAINER_IMAGE is the full
+# <registry>/<repo>:<tag> tag to apply (and, in push-azure, push). Use
+# the ACR_LOGIN_SERVER output from tofu/azure to build the registry
+# part.
+build-container:
+	@test -n "$(CONTAINER_IMAGE)" || (echo "CONTAINER_IMAGE not set — e.g. CONTAINER_IMAGE=myacr.azurecr.io/protosource-auth:dev make build-container" && exit 1)
+	docker build --platform linux/amd64 -f cmd/protosource-auth/Dockerfile -t $(CONTAINER_IMAGE) .
+
+# Pushes to ACR. Requires a prior `az acr login --name <acr-name>` so
+# Docker has credentials; the make recipe doesn't run az for you since
+# it may prompt interactively.
+push-azure: build-container
+	docker push $(CONTAINER_IMAGE)
+
+# Two-stage apply: the first apply (with the upstream quickstart
+# image) provisions the ACR; subsequent applies pass CONTAINER_IMAGE
+# pointing at a tag in that ACR.
+deploy-azure:
+	@test -n "$(CONTAINER_IMAGE)" || (echo "CONTAINER_IMAGE not set — pass an ACR image tag, or omit on first apply to stand up the ACR with the quickstart image" && exit 1)
+	tofu -chdir=$(TOFU_AZURE_DIR) apply -var image=$(CONTAINER_IMAGE)
 
 .PHONY: clean
 clean:
