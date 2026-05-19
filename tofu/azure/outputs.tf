@@ -4,7 +4,7 @@ output "container_app_url" {
 }
 
 output "acr_login_server" {
-  description = "ACR login server hostname. Use with `az acr login --name <prefix>` then `docker push`."
+  description = "ACR login-server hostname (e.g. <name>.azurecr.io). Tag images against this value and `docker push` to it. For `az acr login`, strip the suffix and pass just the registry name: `az acr login --name $(tofu output -raw acr_login_server | cut -d. -f1)`."
   value       = module.app.acr_login_server
 }
 

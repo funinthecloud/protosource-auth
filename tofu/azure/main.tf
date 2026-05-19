@@ -89,7 +89,7 @@ module "app" {
 
     # Key provider selection + Key Vault KEK reference.
     PROTOSOURCE_AUTH_KEY_PROVIDER   = "azurekeyvault"
-    PROTOSOURCE_AUTH_MASTER_KEY_REF = azurerm_key_vault_key.kek.id
+    PROTOSOURCE_AUTH_MASTER_KEY_REF = azurerm_key_vault_key.kek.versionless_id
 
     # Issuer / token config.
     PROTOSOURCE_AUTH_ISSUER_ISS          = var.issuer_iss

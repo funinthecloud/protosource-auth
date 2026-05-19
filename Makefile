@@ -7,7 +7,6 @@ TOFU_AZURE_DIR := tofu/azure
 # After the first apply the upstream container-app-service module
 # emits acr_login_server as a tofu output that you can plumb back in.
 CONTAINER_IMAGE ?=
-AZURE_ACR_LOGIN_SERVER = $(shell tofu -chdir=$(TOFU_AZURE_DIR) output -raw acr_login_server 2>/dev/null)
 
 ADMIN_BUCKET = $(shell tofu -chdir=$(TOFU_DIR) output -raw admin_bucket_name 2>/dev/null)
 ADMIN_DIST   = $(shell tofu -chdir=$(TOFU_DIR) output -raw admin_distribution_id 2>/dev/null)

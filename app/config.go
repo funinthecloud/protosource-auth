@@ -224,7 +224,7 @@ const (
 // Returns an error if required variables are missing or malformed.
 func LoadConfigFromEnv() (*Config, error) {
 	cfg := &Config{
-		ListenAddr:             os.Getenv(EnvListenAddr),
+		ListenAddr:             firstNonEmpty(os.Getenv(EnvListenAddr), portToListenAddr(os.Getenv(EnvPort))),
 		IssuerID:               os.Getenv(EnvIssuerID),
 		IssuerIss:              os.Getenv(EnvIssuerIss),
 		IssuerDisplayName:      os.Getenv(EnvIssuerDisplayName),
@@ -276,11 +276,7 @@ func LoadConfigFromEnv() (*Config, error) {
 // [Run].
 func (c *Config) Normalize() error {
 	if c.ListenAddr == "" {
-		if port := os.Getenv(EnvPort); port != "" {
-			c.ListenAddr = ":" + port
-		} else {
-			c.ListenAddr = ":8080"
-		}
+		c.ListenAddr = ":8080"
 	}
 	if c.KeyProvider == "" {
 		c.KeyProvider = KeyProviderLocal
@@ -348,6 +344,18 @@ func (c *Config) Normalize() error {
 		}
 	}
 	return nil
+}
+
+// portToListenAddr converts a $PORT value to a ":PORT" listen
+// address, or returns "" when port is empty. Kept narrow so
+// LoadConfigFromEnv can fold the Container Apps / Functions / Cloud
+// Run PORT convention into ListenAddr at parse time — Normalize
+// stays a pure function of the Config fields it's given.
+func portToListenAddr(port string) string {
+	if port == "" {
+		return ""
+	}
+	return ":" + port
 }
 
 // firstNonEmpty returns the first non-empty argument, or "" if every
