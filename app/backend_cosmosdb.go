@@ -125,6 +125,27 @@ func newCosmosDBBundle(_ context.Context, cfg *Config) (*Bundle, error) {
 	}, nil
 }
 
+// EnsureCosmosStorage idempotently creates the Cosmos database and
+// the events + aggregates containers named in cfg, returning nil if
+// they already exist. Exposed so the mgr CLI's ensure-tables and
+// bootstrap subcommands can stand up storage before talking to the
+// aggregate repositories.
+func EnsureCosmosStorage(ctx context.Context, cfg *Config) error {
+	client, err := NewCosmosClient(cfg)
+	if err != nil {
+		return err
+	}
+	db, err := cosmosdbstore.EnsureDatabase(ctx, client, cfg.CosmosDatabase)
+	if err != nil {
+		return fmt.Errorf("app: ensure cosmos database %q: %w", cfg.CosmosDatabase, err)
+	}
+	if err := cosmosdbstore.EnsureContainers(ctx, db, cfg.EventsTable, cfg.AggregatesTable); err != nil {
+		return fmt.Errorf("app: ensure cosmos containers (events=%q, aggregates=%q): %w",
+			cfg.EventsTable, cfg.AggregatesTable, err)
+	}
+	return nil
+}
+
 // insecureCosmosTransport returns an HTTP client whose TLS verification
 // is disabled — intended only for the Cosmos emulator, which ships a
 // self-signed cert. When http.DefaultTransport is the stdlib's
