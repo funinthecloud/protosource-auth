@@ -223,8 +223,12 @@ const (
 // LoadConfigFromEnv returns a Config populated from the environment.
 // Returns an error if required variables are missing or malformed.
 func LoadConfigFromEnv() (*Config, error) {
+	portAddr, err := portToListenAddr(os.Getenv(EnvPort))
+	if err != nil {
+		return nil, err
+	}
 	cfg := &Config{
-		ListenAddr:             firstNonEmpty(os.Getenv(EnvListenAddr), portToListenAddr(os.Getenv(EnvPort))),
+		ListenAddr:             firstNonEmpty(os.Getenv(EnvListenAddr), portAddr),
 		IssuerID:               os.Getenv(EnvIssuerID),
 		IssuerIss:              os.Getenv(EnvIssuerIss),
 		IssuerDisplayName:      os.Getenv(EnvIssuerDisplayName),
@@ -351,11 +355,18 @@ func (c *Config) Normalize() error {
 // LoadConfigFromEnv can fold the Container Apps / Functions / Cloud
 // Run PORT convention into ListenAddr at parse time — Normalize
 // stays a pure function of the Config fields it's given.
-func portToListenAddr(port string) string {
+// Validates that the value is a TCP port (integer in 1-65535) so an
+// operator typo surfaces here instead of as a less-actionable bind
+// failure deep in startup.
+func portToListenAddr(port string) (string, error) {
 	if port == "" {
-		return ""
+		return "", nil
 	}
-	return ":" + port
+	n, err := strconv.Atoi(port)
+	if err != nil || n < 1 || n > 65535 {
+		return "", fmt.Errorf("app: invalid %s: %q (want an integer 1-65535)", EnvPort, port)
+	}
+	return ":" + port, nil
 }
 
 // firstNonEmpty returns the first non-empty argument, or "" if every

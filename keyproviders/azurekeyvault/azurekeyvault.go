@@ -114,10 +114,15 @@ func (p *Provider) Encrypt(ctx context.Context, masterKeyRef string, plaintext [
 }
 
 // Decrypt unwraps a blob previously produced by this provider's
-// Encrypt. The masterKeyRef passed here may pin a version (preferred
-// for auditability) or omit it (Key Vault uses the latest active
-// version, which still resolves correctly because the ciphertext is
-// bound to a specific key version internally).
+// Encrypt. The masterKeyRef must pin the same key version that was
+// used at Encrypt time — RSA-OAEP ciphertext carries no key-version
+// metadata, so an unversioned ref will silently route to whichever
+// version Key Vault currently treats as latest, and decryption will
+// fail (or, worse, succeed against the wrong key) once a new version
+// exists. The Resolver persists the exact kid used to wrap each
+// signing key on the Key aggregate and passes it back here, so as
+// long as the configured KEK ref is version-pinned at wrap time,
+// per-aggregate pinning happens automatically.
 func (p *Provider) Decrypt(ctx context.Context, masterKeyRef string, wrapped []byte) ([]byte, error) {
 	vaultURL, name, version, err := parseKeyID(masterKeyRef)
 	if err != nil {

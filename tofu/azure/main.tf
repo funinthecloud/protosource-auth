@@ -148,9 +148,12 @@ resource "azurerm_key_vault" "this" {
   rbac_authorization_enabled = true
 
   # Soft-delete is mandatory on Key Vault. Purge protection prevents
-  # accidental destruction of HSM key material — leave on for prod,
-  # but the dev stack disables it so `tofu destroy` is clean.
-  purge_protection_enabled   = false
+  # accidental destruction of HSM key material — leave it on for any
+  # stack you'd rebuild from disaster recovery rather than redeploy
+  # from scratch. Flip key_vault_purge_protection=false only on
+  # short-lived dev / test stacks where `tofu destroy` cleanliness
+  # outweighs the irreversibility risk.
+  purge_protection_enabled   = var.key_vault_purge_protection
   soft_delete_retention_days = 7
 
   tags = var.tags

@@ -35,8 +35,9 @@ import (
 )
 
 // ensureStorage idempotently provisions the backend-specific storage
-// (DynamoDB tables or Cosmos database + containers). Returns nil for
-// the memory backend.
+// (DynamoDB tables or Cosmos database + containers). The memory
+// backend is a no-op; any other unrecognized value is rejected so a
+// future backend can't silently skip provisioning.
 func ensureStorage(ctx context.Context, cfg *app.Config) error {
 	switch cfg.Backend {
 	case app.BackendDynamoDB:
@@ -50,8 +51,11 @@ func ensureStorage(ctx context.Context, cfg *app.Config) error {
 		return nil
 	case app.BackendCosmosDB:
 		return app.EnsureCosmosStorage(ctx, cfg)
+	case app.BackendMemory:
+		return nil
+	default:
+		return fmt.Errorf("ensureStorage: unsupported backend %q", cfg.Backend)
 	}
-	return nil
 }
 
 // EnvSeedSecret gates the bootstrap and recover-admin subcommands.

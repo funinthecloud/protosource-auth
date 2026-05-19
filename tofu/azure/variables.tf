@@ -113,6 +113,18 @@ variable "container_memory" {
   default     = "1Gi"
 }
 
+variable "key_vault_purge_protection" {
+  description = "Enable Key Vault purge protection. When true, a soft-deleted vault (and its HSM key material) cannot be permanently deleted until the retention window elapses — irreversible until then, which is the right posture for prod. When false, `tofu destroy` (or a portal delete) can permanently remove the KEK and any signing keys wrapped under it, which is fine for short-lived dev / test stacks. Defaults to true so the safe choice is the default."
+  type        = bool
+  default     = true
+}
+
+variable "key_vault_destroy_safety" {
+  description = "Controls the azurerm provider's Key Vault destroy behavior. When true (prod), the provider preserves soft-deleted vaults and refuses to recover an existing soft-deleted vault on apply — destroy is final-ish, and a re-apply with the same name will fail until the soft-delete window elapses. When false (dev), the provider purges soft-deleted vaults on destroy and auto-recovers them on apply so iterative dev cycles aren't blocked by lingering tombstones. Defaults to true; flip to false only for short-lived stacks where you understand the irreversibility tradeoff."
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Tags applied to all resources."
   type        = map(string)
