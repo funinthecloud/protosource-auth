@@ -127,12 +127,20 @@ func newCosmosDBBundle(_ context.Context, cfg *Config) (*Bundle, error) {
 
 // insecureCosmosTransport returns an HTTP client whose TLS verification
 // is disabled — intended only for the Cosmos emulator, which ships a
-// self-signed cert. Cloning http.DefaultTransport (rather than
-// constructing a fresh *http.Transport) preserves the standard
-// proxy / dialer / keepalive defaults so behavior diverges from the
-// stdlib in exactly one dimension: certificate verification.
+// self-signed cert. When http.DefaultTransport is the stdlib's
+// *http.Transport (the common case), we clone it so proxy / dialer /
+// keepalive defaults survive. If a caller has replaced
+// http.DefaultTransport with a non-*http.Transport implementation (a
+// rare but valid pattern in tests or composed binaries), we fall back
+// to a fresh *http.Transport rather than panicking on a type
+// assertion.
 func insecureCosmosTransport() policy.Transporter {
-	t := http.DefaultTransport.(*http.Transport).Clone()
+	var t *http.Transport
+	if dt, ok := http.DefaultTransport.(*http.Transport); ok {
+		t = dt.Clone()
+	} else {
+		t = &http.Transport{}
+	}
 	t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // emulator only; runtime gate refuses non-loopback endpoints
 	return &http.Client{Transport: t}
 }
