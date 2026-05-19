@@ -99,6 +99,54 @@ protosource-authmgr recover-admin --admin-email ... --admin-password ... --force
 
 Recovery creates a timestamped `role-super-admin-recovery-<ts>` + `user-recovery-admin-<ts>` alongside existing state — fully additive, never destructive. `--force` is required; the original super-admin is untouched.
 
+## Azure deploy (Container Apps + Cosmos + Key Vault HSM)
+
+`tofu/azure-bootstrap/` provisions the tfstate storage account (one-shot per subscription). `tofu/azure/` is the env stack — Premium Key Vault with HSM-backed RSA KEK, Cosmos NoSQL, Container Apps via the upstream `container-app-service` + `cosmos-eventstore` modules (pinned at v0.4.0). The same `cmd/protosource-auth` binary serves both clouds; selection is purely env-driven (`PROTOSOURCE_AUTH_STORE_BACKEND`, `PROTOSOURCE_AUTH_KEY_PROVIDER`, `PROTOSOURCE_AUTH_MASTER_KEY_REF`).
+
+```bash
+# One-time bootstrap of tfstate backend
+cd tofu/azure-bootstrap && tofu init && tofu apply -var subscription_id=<id>
+
+# Env stack — first apply with the Microsoft quickstart image, then
+# push the real image and re-apply:
+cd ../azure
+tofu init \
+  -backend-config="resource_group_name=<bootstrap rg>" \
+  -backend-config="storage_account_name=<bootstrap sa>" \
+  -backend-config="container_name=tfstate"
+tofu apply -var subscription_id=<id> -var issuer_iss=https://auth.example.com
+
+# Build + push image, then re-apply
+ACR_LOGIN_SERVER=$(tofu output -raw acr_login_server)
+az acr login --name "${ACR_LOGIN_SERVER%%.*}"
+cd ../.. && make push-azure CONTAINER_IMAGE="$ACR_LOGIN_SERVER/protosource-auth:dev"
+make deploy-azure CONTAINER_IMAGE="$ACR_LOGIN_SERVER/protosource-auth:dev"
+```
+
+Production must use `PROTOSOURCE_AUTH_KEY_PROVIDER=azurekeyvault` — the local provider is dev-only.
+
+### Local Azure-flavor dev
+
+Use the Cosmos emulator + the local key provider:
+
+```bash
+docker run --rm -d -p 8081:8081 --name cosmos-emulator \
+  mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator
+export PROTOSOURCE_AUTH_STORE_BACKEND=cosmosdb
+export PROTOSOURCE_AUTH_COSMOS_ENDPOINT=https://localhost:8081
+export PROTOSOURCE_AUTH_COSMOS_KEY='C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=='
+export PROTOSOURCE_AUTH_COSMOS_INSECURE_TLS=1
+export PROTOSOURCE_AUTH_LOCAL_MASTER_KEY="$(openssl rand 32 | base64)"
+export PROTOSOURCE_AUTH_ISSUER_ISS=https://auth.local
+protosource-authmgr ensure-tables
+go run ./cmd/protosource-auth
+```
+
+### Open follow-ups (not in v1)
+
+- **Private endpoints / custom VNet.** Public endpoints + Managed Identity + RBAC is the current posture. Adding a VNet + private endpoints for Cosmos and Key Vault is additive HCL (a few hundred lines) when a compliance driver appears. The change goes upstream into the protosource modules first.
+- **Functions runtime.** Container Apps was chosen for parity with upstream. Azure Functions would require a custom-handler shim; defer unless cost/cold-start tells a different story.
+
 ## Lambda deploy
 
 ```bash
