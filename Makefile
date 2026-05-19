@@ -88,7 +88,10 @@ invalidate:
 # accepts both linux/amd64 and linux/arm64; the default leaves it
 # unset so docker builds for the host (which is what most CI / local
 # dev wants). Override on Apple Silicon when pushing to an amd64-only
-# ACR repo, or set "linux/amd64,linux/arm64" for a buildx multi-arch
+# ACR repo (e.g. DOCKER_PLATFORM=linux/amd64). Must be a single
+# platform — this target uses `docker build`, which cannot emit a
+# multi-platform manifest list. Use `docker buildx build --platform
+# linux/amd64,linux/arm64 --push` directly if you need a multi-arch
 # manifest.
 DOCKER_PLATFORM ?=
 DOCKER_PLATFORM_FLAG = $(if $(DOCKER_PLATFORM),--platform $(DOCKER_PLATFORM),)
