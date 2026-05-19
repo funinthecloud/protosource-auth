@@ -59,6 +59,8 @@ func NewBundle(ctx context.Context, cfg *Config) (*Bundle, error) {
 		return newMemoryBundle()
 	case BackendDynamoDB:
 		return newDynamoDBBundle(ctx, cfg)
+	case BackendCosmosDB:
+		return newCosmosDBBundle(ctx, cfg)
 	default:
 		return nil, fmt.Errorf("app: unknown backend %q", cfg.Backend)
 	}

@@ -18,7 +18,6 @@ import (
 	rolev1 "github.com/funinthecloud/protosource-auth/gen/auth/role/v1"
 	tokenv1 "github.com/funinthecloud/protosource-auth/gen/auth/token/v1"
 	userv1 "github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
-	"github.com/funinthecloud/protosource-auth/service"
 )
 
 // NewDynamoDBClient constructs an AWS SDK DynamoDB client honoring the
@@ -81,36 +80,6 @@ func newDynamoDBBundle(ctx context.Context, cfg *Config) (*Bundle, error) {
 		IssuerRepo: issuerv1.NewRepository(dynStore, serializer),
 		KeyRepo:    keyv1.NewRepository(dynStore, serializer),
 		TokenRepo:  tokenv1.NewRepository(dynStore, serializer),
-		Directory:  NewDynamoDirectory(userClient),
+		Directory:  NewOpaqueDirectory(userClient),
 	}, nil
 }
-
-// DynamoDirectory satisfies [service.UserDirectory] by running the
-// UserClient's GSI1 (email) query. Because User.email is annotated as
-// GSI1PK in the proto, SelectUserByEmail returns every User whose
-// email matches — we pick the first ACTIVE one. Deleted/locked users
-// are ignored here so a recreated account under the same email wins.
-type DynamoDirectory struct {
-	client *userv1.UserClient
-}
-
-// NewDynamoDirectory constructs a [service.UserDirectory] backed by a
-// GSI email query on the User aggregate.
-func NewDynamoDirectory(client *userv1.UserClient) *DynamoDirectory {
-	return &DynamoDirectory{client: client}
-}
-
-func (d *DynamoDirectory) FindByEmail(ctx context.Context, email string) (string, error) {
-	users, err := d.client.SelectUserByEmail(ctx, email)
-	if err != nil {
-		return "", fmt.Errorf("DynamoDirectory: query by email: %w", err)
-	}
-	for _, u := range users {
-		if u.GetState() == userv1.State_STATE_ACTIVE {
-			return u.GetId(), nil
-		}
-	}
-	return "", service.ErrDirectoryNotFound
-}
-
-var _ service.UserDirectory = (*DynamoDirectory)(nil)

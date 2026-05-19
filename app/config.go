@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -34,6 +35,11 @@ const (
 	// test/local-dev helper, or provision via the CloudFormation
 	// template shipped by protosource).
 	BackendDynamoDB Backend = "dynamodb"
+	// BackendCosmosDB uses a shared Azure Cosmos DB (NoSQL API) event
+	// store + opaquedata store. Database + containers must already
+	// exist (see protosource-authmgr ensure-tables for an idempotent
+	// helper, or provision via the upstream tofu modules).
+	BackendCosmosDB Backend = "cosmosdb"
 )
 
 // Config is the runtime configuration for a protosource-auth instance.
@@ -88,6 +94,33 @@ type Config struct {
 	// the SDK resolves from env/profile.
 	AWSRegion string
 
+	// CosmosEndpoint is the Azure Cosmos DB account endpoint URL
+	// (https://<account>.documents.azure.com:443/, or the emulator's
+	// https://localhost:8081). Required when Backend is
+	// [BackendCosmosDB].
+	CosmosEndpoint string
+
+	// CosmosKey is the Cosmos primary key for shared-key auth. Used
+	// only against the local emulator or for break-glass auth — in
+	// production, prefer Managed Identity via
+	// CosmosUseDefaultCredential.
+	CosmosKey string
+
+	// CosmosUseDefaultCredential, when true, authenticates to Cosmos
+	// via [azidentity.NewDefaultAzureCredential] (Managed Identity,
+	// az login, environment, etc). Ignored when CosmosKey is set.
+	CosmosUseDefaultCredential bool
+
+	// CosmosDatabase is the Cosmos database id. Default:
+	// "protosource-auth".
+	CosmosDatabase string
+
+	// CosmosInsecureTLS, when true, skips TLS verification on the
+	// Cosmos SDK transport — required for the local Cosmos emulator
+	// (self-signed cert). Never enable against a real Cosmos
+	// account.
+	CosmosInsecureTLS bool
+
 	// BootstrapAdminEmail, if non-empty, enables startup bootstrap:
 	// the service creates a default Issuer, a super-admin Role
 	// granting "*", an ACTIVE User with the provided email and
@@ -123,6 +156,12 @@ const (
 	EnvAggregatesTable        = "PROTOSOURCE_AUTH_AGGREGATES_TABLE"
 	EnvAWSEndpoint            = "PROTOSOURCE_AUTH_AWS_ENDPOINT"
 	EnvAWSRegion              = "PROTOSOURCE_AUTH_AWS_REGION"
+
+	EnvCosmosEndpoint             = "PROTOSOURCE_AUTH_COSMOS_ENDPOINT"
+	EnvCosmosKey                  = "PROTOSOURCE_AUTH_COSMOS_KEY"
+	EnvCosmosUseDefaultCredential = "PROTOSOURCE_AUTH_COSMOS_USE_DEFAULT_CREDENTIAL"
+	EnvCosmosDatabase             = "PROTOSOURCE_AUTH_COSMOS_DATABASE"
+	EnvCosmosInsecureTLS          = "PROTOSOURCE_AUTH_COSMOS_INSECURE_TLS"
 )
 
 // LoadConfigFromEnv returns a Config populated from the environment.
@@ -140,6 +179,12 @@ func LoadConfigFromEnv() (*Config, error) {
 		AggregatesTable:        os.Getenv(EnvAggregatesTable),
 		AWSEndpoint:            os.Getenv(EnvAWSEndpoint),
 		AWSRegion:              os.Getenv(EnvAWSRegion),
+
+		CosmosEndpoint:             os.Getenv(EnvCosmosEndpoint),
+		CosmosKey:                  os.Getenv(EnvCosmosKey),
+		CosmosUseDefaultCredential: envTrue(EnvCosmosUseDefaultCredential),
+		CosmosDatabase:             os.Getenv(EnvCosmosDatabase),
+		CosmosInsecureTLS:          envTrue(EnvCosmosInsecureTLS),
 	}
 
 	if raw := os.Getenv(EnvMasterKey); raw != "" {
@@ -196,6 +241,9 @@ func (c *Config) Normalize() error {
 	if c.AggregatesTable == "" {
 		c.AggregatesTable = "aggregates"
 	}
+	if c.CosmosDatabase == "" {
+		c.CosmosDatabase = "protosource-auth"
+	}
 
 	if c.IssuerIss == "" {
 		return errors.New("app: IssuerIss is required (set " + EnvIssuerIss + ")")
@@ -204,10 +252,29 @@ func (c *Config) Normalize() error {
 		return errors.New("app: BootstrapAdminPassword is required when BootstrapAdminEmail is set")
 	}
 	switch c.Backend {
-	case BackendMemory, BackendDynamoDB:
+	case BackendMemory, BackendDynamoDB, BackendCosmosDB:
 		// ok
 	default:
-		return errors.New("app: unknown Backend " + string(c.Backend) + " (want memory or dynamodb)")
+		return errors.New("app: unknown Backend " + string(c.Backend) + " (want memory, dynamodb, or cosmosdb)")
+	}
+	if c.Backend == BackendCosmosDB {
+		if c.CosmosEndpoint == "" {
+			return errors.New("app: CosmosEndpoint is required when Backend=cosmosdb (set " + EnvCosmosEndpoint + ")")
+		}
+		if c.CosmosKey == "" && !c.CosmosUseDefaultCredential {
+			return errors.New("app: Cosmos auth is required when Backend=cosmosdb (set " + EnvCosmosKey + " or " + EnvCosmosUseDefaultCredential + "=1)")
+		}
 	}
 	return nil
+}
+
+// envTrue reports whether the given env variable is set to a truthy
+// value ("1", "true", "yes", case-insensitive). Used for boolean
+// config flags that default to false.
+func envTrue(key string) bool {
+	switch strings.ToLower(os.Getenv(key)) {
+	case "1", "true", "yes":
+		return true
+	}
+	return false
 }

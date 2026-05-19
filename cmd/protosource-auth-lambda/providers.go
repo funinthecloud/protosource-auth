@@ -42,7 +42,7 @@ func provideResolver(repo keyv1.Repo, provider keyproviders.KeyProvider, ref Mas
 }
 
 func provideDirectory(client *userv1.UserClient) service.UserDirectory {
-	return app.NewDynamoDirectory(client)
+	return app.NewOpaqueDirectory(client)
 }
 
 func provideLoginer(
