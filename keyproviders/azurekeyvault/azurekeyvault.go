@@ -148,14 +148,25 @@ func (p *Provider) Decrypt(ctx context.Context, masterKeyRef string, wrapped []b
 // subsequent calls.
 func (p *Provider) clientFor(vaultURL string) (KeysClient, error) {
 	if cached, ok := p.clients.Load(vaultURL); ok {
-		return cached.(KeysClient), nil
+		c, ok := cached.(KeysClient)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("cached client for %q is not a KeysClient", vaultURL)
+		}
+		return c, nil
 	}
 	client, err := p.factory(vaultURL)
 	if err != nil {
 		return nil, fmt.Errorf("build client for %q: %w", vaultURL, err)
 	}
+	if client == nil {
+		return nil, fmt.Errorf("factory returned nil KeysClient for %q", vaultURL)
+	}
 	actual, _ := p.clients.LoadOrStore(vaultURL, client)
-	return actual.(KeysClient), nil
+	c, ok := actual.(KeysClient)
+	if !ok || c == nil {
+		return nil, fmt.Errorf("cached client for %q is not a KeysClient", vaultURL)
+	}
+	return c, nil
 }
 
 // parseKeyID splits a Key Vault key identifier URL into its

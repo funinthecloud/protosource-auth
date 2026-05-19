@@ -166,14 +166,20 @@ func TestClientCachingPerVault(t *testing.T) {
 	ref2 := "https://vault-b.vault.azure.net/keys/k"
 
 	// Two calls to the same vault → one build.
-	_, _ = p.Encrypt(ctx, ref1, []byte("x"))
-	_, _ = p.Encrypt(ctx, ref1, []byte("y"))
+	if _, err := p.Encrypt(ctx, ref1, []byte("x")); err != nil {
+		t.Fatalf("Encrypt(ref1) #1: %v", err)
+	}
+	if _, err := p.Encrypt(ctx, ref1, []byte("y")); err != nil {
+		t.Fatalf("Encrypt(ref1) #2: %v", err)
+	}
 	if builds != 1 {
 		t.Errorf("after 2 calls to same vault, builds=%d, want 1", builds)
 	}
 
 	// Call to a different vault → second build.
-	_, _ = p.Encrypt(ctx, ref2, []byte("z"))
+	if _, err := p.Encrypt(ctx, ref2, []byte("z")); err != nil {
+		t.Fatalf("Encrypt(ref2): %v", err)
+	}
 	if builds != 2 {
 		t.Errorf("after call to second vault, builds=%d, want 2", builds)
 	}

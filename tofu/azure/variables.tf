@@ -120,9 +120,19 @@ variable "key_vault_purge_protection" {
 }
 
 variable "key_vault_destroy_safety" {
-  description = "Controls the azurerm provider's Key Vault destroy behavior. When true (prod), the provider preserves soft-deleted vaults and refuses to recover an existing soft-deleted vault on apply — destroy is final-ish, and a re-apply with the same name will fail until the soft-delete window elapses. When false (dev), the provider purges soft-deleted vaults on destroy and auto-recovers them on apply so iterative dev cycles aren't blocked by lingering tombstones. Defaults to true; flip to false only for short-lived stacks where you understand the irreversibility tradeoff."
+  description = "Controls the azurerm provider's Key Vault destroy behavior. When true (prod), the provider preserves soft-deleted vaults and refuses to recover an existing soft-deleted vault on apply — destroy is final-ish, and a re-apply with the same name will fail until the soft-delete window elapses. When false (dev), the provider purges soft-deleted vaults on destroy and auto-recovers them on apply so iterative dev cycles aren't blocked by lingering tombstones. Requires key_vault_purge_protection=false; with purge protection on, Azure refuses purge during the retention window and the provider's purge_soft_delete_on_destroy setting becomes a no-op (tombstones still linger and a same-name re-apply still fails). Defaults to true; flip to false only for short-lived stacks where you understand the irreversibility tradeoff."
   type        = bool
   default     = true
+
+  # Reject the dev-mode combination that doesn't actually work: with
+  # purge protection on, Azure won't let the provider purge, so the
+  # whole point of key_vault_destroy_safety=false (clean iterative
+  # destroy) is defeated. Forcing both flags to flip together makes
+  # the dev opt-in explicit and avoids a confusing half-applied state.
+  validation {
+    condition     = var.key_vault_destroy_safety || !var.key_vault_purge_protection
+    error_message = "key_vault_destroy_safety=false requires key_vault_purge_protection=false; Azure refuses to purge soft-deleted vaults while purge protection is on."
+  }
 }
 
 variable "tags" {
