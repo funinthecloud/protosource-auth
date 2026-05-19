@@ -190,6 +190,9 @@ func parseKeyID(kid string) (vaultURL, name, version string, err error) {
 	if u.Scheme == "" || u.Host == "" {
 		return "", "", "", fmt.Errorf("masterKeyRef %q is not an absolute URL", kid)
 	}
+	if !strings.EqualFold(u.Scheme, "https") {
+		return "", "", "", fmt.Errorf("masterKeyRef %q must use https", kid)
+	}
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(parts) < 2 || len(parts) > 3 || parts[0] != "keys" || parts[1] == "" {
 		return "", "", "", fmt.Errorf("masterKeyRef %q is not a Key Vault key identifier (expected /keys/<name>[/<version>])", kid)
