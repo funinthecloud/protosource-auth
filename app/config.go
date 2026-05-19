@@ -74,15 +74,26 @@ type Config struct {
 	// repositories. Default: [BackendMemory].
 	Backend Backend
 
-	// EventsTable is the DynamoDB table name used as the event store
-	// when Backend is [BackendDynamoDB]. Default:
-	// "protosource-auth-events".
+	// EventsTable names the storage unit for the event log:
+	//
+	//   - DynamoDB:  table name (default "events")
+	//   - Cosmos DB: container id (default "events")
+	//
+	// The field carries a Dynamo-flavored name for backward
+	// compatibility; the Cosmos backend treats it as a container id.
+	// [EnvEventsContainer] is provided as a clearer-named env-var
+	// alias for the Cosmos use case — both env vars map to this
+	// single field.
 	EventsTable string
 
-	// AggregatesTable is the DynamoDB table name used by the
-	// opaquedata layer for materialized aggregates and GSI queries
-	// when Backend is [BackendDynamoDB]. Default:
-	// "protosource-auth-aggregates".
+	// AggregatesTable names the storage unit for materialized
+	// aggregates (opaquedata):
+	//
+	//   - DynamoDB:  table name (default "aggregates")
+	//   - Cosmos DB: container id (default "aggregates")
+	//
+	// See [EventsTable] regarding the cross-backend naming.
+	// [EnvAggregatesContainer] is the Cosmos-flavored env-var alias.
 	AggregatesTable string
 
 	// AWSEndpoint overrides the AWS SDK's endpoint resolution. Set to
@@ -162,6 +173,13 @@ const (
 	EnvCosmosUseDefaultCredential = "PROTOSOURCE_AUTH_COSMOS_USE_DEFAULT_CREDENTIAL"
 	EnvCosmosDatabase             = "PROTOSOURCE_AUTH_COSMOS_DATABASE"
 	EnvCosmosInsecureTLS          = "PROTOSOURCE_AUTH_COSMOS_INSECURE_TLS"
+
+	// EnvEventsContainer / EnvAggregatesContainer are Cosmos-flavored
+	// aliases for EnvEventsTable / EnvAggregatesTable. The container
+	// envs win when both are set, so an Azure deployment can be
+	// configured without any "table"-named knobs in its environment.
+	EnvEventsContainer     = "PROTOSOURCE_AUTH_EVENTS_CONTAINER"
+	EnvAggregatesContainer = "PROTOSOURCE_AUTH_AGGREGATES_CONTAINER"
 )
 
 // LoadConfigFromEnv returns a Config populated from the environment.
@@ -175,8 +193,8 @@ func LoadConfigFromEnv() (*Config, error) {
 		BootstrapAdminEmail:    os.Getenv(EnvBootstrapAdminEmail),
 		BootstrapAdminPassword: os.Getenv(EnvBootstrapAdminPassword),
 		Backend:                Backend(os.Getenv(EnvBackend)),
-		EventsTable:            os.Getenv(EnvEventsTable),
-		AggregatesTable:        os.Getenv(EnvAggregatesTable),
+		EventsTable:            firstNonEmpty(os.Getenv(EnvEventsContainer), os.Getenv(EnvEventsTable)),
+		AggregatesTable:        firstNonEmpty(os.Getenv(EnvAggregatesContainer), os.Getenv(EnvAggregatesTable)),
 		AWSEndpoint:            os.Getenv(EnvAWSEndpoint),
 		AWSRegion:              os.Getenv(EnvAWSRegion),
 
@@ -266,6 +284,18 @@ func (c *Config) Normalize() error {
 		}
 	}
 	return nil
+}
+
+// firstNonEmpty returns the first non-empty argument, or "" if every
+// argument is empty. Used to give Cosmos-flavored env vars precedence
+// over their Dynamo-named aliases.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // envTrue reports whether the given env variable is set to a truthy

@@ -5,7 +5,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
@@ -32,7 +34,8 @@ import (
 //
 // When CosmosInsecureTLS is set the client skips TLS verification —
 // required for the local Cosmos emulator which ships a self-signed
-// cert. Never use against a real Cosmos account.
+// cert. Refused at runtime for non-loopback endpoints so the flag
+// cannot silently downgrade TLS against a real Cosmos account.
 func NewCosmosClient(cfg *Config) (*azcosmos.Client, error) {
 	if cfg.CosmosEndpoint == "" {
 		return nil, errors.New("app: CosmosEndpoint must be set when Backend=cosmosdb")
@@ -40,6 +43,9 @@ func NewCosmosClient(cfg *Config) (*azcosmos.Client, error) {
 
 	clientOpts := &azcosmos.ClientOptions{}
 	if cfg.CosmosInsecureTLS {
+		if err := requireLoopbackEndpoint(cfg.CosmosEndpoint); err != nil {
+			return nil, err
+		}
 		clientOpts.ClientOptions = azcore.ClientOptions{Transport: insecureCosmosTransport()}
 	}
 
@@ -119,10 +125,38 @@ func newCosmosDBBundle(_ context.Context, cfg *Config) (*Bundle, error) {
 	}, nil
 }
 
+// insecureCosmosTransport returns an HTTP client whose TLS verification
+// is disabled — intended only for the Cosmos emulator, which ships a
+// self-signed cert. Cloning http.DefaultTransport (rather than
+// constructing a fresh *http.Transport) preserves the standard
+// proxy / dialer / keepalive defaults so behavior diverges from the
+// stdlib in exactly one dimension: certificate verification.
 func insecureCosmosTransport() policy.Transporter {
-	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // emulator only
-		},
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // emulator only; runtime gate refuses non-loopback endpoints
+	return &http.Client{Transport: t}
+}
+
+// requireLoopbackEndpoint returns nil iff endpoint's host parses to a
+// loopback name or IP (localhost, 127.0.0.1, ::1). Any other host
+// returns an error — the runtime gate on CosmosInsecureTLS, so the
+// flag cannot silently enable MITM against a real Cosmos account.
+func requireLoopbackEndpoint(endpoint string) error {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("app: CosmosInsecureTLS: parse endpoint %q: %w", endpoint, err)
 	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("app: CosmosInsecureTLS: endpoint %q has no host", endpoint)
+	}
+	if host == "localhost" {
+		return nil
+	}
+	// Strip any IPv6 brackets that Hostname() already removed and check
+	// for a loopback IP literal.
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return nil
+	}
+	return fmt.Errorf("app: CosmosInsecureTLS is refused for non-loopback endpoint %q — set false for any host other than localhost / 127.0.0.1 / ::1", endpoint)
 }
