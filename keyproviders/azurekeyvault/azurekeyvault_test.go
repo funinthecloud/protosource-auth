@@ -47,9 +47,12 @@ func (m *mockKeysClient) Decrypt(_ context.Context, name string, version string,
 	return azkeys.DecryptResponse{KeyOperationResult: azkeys.KeyOperationResult{Result: plain}}, nil
 }
 
-// newWithMock returns a Provider plus the underlying mock so tests can
-// inspect routing state. The factory builds a fresh mock per distinct
-// vault URL.
+// newWithMock returns a Provider plus the underlying mock so tests
+// can inspect routing state. The factory returns the *same* mock
+// instance for every vault URL — sufficient for tests that only need
+// to assert on the last-call's name / version. Tests that care about
+// per-vault behaviour (TestClientCachingPerVault) use NewWithFactory
+// directly with a closure that records each invocation.
 func newWithMock() (*azurekeyvault.Provider, *mockKeysClient) {
 	mock := &mockKeysClient{}
 	return azurekeyvault.NewWithFactory(func(_ string) (azurekeyvault.KeysClient, error) {
@@ -141,6 +144,7 @@ func TestInvalidKeyID(t *testing.T) {
 		{"not absolute", "/keys/foo"},
 		{"missing keys segment", "https://v.vault.azure.net/secrets/foo"},
 		{"missing key name", "https://v.vault.azure.net/keys/"},
+		{"trailing segment past version", "https://v.vault.azure.net/keys/name/version/extra"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

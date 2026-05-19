@@ -168,11 +168,14 @@ func parseKeyID(kid string) (vaultURL, name, version string, err error) {
 		return "", "", "", fmt.Errorf("masterKeyRef %q is not an absolute URL", kid)
 	}
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-	if len(parts) < 2 || parts[0] != "keys" || parts[1] == "" {
+	if len(parts) < 2 || len(parts) > 3 || parts[0] != "keys" || parts[1] == "" {
 		return "", "", "", fmt.Errorf("masterKeyRef %q is not a Key Vault key identifier (expected /keys/<name>[/<version>])", kid)
 	}
 	name = parts[1]
-	if len(parts) >= 3 {
+	if len(parts) == 3 {
+		if parts[2] == "" {
+			return "", "", "", fmt.Errorf("masterKeyRef %q has an empty version segment", kid)
+		}
 		version = parts[2]
 	}
 	vaultURL = u.Scheme + "://" + u.Host

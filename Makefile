@@ -85,13 +85,21 @@ invalidate:
 	aws cloudfront create-invalidation --distribution-id $(ADMIN_DIST) --paths '/*'
 
 .PHONY: build-container push-azure deploy-azure
+# DOCKER_PLATFORM picks the target arch for the image. Container Apps
+# accepts both linux/amd64 and linux/arm64; the default leaves it
+# unset so docker builds for the host (which is what most CI / local
+# dev wants). Override on Apple Silicon when pushing to an amd64-only
+# ACR repo, or set "linux/amd64,linux/arm64" for a buildx multi-arch
+# manifest.
+DOCKER_PLATFORM ?=
+DOCKER_PLATFORM_FLAG = $(if $(DOCKER_PLATFORM),--platform $(DOCKER_PLATFORM),)
+
 # Builds the Container Apps image. CONTAINER_IMAGE is the full
 # <registry>/<repo>:<tag> tag to apply (and, in push-azure, push). Use
-# the ACR_LOGIN_SERVER output from tofu/azure to build the registry
-# part.
+# the acr_login_server tofu output for the registry part.
 build-container:
 	@test -n "$(CONTAINER_IMAGE)" || (echo "CONTAINER_IMAGE not set — e.g. CONTAINER_IMAGE=myacr.azurecr.io/protosource-auth:dev make build-container" && exit 1)
-	docker build --platform linux/amd64 -f cmd/protosource-auth/Dockerfile -t $(CONTAINER_IMAGE) .
+	docker build $(DOCKER_PLATFORM_FLAG) -f cmd/protosource-auth/Dockerfile -t $(CONTAINER_IMAGE) .
 
 # Pushes to ACR. Requires a prior `az acr login --name <acr-name>` so
 # Docker has credentials; the make recipe doesn't run az for you since
@@ -99,12 +107,13 @@ build-container:
 push-azure: build-container
 	docker push $(CONTAINER_IMAGE)
 
-# Two-stage apply: the first apply (with the upstream quickstart
-# image) provisions the ACR; subsequent applies pass CONTAINER_IMAGE
-# pointing at a tag in that ACR.
+# Two-stage workflow:
+#   1. First apply with CONTAINER_IMAGE empty stands up the ACR with
+#      the upstream quickstart image (defaulted in tofu/azure/variables.tf).
+#   2. Push your image (see push-azure) and re-run with CONTAINER_IMAGE
+#      pointing at the ACR-hosted tag.
 deploy-azure:
-	@test -n "$(CONTAINER_IMAGE)" || (echo "CONTAINER_IMAGE not set — pass an ACR image tag, or omit on first apply to stand up the ACR with the quickstart image" && exit 1)
-	tofu -chdir=$(TOFU_AZURE_DIR) apply -var image=$(CONTAINER_IMAGE)
+	tofu -chdir=$(TOFU_AZURE_DIR) apply $(if $(CONTAINER_IMAGE),-var image=$(CONTAINER_IMAGE),)
 
 .PHONY: clean
 clean:

@@ -285,7 +285,12 @@ func (c *Config) Normalize() error {
 	if c.KeyProvider == "" {
 		c.KeyProvider = KeyProviderLocal
 	}
-	if c.KeyProvider == KeyProviderLocal && c.MasterKeyRef == "" {
+	if c.KeyProvider == KeyProviderLocal {
+		// The local provider does not consult MasterKeyRef — the
+		// docstring says so — so pin it to the documented sentinel
+		// even if an operator left a stray cloud kid URL in
+		// PROTOSOURCE_AUTH_MASTER_KEY_REF. Silent override matches
+		// the field docs and the historical hardcoded constant.
 		c.MasterKeyRef = "local-master"
 	}
 	if c.IssuerID == "" {

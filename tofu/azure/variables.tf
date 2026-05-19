@@ -10,13 +10,18 @@ variable "location" {
 }
 
 variable "name_prefix" {
-  description = "Lowercase prefix for resource names (3-20 chars). Used to derive globally-unique names (ACR, Cosmos account, Key Vault) with a deterministic hash suffix."
+  description = "Lowercase prefix for resource names (3-20 chars). Used to derive globally-unique names (ACR, Cosmos account, Key Vault) with a deterministic hash suffix. Must start with a letter and end with a letter or digit so derived names satisfy Azure's stricter resource-name rules (Key Vault: leading letter; ACR / Storage: no hyphens). Internal hyphens are allowed; consecutive or trailing hyphens are not."
   type        = string
   default     = "protosrc-auth"
 
   validation {
-    condition     = can(regex("^[a-z0-9-]{3,20}$", var.name_prefix))
-    error_message = "name_prefix must be 3-20 chars of lowercase letters, digits, or hyphens."
+    condition = (
+      can(regex("^[a-z][a-z0-9-]*[a-z0-9]$", var.name_prefix))
+      && !can(regex("--", var.name_prefix))
+      && length(var.name_prefix) >= 3
+      && length(var.name_prefix) <= 20
+    )
+    error_message = "name_prefix must be 3-20 chars, start with a lowercase letter, end with a lowercase letter or digit, and contain only lowercase letters, digits, and single (non-trailing, non-consecutive) hyphens."
   }
 }
 

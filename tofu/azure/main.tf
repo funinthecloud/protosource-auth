@@ -44,8 +44,15 @@ locals {
   suffix              = substr(md5("${var.subscription_id}-${var.name_prefix}"), 0, 6)
   cosmos_account_name = "${var.name_prefix}-cosmos-${local.suffix}"
   acr_name            = "${replace(var.name_prefix, "-", "")}acr${local.suffix}"
-  # Key Vault names are 3-24 chars, alphanumeric + hyphen.
-  key_vault_name = substr("${var.name_prefix}-kv-${local.suffix}", 0, 24)
+  # Key Vault names are 3-24 chars, must start with a letter, must
+  # end with a letter or digit (no trailing -). Compose
+  # "<prefix>-kv-<suffix>" and pre-truncate the prefix portion to 14
+  # chars so the final string is 14 + 4 ("-kv-") + 6 = 24 chars
+  # exactly, always within the limit. trimsuffix guards against the
+  # prefix being cut on a hyphen boundary (e.g. a 15-char prefix
+  # ending its 14th char with "-"). name_prefix validation requires a
+  # leading letter, so the first character is always a letter.
+  key_vault_name = "${trimsuffix(substr(var.name_prefix, 0, 14), "-")}-kv-${local.suffix}"
 }
 
 resource "azurerm_resource_group" "this" {
