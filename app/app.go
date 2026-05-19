@@ -19,7 +19,6 @@ import (
 	"github.com/funinthecloud/protosource"
 	"github.com/funinthecloud/protosource/adapters/httpstandard"
 
-	"github.com/funinthecloud/protosource-auth/keyproviders/local"
 	"github.com/funinthecloud/protosource-auth/keys"
 	"github.com/funinthecloud/protosource-auth/loginpage"
 	"github.com/funinthecloud/protosource-auth/service"
@@ -78,24 +77,20 @@ func Run(ctx context.Context, cfg *Config) (*App, error) {
 	if err := cfg.Normalize(); err != nil {
 		return nil, err
 	}
-	if len(cfg.MasterKey) == 0 {
-		return nil, fmt.Errorf("app: MasterKey is required (set %s)", EnvMasterKey)
-	}
-
 	bundle, err := NewBundle(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	provider, err := local.New(cfg.MasterKey)
+	provider, masterKeyRef, err := buildKeyProvider(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("app: init key provider: %w", err)
+		return nil, err
 	}
 
 	resolver := keys.NewResolver(
 		bundle.KeyRepo,
 		provider,
-		"local-master",
+		masterKeyRef,
 		map[string]signers.Signer{
 			ed25519signer.Algorithm: ed25519signer.Signer{},
 		},

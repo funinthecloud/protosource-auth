@@ -224,3 +224,43 @@ func TestLoadConfigFromEnvRoundTrip(t *testing.T) {
 	// Cleanup (t.Setenv does this automatically, but be explicit)
 	_ = os.Unsetenv(app.EnvMasterKey)
 }
+
+func TestLoadConfigPortFallback(t *testing.T) {
+	t.Setenv(app.EnvIssuerIss, "https://auth.from.env")
+	t.Setenv(app.EnvPort, "9091")
+
+	cfg, err := app.LoadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("LoadConfigFromEnv: %v", err)
+	}
+	if cfg.ListenAddr != ":9091" {
+		t.Errorf("ListenAddr from PORT = %q, want :9091", cfg.ListenAddr)
+	}
+}
+
+func TestLoadConfigListenAddrWinsOverPort(t *testing.T) {
+	t.Setenv(app.EnvIssuerIss, "https://auth.from.env")
+	t.Setenv(app.EnvListenAddr, ":9999")
+	t.Setenv(app.EnvPort, "9091")
+
+	cfg, err := app.LoadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("LoadConfigFromEnv: %v", err)
+	}
+	if cfg.ListenAddr != ":9999" {
+		t.Errorf("ListenAddr = %q, want explicit PROTOSOURCE_AUTH_LISTEN_ADDR (:9999) to win over PORT", cfg.ListenAddr)
+	}
+}
+
+func TestLoadConfigInvalidPort(t *testing.T) {
+	t.Setenv(app.EnvIssuerIss, "https://auth.from.env")
+
+	for _, raw := range []string{"not-a-number", "0", "65536", "-1"} {
+		t.Run(raw, func(t *testing.T) {
+			t.Setenv(app.EnvPort, raw)
+			if _, err := app.LoadConfigFromEnv(); err == nil {
+				t.Errorf("LoadConfigFromEnv with PORT=%q: expected error", raw)
+			}
+		})
+	}
+}

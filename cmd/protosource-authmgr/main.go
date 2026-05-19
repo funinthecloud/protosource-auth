@@ -34,6 +34,30 @@ import (
 	"github.com/funinthecloud/protosource-auth/app"
 )
 
+// ensureStorage idempotently provisions the backend-specific storage
+// (DynamoDB tables or Cosmos database + containers). The memory
+// backend is a no-op; any other unrecognized value is rejected so a
+// future backend can't silently skip provisioning.
+func ensureStorage(ctx context.Context, cfg *app.Config) error {
+	switch cfg.Backend {
+	case app.BackendDynamoDB:
+		client, err := app.NewDynamoDBClient(ctx, cfg)
+		if err != nil {
+			return fmt.Errorf("dynamodb client: %w", err)
+		}
+		if err := dynamodbstore.EnsureTables(ctx, client, cfg.EventsTable, cfg.AggregatesTable); err != nil {
+			return fmt.Errorf("ensure tables (events=%q, aggregates=%q): %w", cfg.EventsTable, cfg.AggregatesTable, err)
+		}
+		return nil
+	case app.BackendCosmosDB:
+		return app.EnsureCosmosStorage(ctx, cfg)
+	case app.BackendMemory:
+		return nil
+	default:
+		return fmt.Errorf("ensureStorage: unsupported backend %q", cfg.Backend)
+	}
+}
+
 // EnvSeedSecret gates the bootstrap and recover-admin subcommands.
 // Phase 9 just checks that it is non-empty; phase 10 will fetch it
 // from KMS/Secrets Manager and verify against a stored digest.
@@ -81,7 +105,7 @@ func usage(w *os.File) {
 	fmt.Fprintln(w, "Usage: protosource-authmgr <subcommand> [flags]")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Subcommands:")
-	fmt.Fprintln(w, "  ensure-tables    Create the DynamoDB tables if they do not exist.")
+	fmt.Fprintln(w, "  ensure-tables    Create the DynamoDB tables or Cosmos containers if they do not exist.")
 	fmt.Fprintln(w, "  bootstrap        Create default issuer + super-admin role + admin user.")
 	fmt.Fprintln(w, "  recover-admin    Create a fresh admin alongside existing ones (lost-admin recovery).")
 	fmt.Fprintln(w, "  diagnose-user    Print a user's role assignments and per-role resolution status.")
@@ -99,23 +123,21 @@ func fatal(err error) {
 // ── Subcommand: ensure-tables ──
 
 func runEnsureTables(ctx context.Context, args []string) error {
+	_ = args
 	cfg, err := loadConfigForMgr()
 	if err != nil {
 		return err
 	}
-	if cfg.Backend != app.BackendDynamoDB {
-		return fmt.Errorf("ensure-tables only applies to the dynamodb backend (set %s=dynamodb)", app.EnvBackend)
+	switch cfg.Backend {
+	case app.BackendDynamoDB, app.BackendCosmosDB:
+		if err := ensureStorage(ctx, cfg); err != nil {
+			return err
+		}
+		log.Printf("ensured storage backend=%q events=%q aggregates=%q", cfg.Backend, cfg.EventsTable, cfg.AggregatesTable)
+		return nil
+	default:
+		return fmt.Errorf("ensure-tables only applies to persistent backends (set %s=dynamodb or cosmosdb)", app.EnvBackend)
 	}
-
-	client, err := app.NewDynamoDBClient(ctx, cfg)
-	if err != nil {
-		return fmt.Errorf("dynamodb client: %w", err)
-	}
-	if err := dynamodbstore.EnsureTables(ctx, client, cfg.EventsTable, cfg.AggregatesTable); err != nil {
-		return fmt.Errorf("ensure tables (events=%q, aggregates=%q): %w", cfg.EventsTable, cfg.AggregatesTable, err)
-	}
-	log.Printf("ensured tables events=%q aggregates=%q", cfg.EventsTable, cfg.AggregatesTable)
-	return nil
 }
 
 // ── Subcommand: bootstrap ──
@@ -149,16 +171,11 @@ func runBootstrap(ctx context.Context, args []string) error {
 	}
 	defer func() { _ = bundle.Close() }()
 
-	// Ensure tables exist when running against DynamoDB so a fresh
-	// deployment's "bootstrap" step is one call instead of two.
-	if cfg.Backend == app.BackendDynamoDB {
-		client, err := app.NewDynamoDBClient(ctx, cfg)
-		if err != nil {
-			return fmt.Errorf("dynamodb client: %w", err)
-		}
-		if err := dynamodbstore.EnsureTables(ctx, client, cfg.EventsTable, cfg.AggregatesTable); err != nil {
-			return fmt.Errorf("ensure tables: %w", err)
-		}
+	// Ensure storage exists when running against a persistent backend
+	// so a fresh deployment's "bootstrap" step is one call instead of
+	// two.
+	if err := ensureStorage(ctx, cfg); err != nil {
+		return err
 	}
 
 	result, err := app.Bootstrap(ctx, cfg, bundle, nil)

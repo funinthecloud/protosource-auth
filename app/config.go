@@ -42,6 +42,28 @@ const (
 	BackendCosmosDB Backend = "cosmosdb"
 )
 
+// KeyProvider identifies which envelope-encryption provider [Run]
+// wires behind the keys.Resolver for wrapping signing-key material.
+type KeyProvider string
+
+const (
+	// KeyProviderLocal uses an in-process XChaCha20-Poly1305 KEK
+	// derived from a 32-byte master key (see [keyproviders/local]).
+	// Intended for development and tests; never use for production
+	// — there is no HSM root of trust.
+	KeyProviderLocal KeyProvider = "local"
+	// KeyProviderAWSKMS wraps signing-key material via AWS KMS
+	// direct encryption (see [keyproviders/awskms]). Requires
+	// MasterKeyRef to be a KMS key ARN or alias.
+	KeyProviderAWSKMS KeyProvider = "awskms"
+	// KeyProviderAzureKeyVault wraps signing-key material via Azure
+	// Key Vault RSA-OAEP-256 against an HSM-backed KEK (see
+	// [keyproviders/azurekeyvault]). Requires MasterKeyRef to be a
+	// full Key Vault key identifier URL
+	// (https://<vault>.vault.azure.net/keys/<name>[/<version>]).
+	KeyProviderAzureKeyVault KeyProvider = "azurekeyvault"
+)
+
 // Config is the runtime configuration for a protosource-auth instance.
 // Zero-value fields are populated with defaults by [Config.Normalize].
 type Config struct {
@@ -52,8 +74,20 @@ type Config struct {
 	// MasterKey is the raw 32-byte master key used by the local
 	// KeyProvider to envelope-encrypt signing-key private material.
 	// Construct via [LoadConfigFromEnv] from a base64-encoded env
-	// variable, or assign directly in tests.
+	// variable, or assign directly in tests. Required only when
+	// KeyProvider is [KeyProviderLocal].
 	MasterKey []byte
+
+	// KeyProvider selects which envelope-encryption provider wraps
+	// signing-key material. Default: [KeyProviderLocal].
+	KeyProvider KeyProvider
+
+	// MasterKeyRef is the cloud-side identifier passed to the
+	// KeyProvider on Encrypt/Decrypt: a KMS key ARN/alias for
+	// [KeyProviderAWSKMS], a Key Vault key identifier URL for
+	// [KeyProviderAzureKeyVault]. Ignored (defaulted to
+	// "local-master") for [KeyProviderLocal].
+	MasterKeyRef string
 
 	// IssuerID is the aggregate id of the default (and, in phase 7,
 	// only) Issuer registered at bootstrap. Default: "default".
@@ -168,6 +202,10 @@ const (
 	EnvAWSEndpoint            = "PROTOSOURCE_AUTH_AWS_ENDPOINT"
 	EnvAWSRegion              = "PROTOSOURCE_AUTH_AWS_REGION"
 
+	EnvKeyProvider  = "PROTOSOURCE_AUTH_KEY_PROVIDER"
+	EnvMasterKeyRef = "PROTOSOURCE_AUTH_MASTER_KEY_REF"
+	EnvPort         = "PORT" // Container Apps / Functions / Cloud Run convention.
+
 	EnvCosmosEndpoint             = "PROTOSOURCE_AUTH_COSMOS_ENDPOINT"
 	EnvCosmosKey                  = "PROTOSOURCE_AUTH_COSMOS_KEY"
 	EnvCosmosUseDefaultCredential = "PROTOSOURCE_AUTH_COSMOS_USE_DEFAULT_CREDENTIAL"
@@ -185,8 +223,12 @@ const (
 // LoadConfigFromEnv returns a Config populated from the environment.
 // Returns an error if required variables are missing or malformed.
 func LoadConfigFromEnv() (*Config, error) {
+	portAddr, err := portToListenAddr(os.Getenv(EnvPort))
+	if err != nil {
+		return nil, err
+	}
 	cfg := &Config{
-		ListenAddr:             os.Getenv(EnvListenAddr),
+		ListenAddr:             firstNonEmpty(os.Getenv(EnvListenAddr), portAddr),
 		IssuerID:               os.Getenv(EnvIssuerID),
 		IssuerIss:              os.Getenv(EnvIssuerIss),
 		IssuerDisplayName:      os.Getenv(EnvIssuerDisplayName),
@@ -197,6 +239,8 @@ func LoadConfigFromEnv() (*Config, error) {
 		AggregatesTable:        firstNonEmpty(os.Getenv(EnvAggregatesContainer), os.Getenv(EnvAggregatesTable)),
 		AWSEndpoint:            os.Getenv(EnvAWSEndpoint),
 		AWSRegion:              os.Getenv(EnvAWSRegion),
+		KeyProvider:            KeyProvider(os.Getenv(EnvKeyProvider)),
+		MasterKeyRef:           os.Getenv(EnvMasterKeyRef),
 
 		CosmosEndpoint:             os.Getenv(EnvCosmosEndpoint),
 		CosmosKey:                  os.Getenv(EnvCosmosKey),
@@ -238,6 +282,17 @@ func (c *Config) Normalize() error {
 	if c.ListenAddr == "" {
 		c.ListenAddr = ":8080"
 	}
+	if c.KeyProvider == "" {
+		c.KeyProvider = KeyProviderLocal
+	}
+	if c.KeyProvider == KeyProviderLocal {
+		// The local provider does not consult MasterKeyRef — the
+		// docstring says so — so pin it to the documented sentinel
+		// even if an operator left a stray cloud kid URL in
+		// PROTOSOURCE_AUTH_MASTER_KEY_REF. Silent override matches
+		// the field docs and the historical hardcoded constant.
+		c.MasterKeyRef = "local-master"
+	}
 	if c.IssuerID == "" {
 		c.IssuerID = "default"
 	}
@@ -275,6 +330,15 @@ func (c *Config) Normalize() error {
 	default:
 		return errors.New("app: unknown Backend " + string(c.Backend) + " (want memory, dynamodb, or cosmosdb)")
 	}
+	switch c.KeyProvider {
+	case KeyProviderLocal, KeyProviderAWSKMS, KeyProviderAzureKeyVault:
+		// ok
+	default:
+		return errors.New("app: unknown KeyProvider " + string(c.KeyProvider) + " (want local, awskms, or azurekeyvault)")
+	}
+	if c.KeyProvider != KeyProviderLocal && c.MasterKeyRef == "" {
+		return errors.New("app: MasterKeyRef is required when KeyProvider=" + string(c.KeyProvider) + " (set " + EnvMasterKeyRef + ")")
+	}
 	if c.Backend == BackendCosmosDB {
 		if c.CosmosEndpoint == "" {
 			return errors.New("app: CosmosEndpoint is required when Backend=cosmosdb (set " + EnvCosmosEndpoint + ")")
@@ -284,6 +348,25 @@ func (c *Config) Normalize() error {
 		}
 	}
 	return nil
+}
+
+// portToListenAddr converts a $PORT value to a ":PORT" listen
+// address, or returns "" when port is empty. Kept narrow so
+// LoadConfigFromEnv can fold the Container Apps / Functions / Cloud
+// Run PORT convention into ListenAddr at parse time — Normalize
+// stays a pure function of the Config fields it's given.
+// Validates that the value is a TCP port (integer in 1-65535) so an
+// operator typo surfaces here instead of as a less-actionable bind
+// failure deep in startup.
+func portToListenAddr(port string) (string, error) {
+	if port == "" {
+		return "", nil
+	}
+	n, err := strconv.Atoi(port)
+	if err != nil || n < 1 || n > 65535 {
+		return "", fmt.Errorf("app: invalid %s: %q (want an integer 1-65535)", EnvPort, port)
+	}
+	return ":" + port, nil
 }
 
 // firstNonEmpty returns the first non-empty argument, or "" if every

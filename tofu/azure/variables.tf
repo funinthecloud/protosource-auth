@@ -1,0 +1,145 @@
+variable "subscription_id" {
+  description = "Azure subscription ID to deploy into. Required so the env doesn't accidentally target whichever subscription `az account show` returns."
+  type        = string
+}
+
+variable "location" {
+  description = "Azure region for the env."
+  type        = string
+  default     = "eastus"
+}
+
+variable "name_prefix" {
+  description = "Lowercase prefix for resource names (3-20 chars). Used to derive globally-unique names (ACR, Cosmos account, Key Vault) with a deterministic hash suffix. Must start with a letter and end with a letter or digit so derived names satisfy Azure's stricter resource-name rules (Key Vault: leading letter; ACR / Storage: no hyphens). Internal hyphens are allowed; consecutive or trailing hyphens are not."
+  type        = string
+  default     = "protosrc-auth"
+
+  validation {
+    condition = (
+      can(regex("^[a-z][a-z0-9-]*[a-z0-9]$", var.name_prefix))
+      && !can(regex("--", var.name_prefix))
+      && length(var.name_prefix) >= 3
+      && length(var.name_prefix) <= 20
+    )
+    error_message = "name_prefix must be 3-20 chars, start with a lowercase letter, end with a lowercase letter or digit, and contain only lowercase letters, digits, and single (non-trailing, non-consecutive) hyphens."
+  }
+}
+
+variable "image" {
+  description = "Container image to run. Stays on the Microsoft quickstart until you push your own protosource-auth image to the ACR this stack creates."
+  type        = string
+  default     = "mcr.microsoft.com/k8se/quickstart:latest"
+}
+
+variable "issuer_iss" {
+  description = "JWT `iss` claim value advertised by the default issuer. Required."
+  type        = string
+}
+
+variable "issuer_id" {
+  description = "Default issuer aggregate id."
+  type        = string
+  default     = "default"
+}
+
+variable "issuer_display_name" {
+  description = "Human-readable default issuer name."
+  type        = string
+  default     = "protosource-auth"
+}
+
+variable "token_ttl" {
+  description = "Lifetime for issued shadow tokens, as a Go time.Duration string (e.g. \"10h\") or integer seconds."
+  type        = string
+  default     = "10h"
+}
+
+variable "cors_origin" {
+  description = "Allowed CORS origin(s) for the admin frontend (comma-separated). Empty disables CORS."
+  type        = string
+  default     = ""
+}
+
+variable "cosmos_serverless" {
+  description = "Run Cosmos under the Serverless capability. Recommended for dev and low-traffic workloads."
+  type        = bool
+  default     = true
+}
+
+variable "cosmos_database" {
+  description = "Cosmos SQL database id."
+  type        = string
+  default     = "protosource-auth"
+}
+
+variable "key_vault_kek_name" {
+  description = "Name of the HSM-backed RSA key in Key Vault that wraps signing-key material."
+  type        = string
+  default     = "protosource-auth-kek"
+}
+
+variable "key_vault_kek_size" {
+  description = "RSA key size for the KEK. 3072 is the cheapest HSM size that passes most compliance baselines; 4096 adds future-proofing at marginal cost."
+  type        = number
+  default     = 3072
+
+  validation {
+    condition     = contains([2048, 3072, 4096], var.key_vault_kek_size)
+    error_message = "key_vault_kek_size must be 2048, 3072, or 4096."
+  }
+}
+
+variable "min_replicas" {
+  description = "Minimum Container App replicas. 0 enables scale-to-zero."
+  type        = number
+  default     = 0
+}
+
+variable "max_replicas" {
+  description = "Maximum Container App replicas."
+  type        = number
+  default     = 3
+}
+
+variable "container_cpu" {
+  description = "vCPU per Container App replica. Must pair with container_memory per the Container Apps matrix."
+  type        = number
+  default     = 0.5
+}
+
+variable "container_memory" {
+  description = "Memory per Container App replica."
+  type        = string
+  default     = "1Gi"
+}
+
+variable "key_vault_purge_protection" {
+  description = "Enable Key Vault purge protection. When true, a soft-deleted vault (and its HSM key material) cannot be permanently deleted until the retention window elapses — irreversible until then, which is the right posture for prod. When false, `tofu destroy` (or a portal delete) can permanently remove the KEK and any signing keys wrapped under it, which is fine for short-lived dev / test stacks. Defaults to true so the safe choice is the default."
+  type        = bool
+  default     = true
+}
+
+variable "key_vault_destroy_safety" {
+  description = "Controls the azurerm provider's Key Vault destroy behavior. When true (prod), the provider preserves soft-deleted vaults and refuses to recover an existing soft-deleted vault on apply — destroy is final-ish, and a re-apply with the same name will fail until the soft-delete window elapses. When false (dev), the provider purges soft-deleted vaults on destroy and auto-recovers them on apply so iterative dev cycles aren't blocked by lingering tombstones. Requires key_vault_purge_protection=false; with purge protection on, Azure refuses purge during the retention window and the provider's purge_soft_delete_on_destroy setting becomes a no-op (tombstones still linger and a same-name re-apply still fails). Defaults to true; flip to false only for short-lived stacks where you understand the irreversibility tradeoff."
+  type        = bool
+  default     = true
+
+  # Reject the dev-mode combination that doesn't actually work: with
+  # purge protection on, Azure won't let the provider purge, so the
+  # whole point of key_vault_destroy_safety=false (clean iterative
+  # destroy) is defeated. Forcing both flags to flip together makes
+  # the dev opt-in explicit and avoids a confusing half-applied state.
+  validation {
+    condition     = var.key_vault_destroy_safety || !var.key_vault_purge_protection
+    error_message = "key_vault_destroy_safety=false requires key_vault_purge_protection=false; Azure refuses to purge soft-deleted vaults while purge protection is on."
+  }
+}
+
+variable "tags" {
+  description = "Tags applied to all resources."
+  type        = map(string)
+  default = {
+    project   = "protosource-auth"
+    managedBy = "tofu"
+  }
+}
