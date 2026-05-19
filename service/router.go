@@ -53,9 +53,15 @@ type loginRequestJSON struct {
 	Issuer   string `json:"issuer"`
 }
 
+// loginResponseJSON intentionally omits the signed JWT. The shadow
+// token is the only credential external callers need — they round-trip
+// it back through /authz/check, which dereferences it server-side.
+// Leaking the JWT to network callers would let them validate offline
+// and bypass token revocation; keep it server-side until the JWKS +
+// OIDC discovery work (see V2_FEDERATION.md) makes offline
+// verification an intentional contract.
 type loginResponseJSON struct {
 	ShadowToken string `json:"shadow_token"`
-	JWT         string `json:"jwt,omitempty"`
 	ExpiresAt   int64  `json:"expires_at"`
 }
 
@@ -69,9 +75,14 @@ type CheckRequestJSON struct {
 
 // CheckResponseJSON is the wire shape returned by a successful POST
 // /authz/check. Exported alongside [CheckRequestJSON] for client reuse.
+//
+// The signed JWT is intentionally not returned. Downstream services
+// that need user identity should consume UserID and trust the auth
+// service's check; offline JWT verification is a JWKS-era contract
+// (see V2_FEDERATION.md) and shipping the raw JWT here would defeat
+// shadow-token revocation.
 type CheckResponseJSON struct {
 	UserID string `json:"user_id"`
-	JWT    string `json:"jwt,omitempty"`
 }
 
 type errorJSON struct {
@@ -103,7 +114,6 @@ func (s *Service) HandleLogin(ctx context.Context, req protosource.Request) prot
 
 	return jsonOK(loginResponseJSON{
 		ShadowToken: out.ShadowToken,
-		JWT:         out.JWT,
 		ExpiresAt:   out.ExpiresAt,
 	})
 }
@@ -129,7 +139,6 @@ func (s *Service) HandleCheck(ctx context.Context, req protosource.Request) prot
 
 	return jsonOK(CheckResponseJSON{
 		UserID: out.UserID,
-		JWT:    out.JWT,
 	})
 }
 

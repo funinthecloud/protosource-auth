@@ -17,8 +17,14 @@
 // The authorizer extracts the shadow token from the incoming request
 // (Authorization header by default, cookie or custom source configurable),
 // posts it to /authz/check, and on success enriches the returned context
-// with the authenticated user id and forwarded JWT via
-// [protosource/authz.WithUserID] and [protosource/authz.WithJWT].
+// with the authenticated user id via [protosource/authz.WithUserID].
+//
+// The signed JWT is not forwarded over the network — /authz/check
+// returns user_id only. Downstream services that need offline JWT
+// verification will get a JWKS contract in a future release (see
+// V2_FEDERATION.md). In-process callers can keep using directauthz,
+// which still enriches the context with the JWT from the in-memory
+// Token aggregate.
 package httpauthz
 
 import (
@@ -205,9 +211,6 @@ func (a *Authorizer) Authorize(ctx context.Context, req protosource.Request, req
 			return ctx, fmt.Errorf("httpauthz: decode response: %w", err)
 		}
 		ctx = authz.WithUserID(ctx, out.UserID)
-		if out.JWT != "" {
-			ctx = authz.WithJWT(ctx, out.JWT)
-		}
 		return ctx, nil
 
 	case http.StatusUnauthorized:

@@ -176,8 +176,12 @@ func TestHTTPLoginReturnsShadowToken(t *testing.T) {
 	if out["shadow_token"] == "" {
 		t.Errorf("no shadow_token in response")
 	}
-	if out["jwt"] == "" {
-		t.Errorf("no jwt in response")
+	// The JWT is intentionally not exposed on the wire — see
+	// service.loginResponseJSON. Confirm it stays out of the
+	// response body so a regression that adds it back is caught
+	// here.
+	if _, ok := out["jwt"]; ok {
+		t.Errorf("jwt unexpectedly present in /login response: %v", out["jwt"])
 	}
 }
 
@@ -213,8 +217,12 @@ func TestAuthorizerPermitsGrantedFunction(t *testing.T) {
 	if authz.UserIDFromContext(ctx) != "user-alice" {
 		t.Errorf("UserIDFromContext = %q, want user-alice", authz.UserIDFromContext(ctx))
 	}
-	if authz.JWTFromContext(ctx) == "" {
-		t.Errorf("JWTFromContext is empty; check endpoint should forward the JWT")
+	// /authz/check intentionally does not return the JWT over the
+	// network (see service.CheckResponseJSON); httpauthz therefore
+	// must not enrich the context with one. In-process callers that
+	// need the JWT use directauthz against the domain type.
+	if got := authz.JWTFromContext(ctx); got != "" {
+		t.Errorf("JWTFromContext = %q, want empty (JWT must not cross the network)", got)
 	}
 }
 
