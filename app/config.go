@@ -184,6 +184,15 @@ type Config struct {
 	// BootstrapActor is the "actor" recorded on bootstrap commands.
 	// Default: "bootstrap".
 	BootstrapActor string
+
+	// CORSOrigin is a comma-separated list of allowed origins for
+	// CORS. Empty disables CORS (no Access-Control-Allow-* headers
+	// and no preflight handling). Required when the admin SPA is
+	// hosted on a different origin than the API. Methods are fixed
+	// at GET,POST,OPTIONS and headers at Content-Type,Accept;
+	// credentials are always allowed when CORSOrigin is set so the
+	// shadow cookie can flow on cross-origin XHR.
+	CORSOrigin string
 }
 
 // Env variable names consulted by [LoadConfigFromEnv].
@@ -201,6 +210,8 @@ const (
 	EnvAggregatesTable        = "PROTOSOURCE_AUTH_AGGREGATES_TABLE"
 	EnvAWSEndpoint            = "PROTOSOURCE_AUTH_AWS_ENDPOINT"
 	EnvAWSRegion              = "PROTOSOURCE_AUTH_AWS_REGION"
+
+	EnvCORSOrigin = "PROTOSOURCE_AUTH_CORS_ORIGIN"
 
 	EnvKeyProvider  = "PROTOSOURCE_AUTH_KEY_PROVIDER"
 	EnvMasterKeyRef = "PROTOSOURCE_AUTH_MASTER_KEY_REF"
@@ -241,6 +252,7 @@ func LoadConfigFromEnv() (*Config, error) {
 		AWSRegion:              os.Getenv(EnvAWSRegion),
 		KeyProvider:            KeyProvider(os.Getenv(EnvKeyProvider)),
 		MasterKeyRef:           os.Getenv(EnvMasterKeyRef),
+		CORSOrigin:             os.Getenv(EnvCORSOrigin),
 
 		CosmosEndpoint:             os.Getenv(EnvCosmosEndpoint),
 		CosmosKey:                  os.Getenv(EnvCosmosKey),

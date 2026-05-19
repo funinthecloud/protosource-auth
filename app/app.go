@@ -16,11 +16,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/funinthecloud/protosource"
 	"github.com/funinthecloud/protosource/adapters/httpstandard"
 
 	"github.com/funinthecloud/protosource-auth/keys"
-	"github.com/funinthecloud/protosource-auth/loginpage"
 	"github.com/funinthecloud/protosource-auth/service"
 	"github.com/funinthecloud/protosource-auth/signers"
 	"github.com/funinthecloud/protosource-auth/signers/ed25519signer"
@@ -82,7 +80,7 @@ func Run(ctx context.Context, cfg *Config) (*App, error) {
 		return nil, err
 	}
 
-	provider, masterKeyRef, err := buildKeyProvider(ctx, cfg)
+	provider, masterKeyRef, err := BuildKeyProvider(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -96,16 +94,7 @@ func Run(ctx context.Context, cfg *Config) (*App, error) {
 		},
 	)
 
-	loginer := service.NewLoginer(
-		bundle.UserRepo, bundle.IssuerRepo, bundle.TokenRepo,
-		bundle.Directory, resolver,
-		service.WithTokenTTL(cfg.TokenTTL),
-	)
-	checker := service.NewChecker(bundle.TokenRepo, bundle.UserRepo, bundle.RoleRepo)
-	svc := service.NewService(loginer, checker)
-
-	lp := loginpage.New(cfg.IssuerID, loginer)
-	router := protosource.NewRouter(svc, lp)
+	router := NewRouter(cfg, bundle, resolver)
 	handler := httpstandard.WrapRouter(router, func(*http.Request) string { return "" })
 
 	app := &App{

@@ -21,12 +21,29 @@ import (
 // protosource-authmgr CLI calls aggregate commands directly on the
 // exposed repositories (bypassing HTTP entirely) for bootstrap and
 // recovery flows.
+//
+// The typed v1.Repo fields satisfy service.AggregateRepo (each
+// v1.Repo embeds protosource.Repo) so the Loginer/Checker still accept
+// them, while also being narrow enough for the generated v1.Handlers
+// to consume directly when [Run] builds the full router.
+//
+// UserClient … TokenClient are populated for backends that expose an
+// opaquedata store (DynamoDB, Cosmos DB) and left nil for the memory
+// backend. The presence of UserClient is the signal app.Run uses to
+// register the v1 admin handlers — without an opaquedata store there
+// is nothing for Get/Load/Query handlers to read from.
 type Bundle struct {
-	UserRepo   service.AggregateRepo
-	RoleRepo   service.AggregateRepo
-	IssuerRepo service.AggregateRepo
-	KeyRepo    service.AggregateRepo
-	TokenRepo  service.AggregateRepo
+	UserRepo   userv1.Repo
+	RoleRepo   rolev1.Repo
+	IssuerRepo issuerv1.Repo
+	KeyRepo    keyv1.Repo
+	TokenRepo  tokenv1.Repo
+
+	UserClient   *userv1.UserClient
+	RoleClient   *rolev1.RoleClient
+	IssuerClient *issuerv1.IssuerClient
+	KeyClient    *keyv1.KeyClient
+	TokenClient  *tokenv1.TokenClient
 
 	Directory service.UserDirectory
 
@@ -68,6 +85,11 @@ func NewBundle(ctx context.Context, cfg *Config) (*Bundle, error) {
 
 // newMemoryBundle wires five in-process memorystore-backed repositories
 // and a [service.MapDirectory]. State is lost on process exit.
+//
+// The v1 client fields are left nil — memorystore is an event store,
+// not an opaquedata.OpaqueStore, so there is no projection layer for
+// the generated read/query handlers to query. app.Run falls back to
+// the minimal router (login + page) on memory.
 func newMemoryBundle() (*Bundle, error) {
 	serializer := protobinaryserializer.NewSerializer()
 	return &Bundle{

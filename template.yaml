@@ -62,9 +62,12 @@ Resources:
       CodeUri: ./cmd/protosource-auth-lambda/
       Environment:
         Variables:
+          PROTOSOURCE_AUTH_STORE_BACKEND: dynamodb
           PROTOSOURCE_AUTH_EVENTS_TABLE: !Ref EventsTableName
           PROTOSOURCE_AUTH_AGGREGATES_TABLE: !Ref AggregatesTableName
-          PROTOSOURCE_AUTH_KMS_KEY_ARN: !Ref KmsKeyArn
+          PROTOSOURCE_AUTH_KEY_PROVIDER: awskms
+          PROTOSOURCE_AUTH_MASTER_KEY_REF: !Ref KmsKeyArn
+          PROTOSOURCE_AUTH_ISSUER_ISS: !Sub "https://${DomainName}"
           PROTOSOURCE_AUTH_CORS_ORIGIN: !Ref CorsOrigin
       Policies:
         - DynamoDBCrudPolicy:

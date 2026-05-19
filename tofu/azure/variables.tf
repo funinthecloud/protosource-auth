@@ -135,6 +135,17 @@ variable "key_vault_destroy_safety" {
   }
 }
 
+variable "custom_domain" {
+  description = "Custom hostname to bind to the Container App (e.g. auth.fitc.drhayt.com). Two-step apply: leave empty on the first apply, populate the DNS records reported by the dns_records output at your DNS provider, then re-apply with this set. Azure will issue a managed cert once it can validate the hostname via the records you created. Leave empty to keep the default <name>.<region>.azurecontainerapps.io hostname."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.custom_domain == "" || can(regex("^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$", var.custom_domain))
+    error_message = "custom_domain must be a lowercase DNS name (e.g. auth.fitc.drhayt.com) or empty."
+  }
+}
+
 variable "tags" {
   description = "Tags applied to all resources."
   type        = map(string)

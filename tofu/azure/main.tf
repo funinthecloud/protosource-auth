@@ -119,6 +119,24 @@ module "app" {
   tags = var.tags
 }
 
+# Grant the deployer (whoever ran `tofu apply`) Cosmos SQL Data
+# Contributor at the account scope so the mgr CLI can run `bootstrap`
+# and `recover-admin` from a local workstation using
+# DefaultAzureCredential (`az login`). Without this, ARM Owner is not
+# sufficient — Cosmos data-plane access goes through Cosmos SQL RBAC,
+# which is its own permission surface independent of ARM.
+#
+# Role definition id 00000000-0000-0000-0000-000000000002 is the built-
+# in "Cosmos DB Built-in Data Contributor" role (read + write on data,
+# no schema or RBAC changes).
+resource "azurerm_cosmosdb_sql_role_assignment" "deployer_data_contributor" {
+  account_name        = module.cosmos.account_name
+  resource_group_name = azurerm_resource_group.this.name
+  scope               = module.cosmos.account_id
+  principal_id        = data.azurerm_client_config.current.object_id
+  role_definition_id  = "${module.cosmos.account_id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+}
+
 # Cosmos account + DB + 2 containers + data-plane RBAC granted to the
 # Container App's Managed Identity.
 module "cosmos" {
@@ -189,6 +207,73 @@ resource "azurerm_key_vault_key" "kek" {
   tags = var.tags
 
   depends_on = [azurerm_role_assignment.deployer_crypto_officer]
+}
+
+# Read the freshly-created Container App back so we can surface its
+# custom_domain_verification_id — the upstream container-app-service
+# module does not expose it as an output, and it is the value that has
+# to go into the asuid.<host> TXT record at the DNS provider.
+data "azurerm_container_app" "this" {
+  name                = "${var.name_prefix}-app"
+  resource_group_name = azurerm_resource_group.this.name
+
+  depends_on = [module.app]
+}
+
+# ─────────────────────────────────────────────────────────────────────────
+# Custom domain + managed cert (two-step).
+#
+# Step 1 (custom_domain unset):
+#   tofu apply                              # stack stands up; outputs
+#                                           # surface verification id +
+#                                           # the CNAME target
+#   # provision the DNS records reported by the dns_records output
+#
+# Step 2 (custom_domain set):
+#   tofu apply -var custom_domain=auth.fitc.drhayt.com \
+#              -var issuer_iss=https://auth.fitc.drhayt.com
+#   # Azure issues a free managed cert once DNS validates and binds it
+#
+# The lifecycle ignore on the custom-domain binding is required because
+# the managed-certificate resource has to be created against a custom
+# domain that already exists, then a separate update binds the cert
+# back to the domain — the binding fields would otherwise flap on
+# every plan once the cert is in place.
+# ─────────────────────────────────────────────────────────────────────────
+resource "azurerm_container_app_custom_domain" "this" {
+  count = var.custom_domain == "" ? 0 : 1
+
+  name             = var.custom_domain
+  container_app_id = module.app.container_app_id
+
+  # No cert binding on initial create — the managed cert below cannot
+  # exist until this custom domain exists, so binding happens out-of-
+  # band (either via portal/CLI after the cert is issued, or by re-
+  # applying once a future azurerm release supports the bind directly).
+  certificate_binding_type                 = "Disabled"
+  container_app_environment_certificate_id = null
+
+  lifecycle {
+    ignore_changes = [
+      certificate_binding_type,
+      container_app_environment_certificate_id,
+    ]
+  }
+}
+
+resource "azurerm_container_app_environment_managed_certificate" "this" {
+  count = var.custom_domain == "" ? 0 : 1
+
+  name                         = replace(var.custom_domain, ".", "-")
+  container_app_environment_id = module.app.container_app_environment_id
+  subject_name                 = var.custom_domain
+  # CNAME validation reuses the routing CNAME we already need in DNS;
+  # no extra record beyond the asuid TXT for the custom-domain binding.
+  domain_control_validation = "CNAME"
+
+  tags = var.tags
+
+  depends_on = [azurerm_container_app_custom_domain.this]
 }
 
 # Grant the Container App's Managed Identity Key Vault Crypto User on

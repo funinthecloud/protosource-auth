@@ -75,11 +75,16 @@ func newDynamoDBBundle(ctx context.Context, cfg *Config) (*Bundle, error) {
 	userClient := userv1.NewUserClient(opaqueStore)
 
 	return &Bundle{
-		UserRepo:   userv1.NewRepository(dynStore, serializer),
-		RoleRepo:   rolev1.NewRepository(dynStore, serializer),
-		IssuerRepo: issuerv1.NewRepository(dynStore, serializer),
-		KeyRepo:    keyv1.NewRepository(dynStore, serializer),
-		TokenRepo:  tokenv1.NewRepository(dynStore, serializer),
-		Directory:  NewOpaqueDirectory(userClient),
+		UserRepo:     userv1.NewRepository(dynStore, serializer),
+		RoleRepo:     rolev1.NewRepository(dynStore, serializer),
+		IssuerRepo:   issuerv1.NewRepository(dynStore, serializer),
+		KeyRepo:      keyv1.NewRepository(dynStore, serializer),
+		TokenRepo:    tokenv1.NewRepository(dynStore, serializer),
+		UserClient:   userClient,
+		RoleClient:   rolev1.NewRoleClient(opaqueStore),
+		IssuerClient: issuerv1.NewIssuerClient(opaqueStore),
+		KeyClient:    keyv1.NewKeyClient(opaqueStore),
+		TokenClient:  tokenv1.NewTokenClient(opaqueStore),
+		Directory:    NewOpaqueDirectory(userClient),
 	}, nil
 }

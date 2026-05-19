@@ -15,13 +15,18 @@ import (
 	"github.com/funinthecloud/protosource-auth/keyproviders/local"
 )
 
-// buildKeyProvider constructs the [keyproviders.KeyProvider] selected
+// BuildKeyProvider constructs the [keyproviders.KeyProvider] selected
 // by cfg.KeyProvider. The returned masterKeyRef is the value the
 // resolver passes to Encrypt — for [KeyProviderLocal] it is the
 // literal "local-master" sentinel; for the cloud providers it is the
 // operator-supplied cfg.MasterKeyRef (a KMS ARN or Key Vault key
 // identifier URL).
-func buildKeyProvider(ctx context.Context, cfg *Config) (keyproviders.KeyProvider, string, error) {
+//
+// Exposed so binaries that need the *protosource.Router (e.g. the
+// Lambda entry point wrapping with awslambda.WrapRouter) can build
+// the same provider stack [Run] does without going through the HTTP
+// adapter.
+func BuildKeyProvider(ctx context.Context, cfg *Config) (keyproviders.KeyProvider, string, error) {
 	switch cfg.KeyProvider {
 	case KeyProviderLocal:
 		if len(cfg.MasterKey) == 0 {

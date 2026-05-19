@@ -8,6 +8,11 @@
 # PROTOSOURCE_AUTH_* env vars — see app/config.go for the full list.
 
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS build
+# git is required when `go mod download` has to fall back to direct VCS
+# fetch — happens whenever a module version is referenced before
+# proxy.golang.org has cached it (e.g. fresh upstream tag on the same
+# day). Without git, the build fails with "exec: git: not found".
+RUN apk add --no-cache git
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src

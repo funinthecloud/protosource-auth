@@ -1,5 +1,9 @@
 # TODO
 
+See [V2_FEDERATION.md](V2_FEDERATION.md) for the cross-cutting design
+arc that absorbs several of the items below (JWKS, OIDC discovery,
+refresh tokens, federated authentication via PKCE).
+
 ## Operational readiness
 
 - [ ] **JWKS endpoint.** `GET /.well-known/jwks.json?issuer={id}` returning all `STATE_SIGNING` + `STATE_VERIFY_ONLY` public JWKs for an issuer. Unlocks offline JWT verification by downstream services (skip the per-request `/authz/check` network hop for stateless consumers).

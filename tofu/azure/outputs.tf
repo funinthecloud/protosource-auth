@@ -32,3 +32,23 @@ output "managed_identity_client_id" {
   description = "Client ID of the Container App's user-assigned Managed Identity. Already wired into the container as AZURE_CLIENT_ID; surfaced here for cross-stack consumers."
   value       = module.app.client_id
 }
+
+output "custom_domain_verification_id" {
+  description = "Value for the asuid.<host> TXT record at your DNS provider. Stable per Container App — does not change across applies. Wrapped in nonsensitive() because the azurerm provider marks this field sensitive by default, but the value is one we explicitly need to publish at the DNS provider — it is not a secret."
+  value       = nonsensitive(data.azurerm_container_app.this.custom_domain_verification_id)
+}
+
+output "dns_records" {
+  description = "DNS records to create at your DNS provider (e.g. Route53) before the second apply binds the custom domain. When custom_domain is empty the value is a placeholder reminding you to populate it."
+  value       = var.custom_domain == "" ? "Set -var custom_domain=<hostname> on the next apply and create the records this output will then print." : <<-EOT
+    Create the following records at your DNS provider for ${var.custom_domain}:
+
+      CNAME  ${var.custom_domain}        →  ${module.app.container_app_fqdn}
+      TXT    asuid.${var.custom_domain}  →  ${nonsensitive(data.azurerm_container_app.this.custom_domain_verification_id)}
+
+    After both records propagate, re-run `tofu apply` to issue the managed
+    certificate. Then bind the cert to the custom domain (one-time, via
+    portal or `az containerapp hostname bind`) — azurerm cannot do this
+    in one apply because the cert and the binding are mutually dependent.
+  EOT
+}
