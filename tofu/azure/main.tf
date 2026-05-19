@@ -88,8 +88,19 @@ module "app" {
     PROTOSOURCE_AUTH_AGGREGATES_CONTAINER          = module.cosmos.aggregates_container_name
 
     # Key provider selection + Key Vault KEK reference.
+    #
+    # Version-pinned KEK identifier (not versionless): the resolver
+    # stores this value on each Key aggregate at wrap time, and
+    # Decrypt must target the exact version that produced the
+    # ciphertext — RSA-OAEP carries no key-version metadata, so a
+    # versionless ref would silently start decrypting against the
+    # latest version after a rotation and fail on any previously
+    # wrapped signing key. KEK rotation is therefore a deliberate
+    # action: create a new key version, re-apply this stack to push
+    # the new versioned ref into the env, and (separately) re-wrap or
+    # retire signing keys still pinned to the old version.
     PROTOSOURCE_AUTH_KEY_PROVIDER   = "azurekeyvault"
-    PROTOSOURCE_AUTH_MASTER_KEY_REF = azurerm_key_vault_key.kek.versionless_id
+    PROTOSOURCE_AUTH_MASTER_KEY_REF = azurerm_key_vault_key.kek.id
 
     # Issuer / token config.
     PROTOSOURCE_AUTH_ISSUER_ISS          = var.issuer_iss

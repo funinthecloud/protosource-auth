@@ -11,10 +11,17 @@
 //
 // Encrypt and Decrypt parse the kid, locate (or build, then cache) a
 // vault-bound *azkeys.Client, and round-trip through the Key Vault REST
-// API. Decrypt accepts a kid that pins a specific version but the
-// version is also embedded in the ciphertext context, so a missing
-// version on Decrypt falls back to "latest" — safe even if the KEK has
-// since been rotated, provided the prior version is still enabled.
+// API. RSA-OAEP ciphertext carries no key-version metadata, so Decrypt
+// targets the version present in the kid; a kid with no version makes
+// Key Vault default to "latest", which silently breaks decryption of
+// previously-wrapped material the moment a new key version exists.
+// Production deployments should therefore pass a version-pinned kid
+// (the resolver persists the kid used to wrap each signing key on the
+// Key aggregate, so per-key version pinning happens automatically as
+// long as the caller seeded the resolver with a versioned ref). KEK
+// rotation is a deliberate two-step operation: create a new key
+// version, then re-wrap or retire any signing keys still pinned to
+// the prior version before disabling it.
 //
 // HSM root of trust: the KEK must be created with key_type = RSA-HSM
 // against a Premium-tier Key Vault. Standard-tier (software keys) is

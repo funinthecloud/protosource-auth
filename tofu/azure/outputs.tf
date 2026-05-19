@@ -24,8 +24,8 @@ output "key_vault_uri" {
 }
 
 output "master_key_ref" {
-  description = "Versionless Key Vault key identifier URL — the value of PROTOSOURCE_AUTH_MASTER_KEY_REF. The Container App reads this through its env; surfaced here for mgr CLI invocations and debugging. Versionless so KEK rotation (creating a new version of the same key) takes effect without a tofu apply."
-  value       = azurerm_key_vault_key.kek.versionless_id
+  description = "Version-pinned Key Vault key identifier URL — the value of PROTOSOURCE_AUTH_MASTER_KEY_REF. The Container App reads this through its env; surfaced here for mgr CLI invocations and debugging. Version-pinned because the resolver persists this value on each Key aggregate at wrap time and Decrypt must target the exact version that produced the ciphertext. KEK rotation requires a tofu apply (to pick up the new version) plus a re-wrap or retirement of signing keys still pinned to the previous version."
+  value       = azurerm_key_vault_key.kek.id
 }
 
 output "managed_identity_client_id" {

@@ -111,7 +111,15 @@ push-azure: build-container
 #      the upstream quickstart image (defaulted in tofu/azure/variables.tf).
 #   2. Push your image (see push-azure) and re-run with CONTAINER_IMAGE
 #      pointing at the ACR-hosted tag.
+#
+# Required env (forwarded via TF_VAR_*):
+#   TF_VAR_subscription_id   Azure subscription id to deploy into
+#   TF_VAR_issuer_iss        JWT `iss` for the default issuer (e.g. https://auth.example.com)
+# Optional: any other tofu/azure/variables.tf input can be overridden
+# via TF_VAR_<name> without editing this target.
 deploy-azure:
+	@test -n "$$TF_VAR_subscription_id" || (echo "TF_VAR_subscription_id not set — export TF_VAR_subscription_id=<azure-sub-id> before running" && exit 1)
+	@test -n "$$TF_VAR_issuer_iss" || (echo "TF_VAR_issuer_iss not set — export TF_VAR_issuer_iss=https://auth.example.com before running" && exit 1)
 	tofu -chdir=$(TOFU_AZURE_DIR) apply $(if $(CONTAINER_IMAGE),-var image=$(CONTAINER_IMAGE),)
 
 .PHONY: clean
