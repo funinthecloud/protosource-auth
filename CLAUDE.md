@@ -125,6 +125,10 @@ make deploy-azure CONTAINER_IMAGE="$ACR_LOGIN_SERVER/protosource-auth:dev"
 
 Production must use `PROTOSOURCE_AUTH_KEY_PROVIDER=azurekeyvault` — the local provider is dev-only.
 
+### Cross-origin SPA cookie scoping
+
+The Azure SPA at `admin-auth.drhayt.com` talks to the API at `auth.fitc.drhayt.com`. The shadow cookie is scoped to the eTLD+1 (`.drhayt.com`) by `loginpage` via `publicsuffix`, which is what lets it flow across both hosts. CORS must set `AllowCredentials: true` (driven by `PROTOSOURCE_AUTH_CORS_ORIGIN`).
+
 ### Local Azure-flavor dev
 
 Use the Cosmos emulator + the local key provider:
