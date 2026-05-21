@@ -15,7 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 
 	"github.com/funinthecloud/protosource/azure/cosmosclient"
-	opaquecosmos "github.com/funinthecloud/protosource/opaquedata/cosmos"
+	opaquecosmos "github.com/funinthecloud/protosource/gen/opaquedata/cosmos"
 	"github.com/funinthecloud/protosource/serializers/protobinaryserializer"
 	"github.com/funinthecloud/protosource/stores/cosmosdbstore"
 

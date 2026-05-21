@@ -11,7 +11,7 @@ import (
 	"github.com/funinthecloud/protosource/serializers/protobinaryserializer"
 	"github.com/funinthecloud/protosource/stores/dynamodbstore"
 
-	opaquedynamo "github.com/funinthecloud/protosource/opaquedata/dynamo"
+	opaquedynamo "github.com/funinthecloud/protosource/gen/opaquedata/dynamo"
 
 	issuerv1 "github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1"
 	keyv1 "github.com/funinthecloud/protosource-auth/gen/auth/key/v1"
