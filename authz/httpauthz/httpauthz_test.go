@@ -89,7 +89,7 @@ func newAuthServer(t *testing.T) *authServerRig {
 
 	// Use a no-op extractor: the service endpoints derive identity from
 	// the JSON body, not from the adapter-level Actor.
-	handler := httpstandard.WrapRouter(router, func(*http.Request) string { return "" })
+	handler := httpstandard.WrapRouter(router)
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 

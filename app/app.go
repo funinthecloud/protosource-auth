@@ -95,7 +95,7 @@ func Run(ctx context.Context, cfg *Config) (*App, error) {
 	)
 
 	router := NewRouter(cfg, bundle, resolver)
-	handler := httpstandard.WrapRouter(router, func(*http.Request) string { return "" })
+	handler := httpstandard.WrapRouter(router)
 
 	app := &App{
 		Handler:   handler,

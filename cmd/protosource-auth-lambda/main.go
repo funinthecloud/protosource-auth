@@ -28,11 +28,11 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 
-	"github.com/funinthecloud/protosource/adapters/awslambda"
 	"github.com/funinthecloud/protosource-auth/app"
 	"github.com/funinthecloud/protosource-auth/keys"
 	"github.com/funinthecloud/protosource-auth/signers"
 	"github.com/funinthecloud/protosource-auth/signers/ed25519signer"
+	"github.com/funinthecloud/protosource/adapters/awslambda"
 )
 
 func main() {
@@ -63,7 +63,7 @@ func main() {
 	)
 
 	router := app.NewRouter(cfg, bundle, resolver)
-	handler := awslambda.WrapRouter(router, extractActor)
+	handler := awslambda.WrapRouter(router)
 	lambda.Start(handler)
 }
 

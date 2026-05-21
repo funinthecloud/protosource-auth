@@ -59,28 +59,18 @@ func NewHandler(repo Repo, client *UserClient, authorizer authz.Authorizer) *Han
 
 // RegisterRoutes registers all handler routes on the given router.
 func (h *Handler) RegisterRoutes(router *protosource.Router) {
-
 	router.Handle("POST", "auth/user/v1/create", h.HandleCreate)
-
 	router.Handle("POST", "auth/user/v1/changepassword", h.HandleChangePassword)
-
 	router.Handle("POST", "auth/user/v1/assignrole", h.HandleAssignRole)
-
 	router.Handle("POST", "auth/user/v1/revokerole", h.HandleRevokeRole)
-
 	router.Handle("POST", "auth/user/v1/lock", h.HandleLock)
-
 	router.Handle("POST", "auth/user/v1/unlock", h.HandleUnlock)
-
 	router.Handle("POST", "auth/user/v1/delete", h.HandleDelete)
-
 	router.Handle("GET", "auth/user/v1/load/{id}", h.HandleLoad)
 	router.Handle("GET", "auth/user/v1/{id}", h.HandleGet)
 	router.Handle("GET", "auth/user/v1/{id}/history", h.HandleHistory)
-
 	router.Handle("GET", "auth/user/v1/query/by-email", h.HandleQueryByEmail)
 	router.Handle("GET", "auth/user/v1/query/by-state", h.HandleQueryByState)
-
 }
 
 // HandleCreate processes a Create command.
@@ -90,16 +80,8 @@ func (h *Handler) HandleCreate(ctx context.Context, request protosource.Request)
 		return authzErrorResponse(err)
 	}
 
-	// Prefer the authenticated user id stashed by the Authorizer
-	// (via authz.WithUserID) so the command's Actor field reflects
-	// the resolved identity — the raw bearer token in shadow-token
-	// flows is never written to the aggregate's audit trail. Falls
-	// back to request.Actor populated by the adapter's
-	// ActorExtractor for allowall / X-Actor developer flows.
+	// Actor must be extracted by the Authorizer and put into ctx.
 	actor := authz.UserIDFromContext(ctx)
-	if actor == "" {
-		actor = request.Actor
-	}
 	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
@@ -110,9 +92,9 @@ func (h *Handler) HandleCreate(ctx context.Context, request protosource.Request)
 	}
 
 	// Overwrite any Actor the client supplied in the command payload
-	// with the identity resolved above (context user id preferred,
-	// otherwise request.Actor). Never trust an actor field coming
-	// from the wire — it would let any caller spoof any identity.
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
 	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
@@ -139,16 +121,8 @@ func (h *Handler) HandleChangePassword(ctx context.Context, request protosource.
 		return authzErrorResponse(err)
 	}
 
-	// Prefer the authenticated user id stashed by the Authorizer
-	// (via authz.WithUserID) so the command's Actor field reflects
-	// the resolved identity — the raw bearer token in shadow-token
-	// flows is never written to the aggregate's audit trail. Falls
-	// back to request.Actor populated by the adapter's
-	// ActorExtractor for allowall / X-Actor developer flows.
+	// Actor must be extracted by the Authorizer and put into ctx.
 	actor := authz.UserIDFromContext(ctx)
-	if actor == "" {
-		actor = request.Actor
-	}
 	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
@@ -159,9 +133,9 @@ func (h *Handler) HandleChangePassword(ctx context.Context, request protosource.
 	}
 
 	// Overwrite any Actor the client supplied in the command payload
-	// with the identity resolved above (context user id preferred,
-	// otherwise request.Actor). Never trust an actor field coming
-	// from the wire — it would let any caller spoof any identity.
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
 	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
@@ -188,16 +162,8 @@ func (h *Handler) HandleAssignRole(ctx context.Context, request protosource.Requ
 		return authzErrorResponse(err)
 	}
 
-	// Prefer the authenticated user id stashed by the Authorizer
-	// (via authz.WithUserID) so the command's Actor field reflects
-	// the resolved identity — the raw bearer token in shadow-token
-	// flows is never written to the aggregate's audit trail. Falls
-	// back to request.Actor populated by the adapter's
-	// ActorExtractor for allowall / X-Actor developer flows.
+	// Actor must be extracted by the Authorizer and put into ctx.
 	actor := authz.UserIDFromContext(ctx)
-	if actor == "" {
-		actor = request.Actor
-	}
 	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
@@ -208,9 +174,9 @@ func (h *Handler) HandleAssignRole(ctx context.Context, request protosource.Requ
 	}
 
 	// Overwrite any Actor the client supplied in the command payload
-	// with the identity resolved above (context user id preferred,
-	// otherwise request.Actor). Never trust an actor field coming
-	// from the wire — it would let any caller spoof any identity.
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
 	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
@@ -237,16 +203,8 @@ func (h *Handler) HandleRevokeRole(ctx context.Context, request protosource.Requ
 		return authzErrorResponse(err)
 	}
 
-	// Prefer the authenticated user id stashed by the Authorizer
-	// (via authz.WithUserID) so the command's Actor field reflects
-	// the resolved identity — the raw bearer token in shadow-token
-	// flows is never written to the aggregate's audit trail. Falls
-	// back to request.Actor populated by the adapter's
-	// ActorExtractor for allowall / X-Actor developer flows.
+	// Actor must be extracted by the Authorizer and put into ctx.
 	actor := authz.UserIDFromContext(ctx)
-	if actor == "" {
-		actor = request.Actor
-	}
 	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
@@ -257,9 +215,9 @@ func (h *Handler) HandleRevokeRole(ctx context.Context, request protosource.Requ
 	}
 
 	// Overwrite any Actor the client supplied in the command payload
-	// with the identity resolved above (context user id preferred,
-	// otherwise request.Actor). Never trust an actor field coming
-	// from the wire — it would let any caller spoof any identity.
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
 	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
@@ -286,16 +244,8 @@ func (h *Handler) HandleLock(ctx context.Context, request protosource.Request) p
 		return authzErrorResponse(err)
 	}
 
-	// Prefer the authenticated user id stashed by the Authorizer
-	// (via authz.WithUserID) so the command's Actor field reflects
-	// the resolved identity — the raw bearer token in shadow-token
-	// flows is never written to the aggregate's audit trail. Falls
-	// back to request.Actor populated by the adapter's
-	// ActorExtractor for allowall / X-Actor developer flows.
+	// Actor must be extracted by the Authorizer and put into ctx.
 	actor := authz.UserIDFromContext(ctx)
-	if actor == "" {
-		actor = request.Actor
-	}
 	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
@@ -306,9 +256,9 @@ func (h *Handler) HandleLock(ctx context.Context, request protosource.Request) p
 	}
 
 	// Overwrite any Actor the client supplied in the command payload
-	// with the identity resolved above (context user id preferred,
-	// otherwise request.Actor). Never trust an actor field coming
-	// from the wire — it would let any caller spoof any identity.
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
 	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
@@ -335,16 +285,8 @@ func (h *Handler) HandleUnlock(ctx context.Context, request protosource.Request)
 		return authzErrorResponse(err)
 	}
 
-	// Prefer the authenticated user id stashed by the Authorizer
-	// (via authz.WithUserID) so the command's Actor field reflects
-	// the resolved identity — the raw bearer token in shadow-token
-	// flows is never written to the aggregate's audit trail. Falls
-	// back to request.Actor populated by the adapter's
-	// ActorExtractor for allowall / X-Actor developer flows.
+	// Actor must be extracted by the Authorizer and put into ctx.
 	actor := authz.UserIDFromContext(ctx)
-	if actor == "" {
-		actor = request.Actor
-	}
 	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
@@ -355,9 +297,9 @@ func (h *Handler) HandleUnlock(ctx context.Context, request protosource.Request)
 	}
 
 	// Overwrite any Actor the client supplied in the command payload
-	// with the identity resolved above (context user id preferred,
-	// otherwise request.Actor). Never trust an actor field coming
-	// from the wire — it would let any caller spoof any identity.
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
 	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
@@ -384,16 +326,8 @@ func (h *Handler) HandleDelete(ctx context.Context, request protosource.Request)
 		return authzErrorResponse(err)
 	}
 
-	// Prefer the authenticated user id stashed by the Authorizer
-	// (via authz.WithUserID) so the command's Actor field reflects
-	// the resolved identity — the raw bearer token in shadow-token
-	// flows is never written to the aggregate's audit trail. Falls
-	// back to request.Actor populated by the adapter's
-	// ActorExtractor for allowall / X-Actor developer flows.
+	// Actor must be extracted by the Authorizer and put into ctx.
 	actor := authz.UserIDFromContext(ctx)
-	if actor == "" {
-		actor = request.Actor
-	}
 	if actor == "" {
 		return errorResponse(http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
 	}
@@ -404,9 +338,9 @@ func (h *Handler) HandleDelete(ctx context.Context, request protosource.Request)
 	}
 
 	// Overwrite any Actor the client supplied in the command payload
-	// with the identity resolved above (context user id preferred,
-	// otherwise request.Actor). Never trust an actor field coming
-	// from the wire — it would let any caller spoof any identity.
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
 	cmd.Actor = actor
 
 	version, err := h.repo.Apply(ctx, cmd)
