@@ -105,7 +105,14 @@ func (j *JWKS) handle(ctx context.Context, req protosource.Request) protosource.
 			// kid/alg/use. Augment for a standards-compliant JWKS.
 			var jwk map[string]any
 			if err := json.Unmarshal(lk.PublicJWK, &jwk); err != nil || jwk == nil {
-				continue
+				// Fail closed (consistent with resolver/store errors) rather than
+				// silently dropping a corrupt key and returning a misleading
+				// empty/partial JWKS. Corruption should be visible to operators.
+				return protosource.Response{
+					StatusCode: http.StatusInternalServerError,
+					Body:       `{"error":"internal_error","error_description":"malformed public key"}`,
+					Headers:    map[string]string{"Content-Type": "application/json"},
+				}
 			}
 			jwk["kid"] = lk.Kid
 			jwk["alg"] = lk.Algorithm

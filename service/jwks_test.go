@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/funinthecloud/protosource"
 	"github.com/funinthecloud/protosource/serializers/protobinaryserializer"
@@ -159,9 +160,16 @@ func newJWKSTestRig(t *testing.T) *jwksTestRig {
 	serializer := protobinaryserializer.NewSerializer()
 	repo := keyv1.NewRepository(store, serializer)
 
-	// Use real clock so that SigningKey creates a kid for "today" (real time)
-	// and the JWKS handler's recent-day probe (also real time.Now) will find it
-	// on d=0. (We do not assert exact kid values in these tests.)
+	// Capture a fixed time at rig construction (using real time *once* here)
+	// and inject via keys.WithClock. This makes SigningKey's kid derivation
+	// deterministic and stable (no flakes across UTC midnight during a test
+	// run). The JWKS handler still uses its own time.Now() for probing, but
+	// because dispatch happens right after rig creation and the probe window
+	// is 30 days, it will find the key created for the captured "today" even
+	// if the test straddles midnight.
+	fixed := time.Now().UTC()
+	clock := func() time.Time { return fixed }
+
 	r := keys.NewResolver(
 		repo,
 		provider,
@@ -169,6 +177,7 @@ func newJWKSTestRig(t *testing.T) *jwksTestRig {
 		map[string]signers.Signer{
 			ed25519signer.Algorithm: ed25519signer.Signer{},
 		},
+		keys.WithClock(clock),
 	)
 
 	return &jwksTestRig{resolver: r, repo: repo}
