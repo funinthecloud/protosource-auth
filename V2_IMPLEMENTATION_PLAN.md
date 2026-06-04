@@ -10,14 +10,15 @@
 **Completed (as of this session)**:
 - Dependency updated to `github.com/funinthecloud/protosource v0.6.1` (was v0.5.0). `go mod tidy`, plugins installed at v0.6.1, `buf generate` (Go+TS) run. Full `go test -race ./...` + builds pass. Regenerated `gen/.../*.protosource.lambda.pb.go` files (note: v0.6.1 changed internal error helper signatures to take `request protosource.Request` first — our hand-written service/ handlers use their own jsonError paths, unaffected).
 - Cookie name made configurable (`app.Config.ShadowCookieName`, env `PROTOSOURCE_AUTH_SHADOW_COOKIE_NAME`, default "shadow" for BC). Wired to loginpage, whoami, router, authorizers, tests. (First prep item per V2_FEDERATION sequencing.)
+- Discovery doc stub + feedback fixes: service/discovery.go (OIDC-shaped JSON per V2_FEDERATION.md; both the "issuer" field and all endpoint bases now derived from cfg.IssuerIss via issuerBase helper for OIDC client compatibility and consistency with the design doc single-base example; removed per-request Host/X-Forwarded-Proto derivation for discovery URLs). Stub 404/not_implemented handlers for the remaining /oauth/* paths to commit the shapes. Wired unconditionally in app/router.go (alongside svc + loginpage). Added service/discovery_test.go with focused contract tests using the protosource.NewRouter + Dispatch pattern (exact JSON shape + fields from design, both well-known aliases, all stub responses, issuer/endpoint base consistency even with differing request headers). Comments/docs updated in service/router.go (loginResponseJSON, CheckResponseJSON) and app/router.go. Plan + todos advanced.
 - Plan doc + cross-refs created/updated. Todos tracked.
 - Code exploration via jcodemunch (resolve_repo first, search_symbols/get_file_content/search_text for code; native read for .md).
 
-**Current phase**: Prep / "land v1 with cookie-rename + discovery". Cookie done; next is discovery doc stub (commit all `/oauth/*` + `/.well-known/openid-configuration` + `/authz/check` URLs + cookie_name + jwks_uri etc. in public JSON, using cfg + default issuer. Can be registered unconditionally).
+**Current phase**: Prep / "land v1 with cookie-rename + discovery". Cookie + discovery (with feedback fixes for base consistency and contract tests) complete; next is JWKS endpoint (reuse resolver.VerificationKey + PublicJWK).
 
-**Next actions (pick in any session)**: 1. Implement discovery handler (additive, low risk). 2. JWKS endpoint (reuse resolver.VerificationKey). 3. Then proto changes for Issuer OIDCConfig (client_secret wrapped via KeyProvider) + User LinkedIdentity. See full phases below.
+**Next actions (pick in any session)**: 1. JWKS endpoint (reuse resolver.VerificationKey + PublicJWK from keys/resolver.go; implement handler returning RFC 7517 JWKS for the issuer, register GET /oauth/jwks, wire alongside discovery, add tests using Dispatch pattern, stop stubbing the real path in discovery). 2. Then proto changes for Issuer OIDCConfig (client_secret wrapped via KeyProvider) + User LinkedIdentity. See full phases below. (Discovery handler + feedback complete.)
 
-**For compaction / new session**: Read this "RESUME SUMMARY" + "Prerequisites" + "Open Design Calls". Load todos via context. Key files now: `go.mod` (v0.6.1), `app/config.go` (ShadowCookieName + Normalize), `loginpage/loginpage.go` (cookieName), `service/whoami.go`, `app/router.go`, `V2_IMPLEMENTATION_PLAN.md`, `V2_FEDERATION.md`. Use `jcodemunch__get_session_snapshot` if MCP available for prior exploration. Run `make gen` / `go build ./...` / `go test -race ./...` after any regen or dep work. Avoid editing generated/ without regen.
+**For compaction / new session**: Read this "RESUME SUMMARY" + "Prerequisites" + "Open Design Calls". Load todos via context. Key files now: `go.mod` (v0.6.1), `app/config.go` (ShadowCookieName + Normalize), `loginpage/loginpage.go` (cookieName), `service/whoami.go`, `app/router.go`, `keys/resolver.go`, `service/discovery.go`, `service/discovery_test.go`, `service/router.go`, `V2_IMPLEMENTATION_PLAN.md`, `V2_FEDERATION.md`. Use `jcodemunch__get_session_snapshot` if MCP available for prior exploration. Run `make gen` / `go build ./...` / `go test -race ./...` after any regen or dep work. Avoid editing generated/ without regen.
 
 **Risks noted**: v0.6.1+ gen changes (errorResponse signatures), client_secret encryption never in events, state cookie signing reuses KIND_SELF keys (short TTL), JIT races on User create, cookie domain for federated flows.
 
@@ -28,6 +29,7 @@
 ## Prerequisites Completed (do these before V2 phases)
 - [x] Bump protosource dep to v0.6.1 (this session). Includes tidy + full regen + test verification.
 - [x] Cookie rename prep foundation (configurable name, default preserved, all wires + tests updated).
+- [x] Discovery doc stub + committed OIDC endpoint paths (service/discovery.go + app/router.go wiring; JSON with issuer-based endpoints for OIDC consistency; stubs + comments + contract tests updated).
 - [x] Materialized this plan doc for cross-session use.
 
 ## Goal and Core Principles
@@ -148,16 +150,17 @@ Follow the doc's 1-7, but front-load safe additive prep that doesn't touch aggre
   - app/router.go: buildAuthorizer(..., cookieName) → directauthz.WithTokenSource(httpauthz.Cookie(name)).
   - Update directauthz/httpauthz defaults/tests that hardcode "shadow".
   - authz tests, loginpage_test, service_test, app_test that assert cookies or use direct with cookie.
-- [ ] Add discovery handler (new file service/discovery.go or in router/service):
-  - Register GET /.well-known/openid-configuration and GET /oauth/.well-known/openid-configuration (or just one canonical).
-  - Return JSON matching the exact shape in V2_FEDERATION.md (fill issuer from cfg/default, authorization_endpoint etc as full URLs derived from request Host or cfg, jwks_uri, cookie_name: cfg.Shadow..., response_types etc. Stub endpoints that don't exist yet as the URLs).
-  - Make it always registered (additive, no auth needed — public metadata).
-  - Commit the paths: /oauth/authorize, /oauth/callback (or /oauth/token for code exchange?), /oauth/jwks, /oauth/userinfo, /oauth/logout, plus existing /authz/check.
+- [x] Add discovery handler (new file service/discovery.go):
+  - Register GET /.well-known/openid-configuration (and /oauth/.well-known alias).
+  - Return JSON matching the exact shape in V2_FEDERATION.md (issuer from cfg.IssuerIss; endpoint bases also derived from IssuerIss for OIDC client compatibility — issuer and endpoint URLs now guaranteed to share the same base, matching the design doc single-base example. No request host derivation for discovery URLs to avoid inconsistency). Stub 404/not_implemented handlers for /oauth/authorize, /callback, /token, /userinfo, /jwks, /logout so the paths are explicitly committed in the router today.
+  - Always registered (additive, no auth, no backend clients — public metadata). Wired unconditionally in app/router.go alongside svc + loginpage.
+  - Commit the paths (per V2_FEDERATION "land v1 with ... discovery"): the oauth ones above + existing /authz/check.
+  - Added focused contract tests (service/discovery_test.go) using the protosource.Dispatch pattern: exact JSON shape + fields, both well-known aliases, stub responses, and issuer/endpoint consistency even under differing request headers.
 - [ ] Real JWKS (can do in same prep or right after):
   - New handler in service or keys/: uses resolver to list keys for issuer (may need KeyClient query or add helper; for now load via known kids or extend resolver with ListVerificationKeysForIssuer).
   - Endpoint GET /oauth/jwks?issuer=... or /jwks (per discovery). Output {keys: [ {kty, use:"sig", kid, alg, ... from the public_jwk json + extras} ] }.
   - Note: public_jwk is already bytes of the JWK object from signer.
-- [ ] Update router.go comments, CheckResponseJSON docs, LoginResponse docs to reflect new reality.
+- [x] Update router.go comments, CheckResponseJSON docs, LoginResponse docs to reflect new reality (service/router.go loginResponseJSON + CheckResponseJSON godoc; app/router.go NewRouter minimal-set comment). Discovery now lands the committed OIDC contract; access JWTs + JWKS are the follow-on.
 - [ ] Update README.md curl examples + description to note v1 vs upcoming federated. Add section "Federation (v2)" with pointer to the plan.
 - [ ] Update TODO.md: move JWKS/OIDC items under v2 or mark as started.
 - [ ] Update V2_FEDERATION.md status + add "Implementation notes" link or section.
@@ -245,7 +248,7 @@ Follow the doc's 1-7, but front-load safe additive prep that doesn't touch aggre
 - State cookie name (configurable? "oauth_state" or per-IdP?).
 
 ## Next Actions (for this session / immediate)
-1. Land the cookie config + discovery doc stub + JWKS (prep phase) — this is the "real shift" on-ramp and matches the "land v1 with ... discovery doc" requirement.
+1. JWKS endpoint (prep phase) — real implementation reusing keys.Resolver (VerificationKey + PublicJWK), registered at /oauth/jwks as advertised in discovery, with tests. (Cookie config + discovery doc stub complete, including feedback fixes.)
 2. Update V2_FEDERATION.md status and this plan with decisions.
 3. Proto changes for Issuer (step 2) once prep is reviewable.
 4. Use `go test -race ./...` and manual runs after each slice.

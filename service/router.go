@@ -57,9 +57,14 @@ type loginRequestJSON struct {
 // token is the only credential external callers need — they round-trip
 // it back through /authz/check, which dereferences it server-side.
 // Leaking the JWT to network callers would let them validate offline
-// and bypass token revocation; keep it server-side until the JWKS +
-// OIDC discovery work (see V2_FEDERATION.md) makes offline
-// verification an intentional contract.
+// and bypass token revocation.
+//
+// With the OIDC discovery document now landing (see
+// /.well-known/openid-configuration and V2_FEDERATION.md), the
+// contract for short-lived access JWTs + JWKS-based offline
+// verification is committed. Full delivery of access tokens
+// alongside shadow (and the /oauth/jwks endpoint) is the immediate
+// follow-on phase.
 type loginResponseJSON struct {
 	ShadowToken string `json:"shadow_token"`
 	ExpiresAt   int64  `json:"expires_at"`
@@ -76,11 +81,12 @@ type CheckRequestJSON struct {
 // CheckResponseJSON is the wire shape returned by a successful POST
 // /authz/check. Exported alongside [CheckRequestJSON] for client reuse.
 //
-// The signed JWT is intentionally not returned. Downstream services
-// that need user identity should consume UserID and trust the auth
-// service's check; offline JWT verification is a JWKS-era contract
-// (see V2_FEDERATION.md) and shipping the raw JWT here would defeat
-// shadow-token revocation.
+// The signed JWT is intentionally not returned here. Downstream
+// services that need only user identity can (in the JWKS era)
+// verify a short-lived access token locally via the discovery-
+// advertised /oauth/jwks; /authz/check remains the gate for
+// function-grant authorization (and instant revocation via shadow).
+// See V2_FEDERATION.md and the OIDC discovery document.
 type CheckResponseJSON struct {
 	UserID string `json:"user_id"`
 }
