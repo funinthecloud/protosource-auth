@@ -11,14 +11,15 @@
 - Dependency updated to `github.com/funinthecloud/protosource v0.6.1` (was v0.5.0). `go mod tidy`, plugins installed at v0.6.1, `buf generate` (Go+TS) run. Full `go test -race ./...` + builds pass. Regenerated `gen/.../*.protosource.lambda.pb.go` files (note: v0.6.1 changed internal error helper signatures to take `request protosource.Request` first — our hand-written service/ handlers use their own jsonError paths, unaffected).
 - Cookie name made configurable (`app.Config.ShadowCookieName`, env `PROTOSOURCE_AUTH_SHADOW_COOKIE_NAME`, default "shadow" for BC). Wired to loginpage, whoami, router, authorizers, tests. (First prep item per V2_FEDERATION sequencing.)
 - Discovery doc stub + feedback fixes: service/discovery.go (OIDC-shaped JSON per V2_FEDERATION.md; both the "issuer" field and all endpoint bases now derived from cfg.IssuerIss via issuerBase helper for OIDC client compatibility and consistency with the design doc single-base example; removed per-request Host/X-Forwarded-Proto derivation for discovery URLs). Stub 404/not_implemented handlers for the remaining /oauth/* paths to commit the shapes. Wired unconditionally in app/router.go (alongside svc + loginpage). Added service/discovery_test.go with focused contract tests using the protosource.NewRouter + Dispatch pattern (exact JSON shape + fields from design, both well-known aliases, all stub responses, issuer/endpoint base consistency even with differing request headers). Comments/docs updated in service/router.go (loginResponseJSON, CheckResponseJSON) and app/router.go. Plan + todos advanced.
+- Real JWKS endpoint (prep phase): `service/jwks.go` + `service/jwks_test.go` (focused Dispatch tests covering default issuer, `?issuer=...` override, empty result for unknown issuer, RFC 7517 shape with augmented kid/alg/use:"sig"). Reuses `keys.Resolver.VerificationKey` + `PublicJWK` + `ComputeKid`; added additive `LiveKey.VerifyUntil` (for window filtering) + `Resolver.SupportedAlgorithms()` (no duplication of load logic; follows "load via known kids" guidance). Wired unconditionally via `service.NewJWKS(resolver, cfg.IssuerID)` in `app/router.go` (real always wins over any prior stub). Removed `/oauth/jwks` stub registration + test cases from `service/discovery.go` + `_test.go` (and updated godoc/comments). `go build ./...` + `go test -race -count=1 ./service ./app ./keys` green. Live verification: `go run ./cmd/protosource-auth` (w/ bootstrap + local master) + curl `/.well-known/openid-configuration` (confirms `jwks_uri`) + curl `/oauth/jwks` (real key after login-triggered `SigningKey` materialization) succeeds with expected JSON.
 - Plan doc + cross-refs created/updated. Todos tracked.
 - Code exploration via jcodemunch (resolve_repo first, search_symbols/get_file_content/search_text for code; native read for .md).
 
-**Current phase**: Prep / "land v1 with cookie-rename + discovery". Cookie + discovery (with feedback fixes for base consistency and contract tests) complete; next is JWKS endpoint (reuse resolver.VerificationKey + PublicJWK).
+**Current phase**: Prep / "land v1 with cookie-rename + discovery + JWKS". Cookie + discovery (feedback fixes) + real JWKS complete (see completed list). Next: extend Issuer aggregate for OIDC config (proto + regen + configurator for wrapped secret).
 
-**Next actions (pick in any session)**: 1. JWKS endpoint (reuse resolver.VerificationKey + PublicJWK from keys/resolver.go; implement handler returning RFC 7517 JWKS for the issuer, register GET /oauth/jwks, wire alongside discovery, add tests using Dispatch pattern, stop stubbing the real path in discovery). 2. Then proto changes for Issuer OIDCConfig (client_secret wrapped via KeyProvider) + User LinkedIdentity. See full phases below. (Discovery handler + feedback complete.)
+**Next actions (pick in any session)**: 1. Issuer OIDCConfig proto work (Phase 1): edit proto/auth/issuer/v1/issuer.proto (add OIDCConfig message + fields for client_id, wrapped_client_secret + key_provider/master_ref, discovery_url or endpoints, allowed_audiences, claim_map, jit_policy enum + rule data; new commands/events; run buf generate after clang-format). 2. Hand-written support for secret encrypt/decrypt (thin service/oidcconfig or in issuer handling, reuse KeyProvider like resolver). Update bootstrap/mgr/frontend minimally if needed. See detailed breakdown. (JWKS + prior prep done.)
 
-**For compaction / new session**: Read this "RESUME SUMMARY" + "Prerequisites" + "Open Design Calls". Load todos via context. Key files now: `go.mod` (v0.6.1), `app/config.go` (ShadowCookieName + Normalize), `loginpage/loginpage.go` (cookieName), `service/whoami.go`, `app/router.go`, `keys/resolver.go`, `service/discovery.go`, `service/discovery_test.go`, `service/router.go`, `V2_IMPLEMENTATION_PLAN.md`, `V2_FEDERATION.md`. Use `jcodemunch__get_session_snapshot` if MCP available for prior exploration. Run `make gen` / `go build ./...` / `go test -race ./...` after any regen or dep work. Avoid editing generated/ without regen.
+**For compaction / new session**: Read this "RESUME SUMMARY" + "Prerequisites" + "Open Design Calls". Load todos via context. Key files now: `go.mod` (v0.6.1), `app/config.go` (ShadowCookieName + Normalize), `loginpage/loginpage.go` (cookieName), `service/whoami.go`, `app/router.go`, `keys/resolver.go` (VerifyUntil + SupportedAlgorithms), `service/discovery.go` + `_test.go`, `service/jwks.go` + `jwks_test.go`, `service/router.go`, `V2_IMPLEMENTATION_PLAN.md`, `V2_FEDERATION.md`. Use `jcodemunch__get_session_snapshot` if MCP available for prior exploration. Run `make gen` / `go build ./...` / `go test -race ./...` after any regen or dep work. Avoid editing generated/ without regen. (Resolve repo first for any code work.)
 
 **Risks noted**: v0.6.1+ gen changes (errorResponse signatures), client_secret encryption never in events, state cookie signing reuses KIND_SELF keys (short TTL), JIT races on User create, cookie domain for federated flows.
 
@@ -30,6 +31,7 @@
 - [x] Bump protosource dep to v0.6.1 (this session). Includes tidy + full regen + test verification.
 - [x] Cookie rename prep foundation (configurable name, default preserved, all wires + tests updated).
 - [x] Discovery doc stub + committed OIDC endpoint paths (service/discovery.go + app/router.go wiring; JSON with issuer-based endpoints for OIDC consistency; stubs + comments + contract tests updated).
+- [x] Real JWKS endpoint (service/jwks.go + test; resolver extensions for collection/filter; wired; discovery stub removed for that path; live binary+curl verified; race tests green).
 - [x] Materialized this plan doc for cross-session use.
 
 ## Goal and Core Principles
@@ -73,7 +75,7 @@ See the "RESUME / COMPACTION SUMMARY" at top of this document for the session-re
   - Issuer lacks OIDC client config + wrapped secret + jit policy.
   - No PKCE state cookie machinery, no /oauth/authorize|callback.
   - No JIT provisioning path.
-  - No JWKS or discovery endpoints (stubs needed to commit shapes).
+  - No JWKS or discovery endpoints (done: real JWKS + discovery doc + stubs for remaining oauth paths).
   - Cookie name hardcoded in 4+ places (loginpage, whoami, app/router, tests, httpauthz usage in direct).
   - Loginer tightly bound to creds (will stay for break-glass; new path for federated token minting).
   - User Create requires password_hash; federated users will have none (or optional).
@@ -156,10 +158,12 @@ Follow the doc's 1-7, but front-load safe additive prep that doesn't touch aggre
   - Always registered (additive, no auth, no backend clients — public metadata). Wired unconditionally in app/router.go alongside svc + loginpage.
   - Commit the paths (per V2_FEDERATION "land v1 with ... discovery"): the oauth ones above + existing /authz/check.
   - Added focused contract tests (service/discovery_test.go) using the protosource.Dispatch pattern: exact JSON shape + fields, both well-known aliases, stub responses, and issuer/endpoint consistency even under differing request headers.
-- [ ] Real JWKS (can do in same prep or right after):
-  - New handler in service or keys/: uses resolver to list keys for issuer (may need KeyClient query or add helper; for now load via known kids or extend resolver with ListVerificationKeysForIssuer).
-  - Endpoint GET /oauth/jwks?issuer=... or /jwks (per discovery). Output {keys: [ {kty, use:"sig", kid, alg, ... from the public_jwk json + extras} ] }.
-  - Note: public_jwk is already bytes of the JWK object from signer.
+- [x] Real JWKS (done in prep):
+  - `service/jwks.go` + `jwks_test.go` (Dispatch pattern): NewJWKS(resolver, defaultIssuerID), registers GET /oauth/jwks, handler supports ?issuer= override (defaults to cfg.IssuerID), probes via ComputeKid + VerificationKey over supported algs + recent 30 days, filters by LiveKey.VerifyUntil, augments public_jwk JSON with kid/alg/use:"sig", returns RFC 7517 {"keys":[...]}.
+  - Small additive extensions to `keys/resolver.go`: LiveKey.VerifyUntil (populated on all paths), Resolver.SupportedAlgorithms() (for collection without exposing internals).
+  - Wired in `app/router.go` (always, like discovery); `/oauth/jwks` stub removed from discovery (real implementation takes precedence; tests + docs updated).
+  - Decisions: ?issuer= supported (per plan); 30-day probe window + verify filter (defensive, covers TTLs); no new List API yet (known-kids strategy as suggested); empty keys set is valid response.
+  - Verified: unit tests + `go test -race ./service`, full build, live `go run ./cmd/...` + curls (discovery jwks_uri + populated /oauth/jwks after login forces key gen).
 - [x] Update router.go comments, CheckResponseJSON docs, LoginResponse docs to reflect new reality (service/router.go loginResponseJSON + CheckResponseJSON godoc; app/router.go NewRouter minimal-set comment). Discovery now lands the committed OIDC contract; access JWTs + JWKS are the follow-on.
 - [ ] Update README.md curl examples + description to note v1 vs upcoming federated. Add section "Federation (v2)" with pointer to the plan.
 - [ ] Update TODO.md: move JWKS/OIDC items under v2 or mark as started.
@@ -248,9 +252,9 @@ Follow the doc's 1-7, but front-load safe additive prep that doesn't touch aggre
 - State cookie name (configurable? "oauth_state" or per-IdP?).
 
 ## Next Actions (for this session / immediate)
-1. JWKS endpoint (prep phase) — real implementation reusing keys.Resolver (VerificationKey + PublicJWK), registered at /oauth/jwks as advertised in discovery, with tests. (Cookie config + discovery doc stub complete, including feedback fixes.)
-2. Update V2_FEDERATION.md status and this plan with decisions.
-3. Proto changes for Issuer (step 2) once prep is reviewable.
+1. JWKS endpoint (prep phase) — DONE (see Completed + detailed bullet).
+2. Update V2_FEDERATION.md status and this plan with decisions. (Plan updated for JWKS slice.)
+3. Proto changes for Issuer (step 2 / Phase 1) — next: OIDCConfig on Issuer + wrapped secret + JIT policy + commands. (Prep complete: cookie+discovery+JWKS.)
 4. Use `go test -race ./...` and manual runs after each slice.
 5. Coordinate with protosource if plugin changes needed for new collection types on User.
 

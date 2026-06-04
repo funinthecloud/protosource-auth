@@ -55,13 +55,18 @@ var ErrNoSignerForAlgorithm = errors.New("keys: no signer registered for algorit
 // LiveKey is an in-memory handle to a usable key. For signing keys it
 // carries the decrypted private bytes; for verify-only keys it carries
 // only the public JWK.
+//
+// VerifyUntil (unix seconds) is populated from the Key aggregate so
+// callers like the JWKS endpoint can filter out keys past their
+// verification window (see proto auth.key.v1 Key and STATE_VERIFY_ONLY).
 type LiveKey struct {
-	Kid        string
-	Algorithm  string
-	IssuerID   string
-	PrivateKey []byte // nil for verification-only handles
-	PublicJWK  []byte
-	signer     signers.Signer
+	Kid         string
+	Algorithm   string
+	IssuerID    string
+	PrivateKey  []byte // nil for verification-only handles
+	PublicJWK   []byte
+	VerifyUntil int64 // unix seconds; 0 if not known (defensive)
+	signer      signers.Signer
 }
 
 // Sign produces a compact JWT with the resolved kid stamped in the
@@ -162,6 +167,20 @@ func ComputeKid(issuerID, algorithm string, day time.Time) string {
 	return fmt.Sprintf("%s:%s:%s", issuerID, day.UTC().Format("2006-01-02"), algorithm)
 }
 
+// SupportedAlgorithms returns the set of algorithm names this resolver
+// was configured with (e.g. ["EdDSA"]). Used by the JWKS handler to
+// know which (issuer,alg,day) kids to probe via ComputeKid + VerificationKey.
+func (r *Resolver) SupportedAlgorithms() []string {
+	if r == nil || len(r.signers) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(r.signers))
+	for a := range r.signers {
+		out = append(out, a)
+	}
+	return out
+}
+
 // SigningKey returns today's active signing key for (issuerID, algorithm),
 // lazily creating it if no Key aggregate exists yet. Subsequent calls
 // within the same day hit the in-memory cache without touching the store
@@ -229,12 +248,13 @@ func (r *Resolver) SigningKey(ctx context.Context, issuerID, algorithm string) (
 	}
 
 	lk := &LiveKey{
-		Kid:        kid,
-		Algorithm:  algorithm,
-		IssuerID:   issuerID,
-		PrivateKey: privateKey,
-		PublicJWK:  publicJWK,
-		signer:     signer,
+		Kid:         kid,
+		Algorithm:   algorithm,
+		IssuerID:    issuerID,
+		PrivateKey:  privateKey,
+		PublicJWK:   publicJWK,
+		VerifyUntil: verifyUntil,
+		signer:      signer,
 	}
 	r.storeCache(lk)
 	return lk, nil
@@ -252,11 +272,12 @@ func (r *Resolver) SigningKey(ctx context.Context, issuerID, algorithm string) (
 func (r *Resolver) VerificationKey(ctx context.Context, kid string) (*LiveKey, error) {
 	if lk := r.lookupCache(kid); lk != nil {
 		return &LiveKey{
-			Kid:       lk.Kid,
-			Algorithm: lk.Algorithm,
-			IssuerID:  lk.IssuerID,
-			PublicJWK: lk.PublicJWK,
-			signer:    lk.signer,
+			Kid:         lk.Kid,
+			Algorithm:   lk.Algorithm,
+			IssuerID:    lk.IssuerID,
+			PublicJWK:   lk.PublicJWK,
+			VerifyUntil: lk.VerifyUntil,
+			signer:      lk.signer,
 		}, nil
 	}
 	agg, err := r.repo.Load(ctx, kid)
@@ -272,11 +293,12 @@ func (r *Resolver) VerificationKey(ctx context.Context, kid string) (*LiveKey, e
 		return nil, fmt.Errorf("%w: %q", ErrNoSignerForAlgorithm, k.GetAlgorithm())
 	}
 	return &LiveKey{
-		Kid:       k.GetId(),
-		Algorithm: k.GetAlgorithm(),
-		IssuerID:  k.GetIssuerId(),
-		PublicJWK: k.GetPublicJwk(),
-		signer:    signer,
+		Kid:         k.GetId(),
+		Algorithm:   k.GetAlgorithm(),
+		IssuerID:    k.GetIssuerId(),
+		PublicJWK:   k.GetPublicJwk(),
+		VerifyUntil: k.GetVerifyUntil(),
+		signer:      signer,
 	}, nil
 }
 
@@ -315,12 +337,13 @@ func (r *Resolver) loadAndDecrypt(ctx context.Context, kid string) (*LiveKey, er
 		return nil, fmt.Errorf("keys: unwrap private key: %w", err)
 	}
 	return &LiveKey{
-		Kid:        k.GetId(),
-		Algorithm:  k.GetAlgorithm(),
-		IssuerID:   k.GetIssuerId(),
-		PrivateKey: plaintext,
-		PublicJWK:  k.GetPublicJwk(),
-		signer:     signer,
+		Kid:         k.GetId(),
+		Algorithm:   k.GetAlgorithm(),
+		IssuerID:    k.GetIssuerId(),
+		PrivateKey:  plaintext,
+		PublicJWK:   k.GetPublicJwk(),
+		VerifyUntil: k.GetVerifyUntil(),
+		signer:      signer,
 	}, nil
 }
 

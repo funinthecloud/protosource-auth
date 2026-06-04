@@ -107,7 +107,6 @@ func TestDiscoveryStubsReturnNotImplemented(t *testing.T) {
 		{"GET", "/oauth/callback"},
 		{"POST", "/oauth/token"},
 		{"GET", "/oauth/userinfo"},
-		{"GET", "/oauth/jwks"},
 		{"GET", "/oauth/logout"},
 		{"POST", "/oauth/logout"},
 	}

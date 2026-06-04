@@ -46,20 +46,22 @@ func NewDiscovery(issuer, cookieName string) *Discovery {
 // Primary discovery location: GET /.well-known/openid-configuration
 // We also register /oauth/.well-known/openid-configuration as an alias.
 //
-// The /oauth/* targets are registered with stub 404 responses so the paths
-// exist in the router today (clients and generated docs can see the contract)
-// even though the real PKCE/JWKS/userinfo behavior lands in later phases.
+// The /oauth/* targets (except /oauth/jwks, which has a real implementation)
+// are registered with stub 404 responses so the paths exist in the router
+// today (clients and generated docs can see the contract) even though the
+// real PKCE/userinfo/etc behavior lands in later phases.
 func (d *Discovery) RegisterRoutes(router *protosource.Router) {
 	router.Handle("GET", "/.well-known/openid-configuration", d.handleDiscovery)
 	router.Handle("GET", "/oauth/.well-known/openid-configuration", d.handleDiscovery)
 
 	// Commit the endpoint shapes (GET/POST as appropriate for the future
-	// flows). Real implementations replace these stubs.
+	// flows). Real implementations replace these stubs. Note: /oauth/jwks
+	// is implemented by the real JWKS handler (registered alongside
+	// Discovery) so we do not stub it here.
 	router.Handle("GET", "/oauth/authorize", d.stubNotImplemented)
 	router.Handle("GET", "/oauth/callback", d.stubNotImplemented)
 	router.Handle("POST", "/oauth/token", d.stubNotImplemented)
 	router.Handle("GET", "/oauth/userinfo", d.stubNotImplemented)
-	router.Handle("GET", "/oauth/jwks", d.stubNotImplemented)
 	router.Handle("GET", "/oauth/logout", d.stubNotImplemented)
 	router.Handle("POST", "/oauth/logout", d.stubNotImplemented)
 }
@@ -114,8 +116,9 @@ func (d *Discovery) stubNotImplemented(ctx context.Context, req protosource.Requ
 	// These paths are intentionally registered (even while returning 404)
 	// so that the OIDC discovery document can advertise stable URLs today.
 	// This fulfills the "commit the URL shape on v1" requirement from
-	// V2_FEDERATION.md. Real behavior (PKCE, ID token exchange, JWKS
-	// publication, access JWTs, etc.) is added in later phases.
+	// V2_FEDERATION.md. Real behavior (PKCE, ID token exchange, access
+	// JWTs, etc.) is added in later phases. /oauth/jwks is served by the
+	// dedicated JWKS registrar (not stubbed).
 	body, _ := json.Marshal(map[string]string{
 		"error":             "not_implemented",
 		"error_description": "This endpoint shape is committed for v2 federation (see /.well-known/openid-configuration). Implementation is in progress.",
