@@ -168,7 +168,7 @@ Bootstrap before first deploy: `protosource-authmgr bootstrap --admin-email ... 
 ## Conventions
 
 - Module path: `github.com/funinthecloud/protosource-auth`
-- Go 1.25+, depends on `github.com/funinthecloud/protosource v0.1.5+`
+- Go 1.25+, depends on `github.com/funinthecloud/protosource v0.6.1+` (updated for V2 federation work)
 - Generated files under `gen/` are auto-generated — never edit by hand
 - Proto files formatted with `clang-format --style=file -i proto/**/*.proto` (NOT `buf format`)
 - Protosource field-name contracts bit us in phase 2: aggregates need `create_at` / `create_by` / `modify_at` / `modify_by` (not `created_at`); command fields must name-match event fields for mechanical copying; ADD events embed the element message type (`RoleGrant grant`, `FunctionGrant grant`)

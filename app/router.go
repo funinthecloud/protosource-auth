@@ -31,7 +31,7 @@ import (
 // 500 on every read.
 //
 // CORS is applied when cfg.CORSOrigin is non-empty, with credentials
-// always allowed so the shadow cookie flows on cross-origin XHR from
+// always allowed so the (cfg.ShadowCookieName) cookie flows on cross-origin XHR from
 // the admin SPA. An empty CORSOrigin leaves CORS disabled — same-
 // origin deployments (admin SPA and API on one host) need no headers
 // and benefit from a smaller preflight surface.
@@ -43,7 +43,7 @@ func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver) *protosourc
 	)
 	checker := service.NewChecker(bundle.TokenRepo, bundle.UserRepo, bundle.RoleRepo)
 	svc := service.NewService(loginer, checker)
-	lp := loginpage.New(cfg.IssuerID, loginer)
+	lp := loginpage.New(cfg.IssuerID, cfg.ShadowCookieName, loginer)
 
 	registrars := []protosource.RouteRegistrar{svc, lp}
 
@@ -52,8 +52,8 @@ func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver) *protosourc
 	// [Bundle]. Skip registration so the memory binary still serves
 	// the minimal login/check surface used by tests.
 	if bundle.UserClient != nil {
-		authorizer := buildAuthorizer(checker)
-		whoami := service.NewWhoami(bundle.TokenRepo, bundle.UserRepo)
+		authorizer := buildAuthorizer(checker, cfg.ShadowCookieName)
+		whoami := service.NewWhoami(bundle.TokenRepo, bundle.UserRepo, cfg.ShadowCookieName)
 		adminUser := service.NewAdminUser(bundle.UserRepo, authorizer)
 
 		registrars = append(registrars,
@@ -81,10 +81,13 @@ func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver) *protosourc
 
 // buildAuthorizer constructs the in-process authorizer used by the
 // admin handlers. Cookie token source matches what the SPA sends —
-// the loginpage sets a "shadow" cookie on successful POST /.
-func buildAuthorizer(checker *service.Checker) authz.Authorizer {
+// the loginpage sets cfg.ShadowCookieName on successful POST /.
+func buildAuthorizer(checker *service.Checker, cookieName string) authz.Authorizer {
+	if cookieName == "" {
+		cookieName = "shadow"
+	}
 	return directauthz.New(checker,
-		directauthz.WithTokenSource(httpauthz.Cookie("shadow")),
+		directauthz.WithTokenSource(httpauthz.Cookie(cookieName)),
 	)
 }
 

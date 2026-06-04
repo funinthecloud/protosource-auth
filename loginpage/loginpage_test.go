@@ -77,7 +77,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	})
 
 	loginer := service.NewLoginer(userRepo, issuerRepo, tokenRepo, dir, resolver)
-	page := New("default", loginer)
+	page := New("default", "shadow", loginer)
 
 	return &testEnv{page: page}
 }
@@ -277,7 +277,7 @@ func TestNewPanicsOnNilLoginer(t *testing.T) {
 			t.Fatalf("unexpected panic: %v", r)
 		}
 	}()
-	New("issuer", nil)
+	New("issuer", "shadow", nil)
 }
 
 // -- handleLogin tests --
@@ -467,7 +467,7 @@ func TestHandleLoginExpiredToken(t *testing.T) {
 		service.WithLoginerClock(pastClock),
 		service.WithTokenTTL(1*time.Hour),
 	)
-	page := New("default", loginer)
+	page := New("default", "shadow", loginer)
 
 	resp := page.handleLogin(ctx, protosource.Request{
 		Headers: secureHeaders("auth.drhayt.com"),

@@ -25,7 +25,7 @@ func TestWhoamiReturnsUserContext(t *testing.T) {
 		t.Fatalf("Login: %v", err)
 	}
 
-	whoami := service.NewWhoami(rig.tokenRepo, rig.userRepo,
+	whoami := service.NewWhoami(rig.tokenRepo, rig.userRepo, "shadow",
 		service.WithWhoamiClock(rig.clock),
 	)
 
@@ -63,7 +63,7 @@ func TestWhoamiReturnsUserContext(t *testing.T) {
 
 func TestWhoamiNoCookie(t *testing.T) {
 	rig := newE2ERig(t)
-	whoami := service.NewWhoami(rig.tokenRepo, rig.userRepo)
+	whoami := service.NewWhoami(rig.tokenRepo, rig.userRepo, "")
 
 	router := protosource.NewRouter(whoami)
 	got := router.Dispatch(context.Background(), "GET", "/whoami", protosource.Request{})
@@ -75,7 +75,7 @@ func TestWhoamiNoCookie(t *testing.T) {
 
 func TestWhoamiInvalidToken(t *testing.T) {
 	rig := newE2ERig(t)
-	whoami := service.NewWhoami(rig.tokenRepo, rig.userRepo)
+	whoami := service.NewWhoami(rig.tokenRepo, rig.userRepo, "")
 
 	req := protosource.Request{
 		Headers: map[string]string{

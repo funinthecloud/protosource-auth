@@ -1,5 +1,6 @@
 // Package loginpage serves a browser login form and handles
-// authentication with server-side cookie setting.
+// authentication with server-side (configurable name) shadow cookie setting.
+// The cookie name is driven by app.Config.ShadowCookieName (v2 prep).
 package loginpage
 
 import (
@@ -28,19 +29,26 @@ var loginHTML string
 var loginTmpl = template.Must(template.New("login").Parse(loginHTML))
 
 // Page serves the login form, handles authentication, and sets the
-// shadow cookie server-side. Implements [protosource.RouteRegistrar].
+// (configurable) shadow cookie server-side. Implements [protosource.RouteRegistrar].
+// The cookie name is configurable to support the v2 federation cookie-rename
+// + discovery arc (V2_FEDERATION.md); it defaults to "shadow" for compatibility.
 type Page struct {
-	issuerID string
-	loginer  *service.Loginer
+	issuerID   string
+	cookieName string
+	loginer    *service.Loginer
 }
 
 // New returns a Page that serves the login form and handles
 // authentication via the provided Loginer. Panics if loginer is nil.
-func New(issuerID string, loginer *service.Loginer) *Page {
+// cookieName defaults to "shadow" if empty.
+func New(issuerID string, cookieName string, loginer *service.Loginer) *Page {
 	if loginer == nil {
 		panic("loginpage.New: loginer must not be nil")
 	}
-	return &Page{issuerID: issuerID, loginer: loginer}
+	if cookieName == "" {
+		cookieName = "shadow"
+	}
+	return &Page{issuerID: issuerID, cookieName: cookieName, loginer: loginer}
 }
 
 // RegisterRoutes registers GET / (form) and POST / (login) on the router.
@@ -109,7 +117,7 @@ func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protoso
 	}
 
 	c := &http.Cookie{
-		Name:     "shadow",
+		Name:     p.cookieName,
 		Value:    result.ShadowToken,
 		Path:     "/",
 		Domain:   parentDomain(reqHost(req)),

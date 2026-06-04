@@ -1,8 +1,9 @@
 # TODO
 
 See [V2_FEDERATION.md](V2_FEDERATION.md) for the cross-cutting design
-arc that absorbs several of the items below (JWKS, OIDC discovery,
-refresh tokens, federated authentication via PKCE).
+arc. See [V2_IMPLEMENTATION_PLAN.md](V2_IMPLEMENTATION_PLAN.md) for the
+detailed implementation roadmap, sequencing, code touchpoints, and
+verification gates (planning + exploration complete; prep work first).
 
 ## Operational readiness
 

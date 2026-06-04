@@ -15,12 +15,14 @@ import (
 )
 
 // Whoami serves GET /whoami, returning the authenticated user's identity
-// derived from the shadow cookie. The frontend uses it to detect login
-// state and to obtain the user_id for the actor field on commands.
+// derived from the (configurable) shadow cookie. The frontend uses it to
+// detect login state and to obtain the user_id for the actor field on commands.
+// Cookie name is configurable for v2 federation (see ShadowCookieName in app.Config).
 type Whoami struct {
-	tokenRepo AggregateRepo
-	userRepo  AggregateRepo
-	clock     func() time.Time
+	tokenRepo  AggregateRepo
+	userRepo   AggregateRepo
+	cookieName string
+	clock      func() time.Time
 }
 
 // WhoamiOption configures a Whoami at construction time.
@@ -32,17 +34,22 @@ func WithWhoamiClock(clock func() time.Time) WhoamiOption {
 }
 
 // NewWhoami constructs a Whoami handler. Both repos are required.
-func NewWhoami(tokenRepo, userRepo AggregateRepo, opts ...WhoamiOption) *Whoami {
+// cookieName defaults to "shadow" if empty.
+func NewWhoami(tokenRepo, userRepo AggregateRepo, cookieName string, opts ...WhoamiOption) *Whoami {
 	if tokenRepo == nil {
 		panic("service.NewWhoami: tokenRepo must not be nil")
 	}
 	if userRepo == nil {
 		panic("service.NewWhoami: userRepo must not be nil")
 	}
+	if cookieName == "" {
+		cookieName = "shadow"
+	}
 	w := &Whoami{
-		tokenRepo: tokenRepo,
-		userRepo:  userRepo,
-		clock:     time.Now,
+		tokenRepo:  tokenRepo,
+		userRepo:   userRepo,
+		cookieName: cookieName,
+		clock:      time.Now,
 	}
 	for _, opt := range opts {
 		opt(w)
@@ -68,7 +75,7 @@ type whoamiRole struct {
 }
 
 func (w *Whoami) handle(ctx context.Context, req protosource.Request) protosource.Response {
-	token := cookieValue(req, "shadow")
+	token := cookieValue(req, w.cookieName)
 	if token == "" {
 		return whoamiError(http.StatusUnauthorized, "unauthenticated")
 	}

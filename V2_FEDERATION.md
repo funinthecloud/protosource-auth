@@ -1,7 +1,7 @@
 # protosource-auth v2: federated authentication, owned authorization
 
-Status: design notes, not yet committed work. Drafted 2026-05-19 alongside
-the Azure deploy of v1.
+Status: design notes + active implementation planning. Drafted 2026-05-19.
+Implementation planning + codebase exploration started 2026-06; see V2_IMPLEMENTATION_PLAN.md for concrete steps, file impacts, and live tracking. Changes are additive; v1 paths remain fully supported.
 
 ## Mission shift
 

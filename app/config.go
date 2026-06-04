@@ -104,6 +104,13 @@ type Config struct {
 	// TokenTTL is how long issued shadow tokens live. Default 10h.
 	TokenTTL time.Duration
 
+	// ShadowCookieName is the name of the HttpOnly session cookie set
+	// by the login page (and consumed by whoami + authorizers). Default
+	// "shadow". Configurable to support the cookie-rename part of the
+	// v2 federation arc (see V2_FEDERATION.md and
+	// V2_IMPLEMENTATION_PLAN.md). Advertised in OIDC discovery.
+	ShadowCookieName string
+
 	// Backend selects the storage backend wired behind the aggregate
 	// repositories. Default: [BackendMemory].
 	Backend Backend
@@ -229,6 +236,14 @@ const (
 	// configured without any "table"-named knobs in its environment.
 	EnvEventsContainer     = "PROTOSOURCE_AUTH_EVENTS_CONTAINER"
 	EnvAggregatesContainer = "PROTOSOURCE_AUTH_AGGREGATES_CONTAINER"
+
+	// EnvShadowCookieName allows renaming the session cookie from the
+	// default "shadow" (e.g. "shadow_azure" for a particular Azure
+	// deployment or to avoid collision). This is the v1 prep step for
+	// the cookie-rename + discovery doc arc in V2_FEDERATION.md.
+	// The value is advertised in the OIDC discovery document's
+	// "cookie_name" field.
+	EnvShadowCookieName = "PROTOSOURCE_AUTH_SHADOW_COOKIE_NAME"
 )
 
 // LoadConfigFromEnv returns a Config populated from the environment.
@@ -253,6 +268,7 @@ func LoadConfigFromEnv() (*Config, error) {
 		KeyProvider:            KeyProvider(os.Getenv(EnvKeyProvider)),
 		MasterKeyRef:           os.Getenv(EnvMasterKeyRef),
 		CORSOrigin:             os.Getenv(EnvCORSOrigin),
+		ShadowCookieName:       os.Getenv(EnvShadowCookieName),
 
 		CosmosEndpoint:             os.Getenv(EnvCosmosEndpoint),
 		CosmosKey:                  os.Getenv(EnvCosmosKey),
@@ -313,6 +329,9 @@ func (c *Config) Normalize() error {
 	}
 	if c.TokenTTL == 0 {
 		c.TokenTTL = 10 * time.Hour
+	}
+	if c.ShadowCookieName == "" {
+		c.ShadowCookieName = "shadow"
 	}
 	if c.BootstrapActor == "" {
 		c.BootstrapActor = "bootstrap"
