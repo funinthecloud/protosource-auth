@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -61,17 +62,21 @@ func (j *JWKS) handle(ctx context.Context, req protosource.Request) protosource.
 		algs = []string{"EdDSA"}
 	}
 
-	now := time.Now().Unix()
+	// Capture a single base time in UTC so that day probing is stable
+	// (avoids TZ/DST skew across the 30-day window) and "now" for
+	// verify-until checks is consistent with the probed days.
+	base := time.Now().UTC()
+	now := base.Unix()
 
 	// Probe a sliding window of recent days per alg. 30 days is
 	// intentionally generous (covers 24h signing window + 11h grace +
 	// 10h token TTL + clock skew + multi-day key retention).
 	seen := map[string]struct{}{}
-	var jwksKeys []any
+	jwksKeys := []any{} // explicit empty (not nil) so JSON is always {"keys":[]} when empty
 
 	for _, alg := range algs {
 		for d := 0; d < 30; d++ {
-			day := time.Now().Add(-time.Duration(d) * 24 * time.Hour)
+			day := base.Add(-time.Duration(d) * 24 * time.Hour)
 			kid := keys.ComputeKid(issuer, alg, day)
 			if _, ok := seen[kid]; ok {
 				continue
@@ -80,7 +85,16 @@ func (j *JWKS) handle(ctx context.Context, req protosource.Request) protosource.
 
 			lk, err := j.resolver.VerificationKey(ctx, kid)
 			if err != nil {
-				continue
+				if errors.Is(err, protosource.ErrAggregateNotFound) {
+					continue // normal miss for a (issuer,alg,day) we haven't created yet
+				}
+				// Unexpected error (store outage, provider failure, etc.) — fail closed
+				// rather than returning a misleading empty/partial JWKS.
+				return protosource.Response{
+					StatusCode: http.StatusInternalServerError,
+					Body:       `{"error":"internal_error","error_description":"key resolution failed"}`,
+					Headers:    map[string]string{"Content-Type": "application/json"},
+				}
 			}
 			if lk.VerifyUntil != 0 && now > lk.VerifyUntil {
 				continue

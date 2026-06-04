@@ -85,7 +85,9 @@ func TestJWKSWithIssuerQueryParam(t *testing.T) {
 		t.Fatalf("status %d", got.StatusCode)
 	}
 	var doc struct{ Keys []any `json:"keys"` }
-	json.Unmarshal([]byte(got.Body), &doc)
+	if err := json.Unmarshal([]byte(got.Body), &doc); err != nil {
+		t.Fatalf("decode jwks: %v", err)
+	}
 	if len(doc.Keys) == 0 {
 		t.Errorf("expected keys for explicit issuer")
 	}
@@ -99,7 +101,9 @@ func TestJWKSWithIssuerQueryParam(t *testing.T) {
 		t.Fatalf("status %d for unknown issuer", got2.StatusCode)
 	}
 	var doc2 struct{ Keys []any `json:"keys"` }
-	json.Unmarshal([]byte(got2.Body), &doc2)
+	if err := json.Unmarshal([]byte(got2.Body), &doc2); err != nil {
+		t.Fatalf("decode jwks: %v", err)
+	}
 	if len(doc2.Keys) != 0 {
 		t.Errorf("expected empty keys for unknown issuer, got %d", len(doc2.Keys))
 	}
@@ -123,7 +127,9 @@ func TestJWKSDefaultsIssuerID(t *testing.T) {
 		t.Fatalf("status %d", got.StatusCode)
 	}
 	var doc struct{ Keys []any `json:"keys"` }
-	json.Unmarshal([]byte(got.Body), &doc)
+	if err := json.Unmarshal([]byte(got.Body), &doc); err != nil {
+		t.Fatalf("decode jwks: %v", err)
+	}
 	if len(doc.Keys) == 0 {
 		t.Errorf("expected keys when defaulting issuer ID")
 	}
