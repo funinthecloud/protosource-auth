@@ -25,10 +25,12 @@ import (
 //
 // When bundle.UserClient is nil (memory backend — see [Bundle]) the
 // router is reduced to the minimum useful set: POST /login,
-// POST /authz/check, and the login page at /. The v1 admin handlers
-// need a UserClient to back their materialized reads, so omitting them
-// is the honest choice rather than registering routes that would
-// 500 on every read.
+// POST /authz/check, the login page at /, and the OIDC discovery
+// document at /.well-known/openid-configuration (plus committed
+// /oauth/* stub paths per V2_FEDERATION.md so v2 does not force
+// consumer rewiring). The v1 admin handlers need a UserClient to
+// back their materialized reads, so omitting them is the honest
+// choice rather than registering routes that would 500 on every read.
 //
 // CORS is applied when cfg.CORSOrigin is non-empty, with credentials
 // always allowed so the (cfg.ShadowCookieName) cookie flows on cross-origin XHR from
@@ -44,8 +46,9 @@ func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver) *protosourc
 	checker := service.NewChecker(bundle.TokenRepo, bundle.UserRepo, bundle.RoleRepo)
 	svc := service.NewService(loginer, checker)
 	lp := loginpage.New(cfg.IssuerID, cfg.ShadowCookieName, loginer)
+	disc := service.NewDiscovery(cfg.IssuerIss, cfg.ShadowCookieName)
 
-	registrars := []protosource.RouteRegistrar{svc, lp}
+	registrars := []protosource.RouteRegistrar{svc, lp, disc}
 
 	// The v1 admin handlers + whoami + adminUser require the
 	// opaquedata-backed clients. Memory backend leaves them nil; see

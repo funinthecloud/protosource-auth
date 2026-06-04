@@ -199,13 +199,14 @@ func TestAuthorizeUnauthenticatedWhenTokenInvalid(t *testing.T) {
 }
 
 func TestAuthorizeWithCookieTokenSource(t *testing.T) {
+	const cookieName = "shadow"
 	r := newRig(t)
-	r.auth = directauthz.New(r.checker, directauthz.WithTokenSource(httpauthz.Cookie("shadow")))
+	r.auth = directauthz.New(r.checker, directauthz.WithTokenSource(httpauthz.Cookie(cookieName)))
 	token := login(t, r)
 
 	_, err := r.auth.Authorize(
 		context.Background(),
-		protosource.Request{Headers: map[string]string{"Cookie": "other=x; shadow=" + token + "; also=y"}},
+		protosource.Request{Headers: map[string]string{"Cookie": "other=x; " + cookieName + "=" + token + "; also=y"}},
 		"auth.user.v1.Create",
 	)
 	if err != nil {
