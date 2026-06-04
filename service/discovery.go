@@ -16,12 +16,14 @@ import (
 // when PKCE, JWKS, access JWTs, etc. are implemented.
 //
 // See V2_FEDERATION.md for the design and the exact JSON shape we target.
-// The "issuer" field comes from config (stable logical iss for JWTs);
-// endpoint URLs are derived from the request's Host + X-Forwarded-Proto so
-// they reflect how the client reached us (works for local dev, proxies,
-// Container Apps, etc.).
+// Both the "issuer" field and all endpoint base URLs are derived from the
+// configured issuer (cfg.IssuerIss). This ensures the issuer value and
+// endpoint URLs share the same base (as required by OIDC clients and as
+// shown in the design doc examples). Using the request host/scheme for
+// endpoints would risk inconsistency (e.g. localhost vs. canonical IssuerIss,
+// alternate hostnames, missing/mis-set X-Forwarded-Proto).
 type Discovery struct {
-	issuer     string // from cfg.IssuerIss (advertised in "issuer" and used for tokens)
+	issuer     string // from cfg.IssuerIss (advertised in "issuer" and used for tokens + endpoint bases)
 	cookieName string // cfg.ShadowCookieName (advertised so clients know what cookie to send)
 }
 
@@ -63,16 +65,11 @@ func (d *Discovery) RegisterRoutes(router *protosource.Router) {
 }
 
 func (d *Discovery) handleDiscovery(ctx context.Context, req protosource.Request) protosource.Response {
-	scheme := "https"
-	if !isSecure(req) {
-		scheme = "http"
-	}
-	host := reqHost(req)
-	if host == "" {
-		// Should not happen in real requests, but keep the handler robust.
-		host = "localhost"
-	}
-	base := scheme + "://" + host
+	// Derive the endpoint base from the configured issuer (not the request).
+	// This guarantees that the "issuer" value and the base of every
+	// advertised endpoint are identical, satisfying OIDC client expectations
+	// (see V2_FEDERATION.md example and feedback on consistency).
+	base := issuerBase(d.issuer)
 
 	doc := map[string]any{
 		"issuer":                 d.issuer,
@@ -104,6 +101,15 @@ func (d *Discovery) handleDiscovery(ctx context.Context, req protosource.Request
 	}
 }
 
+func issuerBase(iss string) string {
+	if iss == "" {
+		return "https://localhost"
+	}
+	// Trim trailing slash so that appending "/oauth/..." produces clean paths
+	// and the base matches the issuer value (modulo trailing slash).
+	return strings.TrimRight(iss, "/")
+}
+
 func (d *Discovery) stubNotImplemented(ctx context.Context, req protosource.Request) protosource.Response {
 	// These paths are intentionally registered (even while returning 404)
 	// so that the OIDC discovery document can advertise stable URLs today.
@@ -119,33 +125,4 @@ func (d *Discovery) stubNotImplemented(ctx context.Context, req protosource.Requ
 		Body:       string(body),
 		Headers:    map[string]string{"Content-Type": "application/json"},
 	}
-}
-
-// --- request helpers (duplicated from loginpage for URL construction) ---
-//
-// These match the header handling used for the login page (Host +
-// X-Forwarded-Proto with comma support for chained proxies) so that
-// discovery advertises the same base the client is using. In a future
-// cleanup we can extract a small shared helper (internal/httputil or
-// similar) once more v2 pieces need it.
-
-func reqHost(req protosource.Request) string {
-	if h := req.Headers["host"]; h != "" {
-		return h
-	}
-	return req.Headers["Host"]
-}
-
-func isSecure(req protosource.Request) bool {
-	proto := req.Headers["x-forwarded-proto"]
-	if proto == "" {
-		proto = req.Headers["X-Forwarded-Proto"]
-	}
-	if proto == "" {
-		return false
-	}
-	if i := strings.IndexByte(proto, ','); i != -1 {
-		proto = proto[:i]
-	}
-	return strings.EqualFold(strings.TrimSpace(proto), "https")
 }

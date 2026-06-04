@@ -152,9 +152,10 @@ Follow the doc's 1-7, but front-load safe additive prep that doesn't touch aggre
   - authz tests, loginpage_test, service_test, app_test that assert cookies or use direct with cookie.
 - [x] Add discovery handler (new file service/discovery.go):
   - Register GET /.well-known/openid-configuration (and /oauth/.well-known alias).
-  - Return JSON matching the exact shape in V2_FEDERATION.md (issuer from cfg.IssuerIss, other endpoints as full URLs derived from request Host + X-Forwarded-Proto for scheme/host, cookie_name from cfg.ShadowCookieName, standard response_types etc.). Stub 404/not_implemented handlers for /oauth/authorize, /callback, /token, /userinfo, /jwks, /logout so the paths are explicitly committed in the router today.
+  - Return JSON matching the exact shape in V2_FEDERATION.md (issuer from cfg.IssuerIss; endpoint bases also derived from IssuerIss for OIDC client compatibility — issuer and endpoint URLs now guaranteed to share the same base, matching the design doc single-base example. No request host derivation for discovery URLs to avoid inconsistency). Stub 404/not_implemented handlers for /oauth/authorize, /callback, /token, /userinfo, /jwks, /logout so the paths are explicitly committed in the router today.
   - Always registered (additive, no auth, no backend clients — public metadata). Wired unconditionally in app/router.go alongside svc + loginpage.
   - Commit the paths (per V2_FEDERATION "land v1 with ... discovery"): the oauth ones above + existing /authz/check.
+  - Added focused contract tests (service/discovery_test.go) using the protosource.Dispatch pattern: exact JSON shape + fields, both well-known aliases, stub responses, and issuer/endpoint consistency even under differing request headers.
 - [ ] Real JWKS (can do in same prep or right after):
   - New handler in service or keys/: uses resolver to list keys for issuer (may need KeyClient query or add helper; for now load via known kids or extend resolver with ListVerificationKeysForIssuer).
   - Endpoint GET /oauth/jwks?issuer=... or /jwks (per discovery). Output {keys: [ {kty, use:"sig", kid, alg, ... from the public_jwk json + extras} ] }.
