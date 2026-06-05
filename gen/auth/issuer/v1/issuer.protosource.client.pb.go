@@ -27,7 +27,7 @@ func NewHTTPClient(c httpclient.Doer) *HTTPClient {
 }
 
 // Register sends the Register command.
-func (c *HTTPClient) Register(ctx context.Context, id string, iss string, displayName string, kind Kind, defaultAlgorithm string, jwksUrl string) (responsev1.Responseer, error) {
+func (c *HTTPClient) Register(ctx context.Context, id string, iss string, displayName string, kind Kind, defaultAlgorithm string, jwksUrl string, initialOidc *OIDCConfig) (responsev1.Responseer, error) {
 	cmd := &Register{
 		Id:               id,
 		Iss:              iss,
@@ -35,6 +35,7 @@ func (c *HTTPClient) Register(ctx context.Context, id string, iss string, displa
 		Kind:             kind,
 		DefaultAlgorithm: defaultAlgorithm,
 		JwksUrl:          jwksUrl,
+		InitialOidc:      initialOidc,
 	}
 	return c.c.Apply(ctx, routePath, cmd)
 }
@@ -85,6 +86,23 @@ func (c *HTTPClient) Reactivate(ctx context.Context, id string) (responsev1.Resp
 // Delete sends the Delete command.
 func (c *HTTPClient) Delete(ctx context.Context, id string) (responsev1.Responseer, error) {
 	cmd := &Delete{
+		Id: id,
+	}
+	return c.c.Apply(ctx, routePath, cmd)
+}
+
+// SetOIDCConfig sends the SetOIDCConfig command.
+func (c *HTTPClient) SetOIDCConfig(ctx context.Context, id string, config *OIDCConfig) (responsev1.Responseer, error) {
+	cmd := &SetOIDCConfig{
+		Id:     id,
+		Config: config,
+	}
+	return c.c.Apply(ctx, routePath, cmd)
+}
+
+// ClearOIDCConfig sends the ClearOIDCConfig command.
+func (c *HTTPClient) ClearOIDCConfig(ctx context.Context, id string) (responsev1.Responseer, error) {
+	cmd := &ClearOIDCConfig{
 		Id: id,
 	}
 	return c.c.Apply(ctx, routePath, cmd)

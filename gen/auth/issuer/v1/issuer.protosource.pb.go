@@ -98,6 +98,14 @@ func (aggregate *Issuer) On(event protosource.Event) error {
 	case *Deleted:
 		aggregate.setModified(e)
 		aggregate.State = State_STATE_DELETED
+	case *OIDCConfigSet:
+		aggregate.setModified(e)
+		if c := e.GetConfig(); c != nil {
+			aggregate.Oidc = c
+		}
+	case *OIDCConfigCleared:
+		aggregate.setModified(e)
+		aggregate.Oidc = nil
 	default:
 		return fmt.Errorf("%T: %w", e, protosource.ErrUnhandledEvent)
 	}
@@ -305,7 +313,7 @@ func (m *Register) ValidateVersion(version int64) error {
 }
 func (m *Register) EmitEvents(aggregate protosource.Aggregate) []protosource.Event {
 	b := NewBuilder(m.GetId(), aggregate.GetVersion())
-	b.Registered(m.GetActor(), m.GetIss(), m.GetDisplayName(), m.GetKind(), m.GetDefaultAlgorithm(), m.GetJwksUrl())
+	b.Registered(m.GetActor(), m.GetIss(), m.GetDisplayName(), m.GetKind(), m.GetDefaultAlgorithm(), m.GetJwksUrl(), m.GetInitialOidc())
 	return b.Events
 }
 
@@ -501,11 +509,75 @@ func (m *Delete) EmitEvents(aggregate protosource.Aggregate) []protosource.Event
 	return b.Events
 }
 
+func (m *SetOIDCConfig) CommandName() string {
+	return "SetOIDCConfig"
+}
+
+func (m *SetOIDCConfig) ProtoValidate() error {
+	if err := validator().Validate(m); err != nil {
+		return fmt.Errorf("command %s: %w: %w", m.CommandName(), protosource.ErrValidationFailed, err)
+	}
+	return nil
+}
+
+func (m *SetOIDCConfig) ValidateVersion(version int64) error {
+	if version == 0 {
+		return fmt.Errorf("command %s requires an existing aggregate (version > 0), got version 0: %w", m.CommandName(), protosource.ErrNotCreatedYet)
+	}
+	return nil
+}
+func (m *SetOIDCConfig) GuardState(aggregate protosource.Aggregate) error {
+	a := aggregate.(*Issuer)
+	switch a.GetState() {
+	case State_STATE_ACTIVE:
+		return nil
+	default:
+		return fmt.Errorf("command %s not allowed in state %s: %w", m.CommandName(), a.GetState(), protosource.ErrStateNotAllowed)
+	}
+}
+func (m *SetOIDCConfig) EmitEvents(aggregate protosource.Aggregate) []protosource.Event {
+	b := NewBuilder(m.GetId(), aggregate.GetVersion())
+	b.OIDCConfigSet(m.GetActor(), m.GetConfig())
+	return b.Events
+}
+
+func (m *ClearOIDCConfig) CommandName() string {
+	return "ClearOIDCConfig"
+}
+
+func (m *ClearOIDCConfig) ProtoValidate() error {
+	if err := validator().Validate(m); err != nil {
+		return fmt.Errorf("command %s: %w: %w", m.CommandName(), protosource.ErrValidationFailed, err)
+	}
+	return nil
+}
+
+func (m *ClearOIDCConfig) ValidateVersion(version int64) error {
+	if version == 0 {
+		return fmt.Errorf("command %s requires an existing aggregate (version > 0), got version 0: %w", m.CommandName(), protosource.ErrNotCreatedYet)
+	}
+	return nil
+}
+func (m *ClearOIDCConfig) GuardState(aggregate protosource.Aggregate) error {
+	a := aggregate.(*Issuer)
+	switch a.GetState() {
+	case State_STATE_ACTIVE:
+		return nil
+	default:
+		return fmt.Errorf("command %s not allowed in state %s: %w", m.CommandName(), a.GetState(), protosource.ErrStateNotAllowed)
+	}
+}
+func (m *ClearOIDCConfig) EmitEvents(aggregate protosource.Aggregate) []protosource.Event {
+	b := NewBuilder(m.GetId(), aggregate.GetVersion())
+	b.OIDCConfigCleared(m.GetActor())
+	return b.Events
+}
+
 func (m *Registered) EventName() string {
 	return "Registered"
 }
 
-func (b *Builder) Registered(Actor string, Iss string, DisplayName string, Kind Kind, DefaultAlgorithm string, JwksUrl string) {
+func (b *Builder) Registered(Actor string, Iss string, DisplayName string, Kind Kind, DefaultAlgorithm string, JwksUrl string, InitialOidc *OIDCConfig) {
 	event := &Registered{
 		Id:               b.id,
 		Actor:            Actor,
@@ -514,6 +586,7 @@ func (b *Builder) Registered(Actor string, Iss string, DisplayName string, Kind 
 		Kind:             Kind,
 		DefaultAlgorithm: DefaultAlgorithm,
 		JwksUrl:          JwksUrl,
+		InitialOidc:      InitialOidc,
 
 		Version: b.nextVersion(),
 		At:      protosource.NowMicros(),
@@ -614,6 +687,37 @@ func (b *Builder) Deleted(Actor string) {
 	b.Events = append(b.Events, event)
 }
 
+func (m *OIDCConfigSet) EventName() string {
+	return "OIDCConfigSet"
+}
+
+func (b *Builder) OIDCConfigSet(Actor string, Config *OIDCConfig) {
+	event := &OIDCConfigSet{
+		Id:     b.id,
+		Actor:  Actor,
+		Config: Config,
+
+		Version: b.nextVersion(),
+		At:      protosource.NowMicros(),
+	}
+	b.Events = append(b.Events, event)
+}
+
+func (m *OIDCConfigCleared) EventName() string {
+	return "OIDCConfigCleared"
+}
+
+func (b *Builder) OIDCConfigCleared(Actor string) {
+	event := &OIDCConfigCleared{
+		Id:    b.id,
+		Actor: Actor,
+
+		Version: b.nextVersion(),
+		At:      protosource.NowMicros(),
+	}
+	b.Events = append(b.Events, event)
+}
+
 // State_Display maps each State value to a human-readable label.
 // The keyed-by-enum-type form gives a compile error if a new value is added
 // without updating the map.
@@ -631,4 +735,13 @@ var Kind_Display = map[Kind]string{
 	Kind_KIND_UNSPECIFIED: "Unspecified",
 	Kind_KIND_SELF:        "Self",
 	Kind_KIND_EXTERNAL:    "External",
+}
+
+// OIDCJITPolicy_Display maps each OIDCJITPolicy value to a human-readable label.
+// The keyed-by-enum-type form gives a compile error if a new value is added
+// without updating the map.
+var OIDCJITPolicy_Display = map[OIDCJITPolicy]string{
+	OIDCJITPolicy_JIT_REJECT:        "Jit Reject",
+	OIDCJITPolicy_JIT_AUTO_NO_ROLES: "Jit Auto No Roles",
+	OIDCJITPolicy_JIT_DOMAIN_RULE:   "Jit Domain Rule",
 }

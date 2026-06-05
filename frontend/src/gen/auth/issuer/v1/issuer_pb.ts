@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file auth/issuer/v1/issuer.proto.
  */
 export const file_auth_issuer_v1_issuer: GenFile = /*@__PURE__*/
-  fileDesc("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IAEoAxIKCgJhdBgDIAEoAxINCgVhY3RvchgEIAEoCToTilEQEg4SDFNUQVRFX0FDVElWRSJXCgdEZWxldGVkEgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSCgoCYXQYAyABKAMSDQoFYWN0b3IYBCABKAk6FIpRERIPEg1TVEFURV9ERUxFVEVEKloKBVN0YXRlEhUKEVNUQVRFX1VOU1BFQ0lGSUVEEAASEAoMU1RBVEVfQUNUSVZFEAESFQoRU1RBVEVfREVBQ1RJVkFURUQQAhIRCg1TVEFURV9ERUxFVEVEEAMqPgoES2luZBIUChBLSU5EX1VOU1BFQ0lGSUVEEAASDQoJS0lORF9TRUxGEAESEQoNS0lORF9FWFRFUk5BTBACQscBChJjb20uYXV0aC5pc3N1ZXIudjFCC0lzc3VlclByb3RvUAFaRWdpdGh1Yi5jb20vZnVuaW50aGVjbG91ZC9wcm90b3NvdXJjZS1hdXRoL2dlbi9hdXRoL2lzc3Vlci92MTtpc3N1ZXJ2MaICA0FJWKoCDkF1dGguSXNzdWVyLlYxygIOQXV0aFxJc3N1ZXJcVjHiAhpBdXRoXElzc3VlclxWMVxHUEJNZXRhZGF0YeoCEEF1dGg6Oklzc3Vlcjo6VjGSUQIIAWIGcHJvdG8z", [file_buf_validate_validate, file_funinthecloud_protosource_options_v1_options_v1]);
+  fileDesc("ChthdXRoL2lzc3Vlci92MS9pc3N1ZXIucHJvdG8SDmF1dGguaXNzdWVyLnYxIs4CCgZJc3N1ZXISCgoCaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxIaCgljcmVhdGVfYXQYAyABKANCB4JRBAoCCAYSEQoJY3JlYXRlX2J5GAQgASgJEhEKCW1vZGlmeV9hdBgFIAEoAxIRCgltb2RpZnlfYnkYBiABKAkSCwoDaXNzGAcgASgJEhQKDGRpc3BsYXlfbmFtZRgIIAEoCRIiCgRraW5kGAkgASgOMhQuYXV0aC5pc3N1ZXIudjEuS2luZBIZChFkZWZhdWx0X2FsZ29yaXRobRgKIAEoCRIQCghqd2tzX3VybBgLIAEoCRItCgVzdGF0ZRgMIAEoDjIVLmF1dGguaXNzdWVyLnYxLlN0YXRlQgeCUQQKAggFEigKBG9pZGMYDSABKAsyGi5hdXRoLmlzc3Vlci52MS5PSURDQ29uZmlnOgWKUQIaACIzCgpJc3N1ZXJMaXN0EiUKBWl0ZW1zGAEgAygLMhYuYXV0aC5pc3N1ZXIudjEuSXNzdWVyItYDCgpPSURDQ29uZmlnEhEKCWNsaWVudF9pZBgBIAEoCRIdChV3cmFwcGVkX2NsaWVudF9zZWNyZXQYAiABKAwSIgoaY2xpZW50X3NlY3JldF9rZXlfcHJvdmlkZXIYAyABKAkSJAocY2xpZW50X3NlY3JldF9tYXN0ZXJfa2V5X3JlZhgEIAEoCRIVCg1kaXNjb3ZlcnlfdXJsGAUgASgJEh4KFmF1dGhvcml6YXRpb25fZW5kcG9pbnQYBiABKAkSFgoOdG9rZW5fZW5kcG9pbnQYByABKAkSEAoIandrc191cmkYCCABKAkSGQoRYWxsb3dlZF9hdWRpZW5jZXMYCSADKAkSOwoJY2xhaW1fbWFwGAogAygLMiguYXV0aC5pc3N1ZXIudjEuT0lEQ0NvbmZpZy5DbGFpbU1hcEVudHJ5EjEKCmppdF9wb2xpY3kYCyABKA4yHS5hdXRoLmlzc3Vlci52MS5PSURDSklUUG9saWN5EhsKE2ppdF9kZWZhdWx0X3JvbGVfaWQYDCABKAkSEgoKaml0X2RvbWFpbhgNIAEoCRovCg1DbGFpbU1hcEVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEi6QEKCFJlZ2lzdGVyEgoKAmlkGAEgASgJEg0KBWFjdG9yGAIgASgJEhQKA2lzcxgDIAEoCUIHukgEcgIQARIUCgxkaXNwbGF5X25hbWUYBCABKAkSIgoEa2luZBgFIAEoDjIULmF1dGguaXNzdWVyLnYxLktpbmQSGQoRZGVmYXVsdF9hbGdvcml0aG0YBiABKAkSEAoIandrc191cmwYByABKAkSMAoMaW5pdGlhbF9vaWRjGAggASgLMhouYXV0aC5pc3N1ZXIudjEuT0lEQ0NvbmZpZzoTilEQCg4KClJlZ2lzdGVyZWQQASJiCgZSZW5hbWUSCgoCaWQYASABKAkSDQoFYWN0b3IYAiABKAkSHQoMZGlzcGxheV9uYW1lGAMgASgJQge6SARyAhABOh6KURsKGQoHUmVuYW1lZBACGgxTVEFURV9BQ1RJVkUigAEKE1NldERlZmF1bHRBbGdvcml0aG0SCgoCaWQYASABKAkSDQoFYWN0b3IYAiABKAkSIgoRZGVmYXVsdF9hbGdvcml0aG0YAyABKAlCB7pIBHICEAE6KopRJwolChNEZWZhdWx0QWxnb3JpdGhtU2V0EAIaDFNUQVRFX0FDVElWRSJcCgpTZXRKV0tTVVJMEgoKAmlkGAEgASgJEg0KBWFjdG9yGAIgASgJEhAKCGp3a3NfdXJsGAMgASgJOiGKUR4KHAoKSldLU1VSTFNldBACGgxTVEFURV9BQ1RJVkUiSwoKRGVhY3RpdmF0ZRIKCgJpZBgBIAEoCRINCgVhY3RvchgCIAEoCToiilEfCh0KC0RlYWN0aXZhdGVkEAIaDFNUQVRFX0FDVElWRSJQCgpSZWFjdGl2YXRlEgoKAmlkGAEgASgJEg0KBWFjdG9yGAIgASgJOieKUSQKIgoLUmVhY3RpdmF0ZWQQAhoRU1RBVEVfREVBQ1RJVkFURUQiVgoGRGVsZXRlEgoKAmlkGAEgASgJEg0KBWFjdG9yGAIgASgJOjGKUS4KLAoHRGVsZXRlZBACGgxTVEFURV9BQ1RJVkUaEVNUQVRFX0RFQUNUSVZBVEVEInwKDVNldE9JRENDb25maWcSCgoCaWQYASABKAkSDQoFYWN0b3IYAiABKAkSKgoGY29uZmlnGAMgASgLMhouYXV0aC5pc3N1ZXIudjEuT0lEQ0NvbmZpZzokilEhCh8KDU9JRENDb25maWdTZXQQAhoMU1RBVEVfQUNUSVZFIlYKD0NsZWFyT0lEQ0NvbmZpZxIKCgJpZBgBIAEoCRINCgVhY3RvchgCIAEoCTooilElCiMKEU9JRENDb25maWdDbGVhcmVkEAIaDFNUQVRFX0FDVElWRSL/AQoKUmVnaXN0ZXJlZBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJEgsKA2lzcxgFIAEoCRIUCgxkaXNwbGF5X25hbWUYBiABKAkSIgoEa2luZBgHIAEoDjIULmF1dGguaXNzdWVyLnYxLktpbmQSGQoRZGVmYXVsdF9hbGdvcml0aG0YCCABKAkSEAoIandrc191cmwYCSABKAkSMAoMaW5pdGlhbF9vaWRjGAogASgLMhouYXV0aC5pc3N1ZXIudjEuT0lEQ0NvbmZpZzoTilEQEg4SDFNUQVRFX0FDVElWRSJeCgdSZW5hbWVkEgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSCgoCYXQYAyABKAMSDQoFYWN0b3IYBCABKAkSFAoMZGlzcGxheV9uYW1lGAUgASgJOgWKUQISACJvChNEZWZhdWx0QWxnb3JpdGhtU2V0EgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSCgoCYXQYAyABKAMSDQoFYWN0b3IYBCABKAkSGQoRZGVmYXVsdF9hbGdvcml0aG0YBSABKAk6BYpRAhIAIl0KCkpXS1NVUkxTZXQSCgoCaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxIKCgJhdBgDIAEoAxINCgVhY3RvchgEIAEoCRIQCghqd2tzX3VybBgFIAEoCToFilECEgAiXwoLRGVhY3RpdmF0ZWQSCgoCaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxIKCgJhdBgDIAEoAxINCgVhY3RvchgEIAEoCToYilEVEhMSEVNUQVRFX0RFQUNUSVZBVEVEIloKC1JlYWN0aXZhdGVkEgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSCgoCYXQYAyABKAMSDQoFYWN0b3IYBCABKAk6E4pREBIOEgxTVEFURV9BQ1RJVkUiVwoHRGVsZXRlZBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJOhSKURESDxINU1RBVEVfREVMRVRFRCJ6Cg1PSURDQ29uZmlnU2V0EgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSCgoCYXQYAyABKAMSDQoFYWN0b3IYBCABKAkSKgoGY29uZmlnGAUgASgLMhouYXV0aC5pc3N1ZXIudjEuT0lEQ0NvbmZpZzoFilECEgAiUgoRT0lEQ0NvbmZpZ0NsZWFyZWQSCgoCaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxIKCgJhdBgDIAEoAxINCgVhY3RvchgEIAEoCToFilECEgAqWgoFU3RhdGUSFQoRU1RBVEVfVU5TUEVDSUZJRUQQABIQCgxTVEFURV9BQ1RJVkUQARIVChFTVEFURV9ERUFDVElWQVRFRBACEhEKDVNUQVRFX0RFTEVURUQQAyo+CgRLaW5kEhQKEEtJTkRfVU5TUEVDSUZJRUQQABINCglLSU5EX1NFTEYQARIRCg1LSU5EX0VYVEVSTkFMEAIqSwoNT0lEQ0pJVFBvbGljeRIOCgpKSVRfUkVKRUNUEAASFQoRSklUX0FVVE9fTk9fUk9MRVMQARITCg9KSVRfRE9NQUlOX1JVTEUQAkLHAQoSY29tLmF1dGguaXNzdWVyLnYxQgtJc3N1ZXJQcm90b1ABWkVnaXRodWIuY29tL2Z1bmludGhlY2xvdWQvcHJvdG9zb3VyY2UtYXV0aC9nZW4vYXV0aC9pc3N1ZXIvdjE7aXNzdWVydjGiAgNBSViqAg5BdXRoLklzc3Vlci5WMcoCDkF1dGhcSXNzdWVyXFYx4gIaQXV0aFxJc3N1ZXJcVjFcR1BCTWV0YWRhdGHqAhBBdXRoOjpJc3N1ZXI6OlYxklECCAFiBnByb3RvMw", [file_buf_validate_validate, file_funinthecloud_protosource_options_v1_options_v1]);
 
 /**
  * Issuer represents a JWT issuer — either this service (KIND_SELF) or a
@@ -81,6 +81,16 @@ export type Issuer = Message<"auth.issuer.v1.Issuer"> & {
    * @generated from field: auth.issuer.v1.State state = 12;
    */
   state: State;
+
+  /**
+   * oidc is populated only for KIND_EXTERNAL. It is ignored (and should be
+   * left unset) for KIND_SELF. The wrapped secret and provider metadata
+   * are set by the hand-written configurator (never directly via raw
+   * commands from untrusted callers).
+   *
+   * @generated from field: auth.issuer.v1.OIDCConfig oidc = 13;
+   */
+  oidc?: OIDCConfig | undefined;
 };
 
 /**
@@ -106,6 +116,105 @@ export type IssuerList = Message<"auth.issuer.v1.IssuerList"> & {
  */
 export const IssuerListSchema: GenMessage<IssuerList> = /*@__PURE__*/
   messageDesc(file_auth_issuer_v1_issuer, 1);
+
+/**
+ * OIDCConfig holds the client configuration for a KIND_EXTERNAL issuer
+ * (Google, Entra, Auth0, peer, ...). The client_secret is envelope-encrypted
+ * via a KeyProvider exactly like signing-key private material (see Key
+ * aggregate: wrapped_private + key_provider + master_key_ref). Plaintext
+ * secret exists only transiently in the hand-written OIDC configurator and
+ * in the per-process decrypt cache for the PKCE callback path.
+ *
+ * Either supply discovery_url (we will fetch the three endpoints at runtime)
+ * or pin the three endpoints explicitly. claim_map tells us which IdP claims
+ * to use for local identity (e.g. "email_at_link" -> "email").
+ * jit_* fields drive the per-IdP JIT policy (default REJECT).
+ *
+ * @generated from message auth.issuer.v1.OIDCConfig
+ */
+export type OIDCConfig = Message<"auth.issuer.v1.OIDCConfig"> & {
+  /**
+   * @generated from field: string client_id = 1;
+   */
+  clientId: string;
+
+  /**
+   * @generated from field: bytes wrapped_client_secret = 2;
+   */
+  wrappedClientSecret: Uint8Array;
+
+  /**
+   * @generated from field: string client_secret_key_provider = 3;
+   */
+  clientSecretKeyProvider: string;
+
+  /**
+   * @generated from field: string client_secret_master_key_ref = 4;
+   */
+  clientSecretMasterKeyRef: string;
+
+  /**
+   * discovery_url takes precedence if set; the three explicit endpoints
+   * are fallbacks for providers that don't publish discovery or for pinning.
+   *
+   * @generated from field: string discovery_url = 5;
+   */
+  discoveryUrl: string;
+
+  /**
+   * @generated from field: string authorization_endpoint = 6;
+   */
+  authorizationEndpoint: string;
+
+  /**
+   * @generated from field: string token_endpoint = 7;
+   */
+  tokenEndpoint: string;
+
+  /**
+   * for ID token signature verification in /oauth/callback
+   *
+   * @generated from field: string jwks_uri = 8;
+   */
+  jwksUri: string;
+
+  /**
+   * @generated from field: repeated string allowed_audiences = 9;
+   */
+  allowedAudiences: string[];
+
+  /**
+   * claim_map keys are our internal names (e.g. "email_at_link", "display_name");
+   * values are the claim names in the IdP ID token (e.g. "email", "name").
+   *
+   * @generated from field: map<string, string> claim_map = 10;
+   */
+  claimMap: { [key: string]: string };
+
+  /**
+   * @generated from field: auth.issuer.v1.OIDCJITPolicy jit_policy = 11;
+   */
+  jitPolicy: OIDCJITPolicy;
+
+  /**
+   * @generated from field: string jit_default_role_id = 12;
+   */
+  jitDefaultRoleId: string;
+
+  /**
+   * for JIT_DOMAIN_RULE, e.g. "example.com" or ".corp.example.com"
+   *
+   * @generated from field: string jit_domain = 13;
+   */
+  jitDomain: string;
+};
+
+/**
+ * Describes the message auth.issuer.v1.OIDCConfig.
+ * Use `create(OIDCConfigSchema)` to create a new message.
+ */
+export const OIDCConfigSchema: GenMessage<OIDCConfig> = /*@__PURE__*/
+  messageDesc(file_auth_issuer_v1_issuer, 2);
 
 /**
  * @generated from message auth.issuer.v1.Register
@@ -145,6 +254,17 @@ export type Register = Message<"auth.issuer.v1.Register"> & {
    * @generated from field: string jwks_url = 7;
    */
   jwksUrl: string;
+
+  /**
+   * initial_oidc may be supplied when creating a KIND_EXTERNAL issuer so
+   * the OIDC client config (including wrapped secret) is set atomically
+   * with registration. For KIND_SELF it must be unset. The secret (if
+   * present) must already be wrapped by the caller (see service configurator
+   * or mgr helper); the raw command path does not perform encryption.
+   *
+   * @generated from field: auth.issuer.v1.OIDCConfig initial_oidc = 8;
+   */
+  initialOidc?: OIDCConfig | undefined;
 };
 
 /**
@@ -152,7 +272,7 @@ export type Register = Message<"auth.issuer.v1.Register"> & {
  * Use `create(RegisterSchema)` to create a new message.
  */
 export const RegisterSchema: GenMessage<Register> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 2);
+  messageDesc(file_auth_issuer_v1_issuer, 3);
 
 /**
  * @generated from message auth.issuer.v1.Rename
@@ -179,7 +299,7 @@ export type Rename = Message<"auth.issuer.v1.Rename"> & {
  * Use `create(RenameSchema)` to create a new message.
  */
 export const RenameSchema: GenMessage<Rename> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 3);
+  messageDesc(file_auth_issuer_v1_issuer, 4);
 
 /**
  * @generated from message auth.issuer.v1.SetDefaultAlgorithm
@@ -206,7 +326,7 @@ export type SetDefaultAlgorithm = Message<"auth.issuer.v1.SetDefaultAlgorithm"> 
  * Use `create(SetDefaultAlgorithmSchema)` to create a new message.
  */
 export const SetDefaultAlgorithmSchema: GenMessage<SetDefaultAlgorithm> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 4);
+  messageDesc(file_auth_issuer_v1_issuer, 5);
 
 /**
  * @generated from message auth.issuer.v1.SetJWKSURL
@@ -233,7 +353,7 @@ export type SetJWKSURL = Message<"auth.issuer.v1.SetJWKSURL"> & {
  * Use `create(SetJWKSURLSchema)` to create a new message.
  */
 export const SetJWKSURLSchema: GenMessage<SetJWKSURL> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 5);
+  messageDesc(file_auth_issuer_v1_issuer, 6);
 
 /**
  * @generated from message auth.issuer.v1.Deactivate
@@ -255,7 +375,7 @@ export type Deactivate = Message<"auth.issuer.v1.Deactivate"> & {
  * Use `create(DeactivateSchema)` to create a new message.
  */
 export const DeactivateSchema: GenMessage<Deactivate> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 6);
+  messageDesc(file_auth_issuer_v1_issuer, 7);
 
 /**
  * @generated from message auth.issuer.v1.Reactivate
@@ -277,7 +397,7 @@ export type Reactivate = Message<"auth.issuer.v1.Reactivate"> & {
  * Use `create(ReactivateSchema)` to create a new message.
  */
 export const ReactivateSchema: GenMessage<Reactivate> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 7);
+  messageDesc(file_auth_issuer_v1_issuer, 8);
 
 /**
  * @generated from message auth.issuer.v1.Delete
@@ -299,7 +419,64 @@ export type Delete = Message<"auth.issuer.v1.Delete"> & {
  * Use `create(DeleteSchema)` to create a new message.
  */
 export const DeleteSchema: GenMessage<Delete> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 8);
+  messageDesc(file_auth_issuer_v1_issuer, 9);
+
+/**
+ * SetOIDCConfig (and its symmetric Clear) let operators configure or
+ * rotate the OIDC client credentials + policy for an existing
+ * KIND_EXTERNAL issuer without re-creating the aggregate. The command
+ * must only be issued by trusted actors (mgr CLI, admin UI, bootstrap);
+ * the wrapped secret bytes are produced by a KeyProvider.Encrypt call in
+ * the hand-written layer (service/oidcconfig or equivalent) before the
+ * command is built.
+ *
+ * @generated from message auth.issuer.v1.SetOIDCConfig
+ */
+export type SetOIDCConfig = Message<"auth.issuer.v1.SetOIDCConfig"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string actor = 2;
+   */
+  actor: string;
+
+  /**
+   * @generated from field: auth.issuer.v1.OIDCConfig config = 3;
+   */
+  config?: OIDCConfig | undefined;
+};
+
+/**
+ * Describes the message auth.issuer.v1.SetOIDCConfig.
+ * Use `create(SetOIDCConfigSchema)` to create a new message.
+ */
+export const SetOIDCConfigSchema: GenMessage<SetOIDCConfig> = /*@__PURE__*/
+  messageDesc(file_auth_issuer_v1_issuer, 10);
+
+/**
+ * @generated from message auth.issuer.v1.ClearOIDCConfig
+ */
+export type ClearOIDCConfig = Message<"auth.issuer.v1.ClearOIDCConfig"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string actor = 2;
+   */
+  actor: string;
+};
+
+/**
+ * Describes the message auth.issuer.v1.ClearOIDCConfig.
+ * Use `create(ClearOIDCConfigSchema)` to create a new message.
+ */
+export const ClearOIDCConfigSchema: GenMessage<ClearOIDCConfig> = /*@__PURE__*/
+  messageDesc(file_auth_issuer_v1_issuer, 11);
 
 /**
  * @generated from message auth.issuer.v1.Registered
@@ -349,6 +526,15 @@ export type Registered = Message<"auth.issuer.v1.Registered"> & {
    * @generated from field: string jwks_url = 9;
    */
   jwksUrl: string;
+
+  /**
+   * initial_oidc is echoed from the Register command when the issuer was
+   * created as KIND_EXTERNAL with OIDC config. Stored in the aggregate
+   * snapshot via On(Registered).
+   *
+   * @generated from field: auth.issuer.v1.OIDCConfig initial_oidc = 10;
+   */
+  initialOidc?: OIDCConfig | undefined;
 };
 
 /**
@@ -356,7 +542,7 @@ export type Registered = Message<"auth.issuer.v1.Registered"> & {
  * Use `create(RegisteredSchema)` to create a new message.
  */
 export const RegisteredSchema: GenMessage<Registered> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 9);
+  messageDesc(file_auth_issuer_v1_issuer, 12);
 
 /**
  * @generated from message auth.issuer.v1.Renamed
@@ -393,7 +579,7 @@ export type Renamed = Message<"auth.issuer.v1.Renamed"> & {
  * Use `create(RenamedSchema)` to create a new message.
  */
 export const RenamedSchema: GenMessage<Renamed> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 10);
+  messageDesc(file_auth_issuer_v1_issuer, 13);
 
 /**
  * @generated from message auth.issuer.v1.DefaultAlgorithmSet
@@ -430,7 +616,7 @@ export type DefaultAlgorithmSet = Message<"auth.issuer.v1.DefaultAlgorithmSet"> 
  * Use `create(DefaultAlgorithmSetSchema)` to create a new message.
  */
 export const DefaultAlgorithmSetSchema: GenMessage<DefaultAlgorithmSet> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 11);
+  messageDesc(file_auth_issuer_v1_issuer, 14);
 
 /**
  * @generated from message auth.issuer.v1.JWKSURLSet
@@ -467,7 +653,7 @@ export type JWKSURLSet = Message<"auth.issuer.v1.JWKSURLSet"> & {
  * Use `create(JWKSURLSetSchema)` to create a new message.
  */
 export const JWKSURLSetSchema: GenMessage<JWKSURLSet> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 12);
+  messageDesc(file_auth_issuer_v1_issuer, 15);
 
 /**
  * @generated from message auth.issuer.v1.Deactivated
@@ -499,7 +685,7 @@ export type Deactivated = Message<"auth.issuer.v1.Deactivated"> & {
  * Use `create(DeactivatedSchema)` to create a new message.
  */
 export const DeactivatedSchema: GenMessage<Deactivated> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 13);
+  messageDesc(file_auth_issuer_v1_issuer, 16);
 
 /**
  * @generated from message auth.issuer.v1.Reactivated
@@ -531,7 +717,7 @@ export type Reactivated = Message<"auth.issuer.v1.Reactivated"> & {
  * Use `create(ReactivatedSchema)` to create a new message.
  */
 export const ReactivatedSchema: GenMessage<Reactivated> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 14);
+  messageDesc(file_auth_issuer_v1_issuer, 17);
 
 /**
  * @generated from message auth.issuer.v1.Deleted
@@ -563,7 +749,76 @@ export type Deleted = Message<"auth.issuer.v1.Deleted"> & {
  * Use `create(DeletedSchema)` to create a new message.
  */
 export const DeletedSchema: GenMessage<Deleted> = /*@__PURE__*/
-  messageDesc(file_auth_issuer_v1_issuer, 15);
+  messageDesc(file_auth_issuer_v1_issuer, 18);
+
+/**
+ * @generated from message auth.issuer.v1.OIDCConfigSet
+ */
+export type OIDCConfigSet = Message<"auth.issuer.v1.OIDCConfigSet"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: int64 version = 2;
+   */
+  version: bigint;
+
+  /**
+   * @generated from field: int64 at = 3;
+   */
+  at: bigint;
+
+  /**
+   * @generated from field: string actor = 4;
+   */
+  actor: string;
+
+  /**
+   * @generated from field: auth.issuer.v1.OIDCConfig config = 5;
+   */
+  config?: OIDCConfig | undefined;
+};
+
+/**
+ * Describes the message auth.issuer.v1.OIDCConfigSet.
+ * Use `create(OIDCConfigSetSchema)` to create a new message.
+ */
+export const OIDCConfigSetSchema: GenMessage<OIDCConfigSet> = /*@__PURE__*/
+  messageDesc(file_auth_issuer_v1_issuer, 19);
+
+/**
+ * @generated from message auth.issuer.v1.OIDCConfigCleared
+ */
+export type OIDCConfigCleared = Message<"auth.issuer.v1.OIDCConfigCleared"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: int64 version = 2;
+   */
+  version: bigint;
+
+  /**
+   * @generated from field: int64 at = 3;
+   */
+  at: bigint;
+
+  /**
+   * @generated from field: string actor = 4;
+   */
+  actor: string;
+};
+
+/**
+ * Describes the message auth.issuer.v1.OIDCConfigCleared.
+ * Use `create(OIDCConfigClearedSchema)` to create a new message.
+ */
+export const OIDCConfigClearedSchema: GenMessage<OIDCConfigCleared> = /*@__PURE__*/
+  messageDesc(file_auth_issuer_v1_issuer, 20);
 
 /**
  * @generated from enum auth.issuer.v1.State
@@ -616,6 +871,9 @@ export enum Kind {
   /**
    * KIND_EXTERNAL issuers are JWTs we only verify (Google, Auth0, peer
    * services). We keep jwks_url or a pinned public key, never a private.
+   * For KIND_EXTERNAL, populate the embedded oidc (client_id + wrapped
+   * client_secret via KeyProvider, endpoints or discovery_url, claim_map,
+   * per-IdP JIT policy). See OIDCConfig.
    *
    * @generated from enum value: KIND_EXTERNAL = 2;
    */
@@ -627,4 +885,46 @@ export enum Kind {
  */
 export const KindSchema: GenEnum<Kind> = /*@__PURE__*/
   enumDesc(file_auth_issuer_v1_issuer, 1);
+
+/**
+ * OIDCJITPolicy controls just-in-time user provisioning behavior when an
+ * external IdP returns a successful authentication for a subject that has
+ * no prior LinkedIdentity under this issuer.
+ *
+ * @generated from enum auth.issuer.v1.OIDCJITPolicy
+ */
+export enum OIDCJITPolicy {
+  /**
+   * JIT_REJECT (default): do not create a User; return an error to the
+   * federation callback. Admin must pre-create the User + link (or use
+   * mgr / future admin UI).
+   *
+   * @generated from enum value: JIT_REJECT = 0;
+   */
+  JIT_REJECT = 0,
+
+  /**
+   * JIT_AUTO_NO_ROLES: create a new User (no password_hash) + LinkedIdentity
+   * automatically. No roles granted by default — admin assigns via Role
+   * grants afterward.
+   *
+   * @generated from enum value: JIT_AUTO_NO_ROLES = 1;
+   */
+  JIT_AUTO_NO_ROLES = 1,
+
+  /**
+   * JIT_DOMAIN_RULE: if the email_at_link (per claim_map) domain matches
+   * jit_domain (exact or suffix match), create the User and assign
+   * jit_default_role_id. Otherwise reject. Enables "anyone @corp.com gets X".
+   *
+   * @generated from enum value: JIT_DOMAIN_RULE = 2;
+   */
+  JIT_DOMAIN_RULE = 2,
+}
+
+/**
+ * Describes the enum auth.issuer.v1.OIDCJITPolicy.
+ */
+export const OIDCJITPolicySchema: GenEnum<OIDCJITPolicy> = /*@__PURE__*/
+  enumDesc(file_auth_issuer_v1_issuer, 2);
 

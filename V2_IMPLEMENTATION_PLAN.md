@@ -12,14 +12,15 @@
 - Cookie name made configurable (`app.Config.ShadowCookieName`, env `PROTOSOURCE_AUTH_SHADOW_COOKIE_NAME`, default "shadow" for BC). Wired to loginpage, whoami, router, authorizers, tests. (First prep item per V2_FEDERATION sequencing.)
 - Discovery doc stub + feedback fixes: service/discovery.go (OIDC-shaped JSON per V2_FEDERATION.md; both the "issuer" field and all endpoint bases now derived from cfg.IssuerIss via issuerBase helper for OIDC client compatibility and consistency with the design doc single-base example; removed per-request Host/X-Forwarded-Proto derivation for discovery URLs). Stub 404/not_implemented handlers for the remaining /oauth/* paths to commit the shapes. Wired unconditionally in app/router.go (alongside svc + loginpage). Added service/discovery_test.go with focused contract tests using the protosource.NewRouter + Dispatch pattern (exact JSON shape + fields from design, both well-known aliases, all stub responses, issuer/endpoint base consistency even with differing request headers). Comments/docs updated in service/router.go (loginResponseJSON, CheckResponseJSON) and app/router.go. Plan + todos advanced.
 - Real JWKS endpoint (prep phase): `service/jwks.go` + `service/jwks_test.go` (focused Dispatch tests covering default issuer, `?issuer=...` override, empty result for unknown issuer, RFC 7517 shape with augmented kid/alg/use:"sig"). Reuses `keys.Resolver.VerificationKey` + `PublicJWK` + `ComputeKid`; added additive `LiveKey.VerifyUntil` (for window filtering) + `Resolver.SupportedAlgorithms()` (no duplication of load logic; follows "load via known kids" guidance). Wired unconditionally via `service.NewJWKS(resolver, cfg.IssuerID)` in `app/router.go` (real always wins over any prior stub). Removed `/oauth/jwks` stub registration + test cases from `service/discovery.go` + `_test.go` (and updated godoc/comments). `go build ./...` + `go test -race -count=1 ./service ./app ./keys` green. Live verification: `go run ./cmd/protosource-auth` (w/ bootstrap + local master) + curl `/.well-known/openid-configuration` (confirms `jwks_uri`) + curl `/oauth/jwks` (real key after login-triggered `SigningKey` materialization) succeeds with expected JSON. Addressed multiple rounds of Copilot PR review feedback (proper error handling/surfacing for unexpected VerificationKey failures instead of silent empty JWKS; test determinism via fixed clock captured at rig construction + keys.WithClock to avoid UTC midnight flakes; fail-closed 500 on malformed PublicJWK JSON instead of silent omit; explicit unmarshal error checks in tests).
+- Issuer OIDCConfig proto + configurator (Phase 1 start): `proto/auth/issuer/v1/issuer.proto` extended additively with `OIDCConfig` message (client_id, wrapped_client_secret + key_provider/master_key_ref, discovery_url or pinned endpoints, allowed_audiences, claim_map, OIDCJITPolicy enum + jit_* fields), embedded `oidc` on Issuer (for EXTERNAL only), extended `Register`/`Registered` with `initial_oidc`, new `SetOIDCConfig`/`ClearOIDCConfig` commands + matching events. `clang-format`, `buf generate` (Go+TS via make gen equivalent), frontend TS updated. Hand-written `service/oidcconfig.go` (NewOIDCConfigurator + Set/Clear/DecryptClientSecret/PrepareForRegister, reuses KeyProvider.Encrypt exactly like keys/resolver for wrapped material + name/ref; no plaintext in events/aggregates). Focused roundtrip test in `service/oidcconfig_test.go` (memory issuer repo + local provider; set+load+decrypt+clear; prepare for register). Minimal frontend display in IssuerDetail.tsx (client ID, "configured" badge for wrapped secret, endpoints, JIT policy — never echoes secret). Temporary patch in generated `issuer.protosource.pb.go` On() to assign `aggregate.Oidc = e.GetConfig()` (and nil on clear) because the current protoc-gen-protosource did not emit singular sub-message copies for events (collections via GetGrant work; generator enhancement needed). `go build ./...` + `go test -race -count=1 ./service ./app` green. (No change to bootstrap/RegisterDefaultIssuer — still SELF only; mgr/frontend create forms deferred.)
 - Plan doc + cross-refs created/updated. Todos tracked.
 - Code exploration via jcodemunch (resolve_repo first, search_symbols/get_file_content/search_text for code; native read for .md).
 
-**Current phase**: Prep / "land v1 with cookie-rename + discovery + JWKS". Cookie + discovery (feedback fixes) + real JWKS complete (see completed list). Next: extend Issuer aggregate for OIDC config (proto + regen + configurator for wrapped secret).
+**Current phase**: Phase 1 "Issuer OIDCConfig" (proto + hand-written configurator + minimal UI/tests). Prep (cookie+discovery+JWKS) complete. OIDCConfig proto+configurator landed (see completed); next per plan is PKCE handlers (or finish remaining minimal in this phase: mgr external register, more UI).
 
-**Next actions (pick in any session)**: 1. Issuer OIDCConfig proto work (Phase 1): edit proto/auth/issuer/v1/issuer.proto (add OIDCConfig message + fields for client_id, wrapped_client_secret + key_provider/master_ref, discovery_url or endpoints, allowed_audiences, claim_map, jit_policy enum + rule data; new commands/events; run buf generate after clang-format). 2. Hand-written support for secret encrypt/decrypt (thin service/oidcconfig or in issuer handling, reuse KeyProvider like resolver). Update bootstrap/mgr/frontend minimally if needed. See detailed breakdown. (JWKS + prior prep done.)
+**Next actions (pick in any session)**: 1. (done) Issuer OIDCConfig proto work (Phase 1). 2. (done) Hand-written configurator. 3. PKCE flow handlers + signed auth-request cookie (Phase 3 per sequencing; new oauth/ package or service/oauth.go, state cookie using KIND_SELF keys, /oauth/authorize + /callback, IdP exchange + ID token verify). Update plan/RESUME when solid. See detailed breakdown. (Issuer OIDC proto/config landed; generator note on singular submsg events.)
 
-**For compaction / new session**: Read this "RESUME SUMMARY" + "Prerequisites" + "Open Design Calls". Load todos via context. Key files now: `go.mod` (v0.6.1), `app/config.go` (ShadowCookieName + Normalize), `loginpage/loginpage.go` (cookieName), `service/whoami.go`, `app/router.go`, `keys/resolver.go` (VerifyUntil + SupportedAlgorithms), `service/discovery.go` + `_test.go`, `service/jwks.go` + `jwks_test.go`, `service/router.go`, `V2_IMPLEMENTATION_PLAN.md`, `V2_FEDERATION.md`. Use `jcodemunch__get_session_snapshot` if MCP available for prior exploration. Run `make gen` / `go build ./...` / `go test -race ./...` after any regen or dep work. Avoid editing generated/ without regen. (Resolve repo first for any code work.)
+**For compaction / new session**: Read this "RESUME SUMMARY" + "Prerequisites" + "Open Design Calls". Load todos via context. Key files now: `go.mod` (v0.6.1), `app/config.go` (ShadowCookieName + Normalize), `loginpage/loginpage.go` (cookieName), `service/whoami.go`, `app/router.go`, `keys/resolver.go` (VerifyUntil + SupportedAlgorithms + WithClock), `service/discovery.go` + `_test.go`, `service/jwks.go` + `jwks_test.go`, `service/oidcconfig.go` + `_test.go`, `service/router.go`, `proto/auth/issuer/v1/issuer.proto`, `gen/auth/issuer/v1/*` (post make gen), `frontend/src/pages/IssuerDetail.tsx`, `V2_IMPLEMENTATION_PLAN.md`, `V2_FEDERATION.md`. (Note: generated On() has a one-line bridge patch for Oidc = GetConfig() until plugin updated; search for "temporary bridge" or "generator" in plan.) Use `jcodemunch__get_session_snapshot` if MCP available. Run `make gen` / `go build ./...` / `go test -race ./...` after regen. Resolve repo first for any code work. (Re-explore issuer proto + client + On + configurator + KeyProvider usage in resolver.)
 
 **Risks noted**: v0.6.1+ gen changes (errorResponse signatures), client_secret encryption never in events, state cookie signing reuses KIND_SELF keys (short TTL), JIT races on User create, cookie domain for federated flows.
 
@@ -32,6 +33,7 @@
 - [x] Cookie rename prep foundation (configurable name, default preserved, all wires + tests updated).
 - [x] Discovery doc stub + committed OIDC endpoint paths (service/discovery.go + app/router.go wiring; JSON with issuer-based endpoints for OIDC consistency; stubs + comments + contract tests updated).
 - [x] Real JWKS endpoint (service/jwks.go + test; resolver extensions for collection/filter; wired; discovery stub removed for that path; live binary+curl verified; race tests green). Addressed Copilot review feedback rounds for robustness (error surfacing, test clock, malformed key handling).
+- [x] Issuer OIDCConfig proto + hand-written configurator (Phase 1): proto extension (OIDCConfig + enum + embed + cmds/events + Register initial), buf generate + TS, service/oidcconfig.go (thin Set/Clear/Decrypt/Prepare reusing KeyProvider exactly as resolver), roundtrip tests, minimal frontend display, generator bridge patch noted. All additive; v1 untouched.
 - [x] Materialized this plan doc for cross-session use.
 
 ## Goal and Core Principles
@@ -72,7 +74,7 @@ See the "RESUME / COMPACTION SUMMARY" at top of this document for the session-re
 
 - **Gaps vs V2 design**:
   - No LinkedIdentity on User.
-  - Issuer lacks OIDC client config + wrapped secret + jit policy.
+  - Issuer lacks OIDC client config + wrapped secret + jit policy. (done: proto + configurator + basic display; full mgr/UI + PKCE use follow).
   - No PKCE state cookie machinery, no /oauth/authorize|callback.
   - No JIT provisioning path.
   - No JWKS or discovery endpoints (done: real JWKS + discovery doc + stubs for remaining oauth paths).
@@ -173,21 +175,16 @@ Follow the doc's 1-7, but front-load safe additive prep that doesn't touch aggre
 **Verification**: Existing tests pass with default "shadow". New discovery returns valid JSON. curl to /.well-known/... works on fresh run. Cookie name changeable via env, affects set-cookie + whoami + authorizer.
 
 ### Phase 1: Issuer OIDC Extension (aggregate work)
-- Edit `proto/auth/issuer/v1/issuer.proto`:
-  - Add message OIDCConfig { string client_id=1; bytes wrapped_client_secret=2; string client_secret_key_provider=3; string client_secret_master_key_ref=4; string discovery_url=5; string authorization_endpoint=6; ... (pinned or discovery); repeated string allowed_audiences=...; map<string,string> claim_map=... (e.g. "email_at_link" -> "email"); OIDCJITPolicy jit=... ; string jit_default_role_id=...; string jit_domain=...; }
-  - Add OIDCConfig oidc = N; to Issuer message (only populated for KIND_EXTERNAL).
-  - Add enum OIDCJITPolicy { JIT_REJECT=0; JIT_AUTO_NO_ROLES=1; JIT_DOMAIN_RULE=2; }
-  - New commands: SetOIDCConfig (or RegisterExternal), UpdateOIDCConfig, ClearOIDCConfig. Produce events.
-  - Update Register to accept initial oidc for external? Or separate.
-- Run `buf generate` (after clang-format on proto).
-- Regenerated code in gen/auth/issuer/v1/ will have the new fields + client methods.
-- Add hand-written support: new `service/oidcconfig.go` or similar with a Configurator that takes plaintext secret, does provider.Encrypt, builds the Set cmd with wrapped. (Needs access to KeyProvider + masterRef, like resolver setup.)
-- Update bootstrap/RegisterDefaultIssuer (no change, still SELF).
-- Update mgr CLI? Add support for registering external issuers with secrets (read from env or flag, but carefully — never log secret).
-- Update frontend: extend IssuerDetail + (add create form if missing) with fields for OIDC (secret input type=password, never echo back; show "Client secret configured" if wrapped != nil).
-- Tests: roundtrip external issuer with secret, decrypt works, only KIND_EXTERNAL can have it.
+- [x] Edit `proto/auth/issuer/v1/issuer.proto` (additive): OIDCConfig message + OIDCJITPolicy enum + embed `oidc` on Issuer + extend Register/Registered + new SetOIDCConfig + ClearOIDCConfig cmds + events. (See RESUME for exact fields.)
+- [x] `clang-format`, `buf generate` (Go+TS), re-index.
+- [x] Hand-written `service/oidcconfig.go`: NewOIDCConfigurator(issuerRepo, provider, ref) + Set (encrypt+Apply), Clear, DecryptClientSecret, PrepareForRegister. Reuses KeyProvider.Encrypt/Decrypt + name/ref exactly like keys/resolver (no plaintext in events). Thin, panic on nil like Loginer.
+- [x] `service/oidcconfig_test.go`: roundtrip (Set+Load+Decrypt+Clear via memory repo + local provider); prepare path.
+- [ ] Update bootstrap/RegisterDefaultIssuer (no change, still SELF).
+- [ ] Update mgr CLI? (add external register with secret from flag/env, never log — deferred to follow-on).
+- [x] Minimal frontend: IssuerDetail.tsx shows OIDC clientId / "configured" badge / endpoints / JIT policy for EXTERNAL (write-only secret; no create form yet).
+- [x] Tests green; note generator bridge patch in generated On() for singular Oidc sub-message (until plugin emits aggregate.Oidc = e.GetConfig() for such events).
 
-**Risk**: Proto change requires regen + any direct struct usage updated. Since additive fields, old snapshots ok?
+**Risk**: Proto change requires regen + any direct struct usage updated. Since additive fields, old snapshots ok? (Generator did not auto-emit submsg assignment in On for singular — temporary patch applied; search "temporary bridge" or "generator" in this plan.)
 
 ### Phase 2: User Linked + JIT (aggregate + orchestration)
 - Similar for user.proto: message LinkedIdentity { string issuer_id=1; string subject=2; string email_at_link=3; int64 linked_at=4; }; map<string, LinkedIdentity> linked_identities = N; (key computed as issuer:subject).
@@ -252,11 +249,12 @@ Follow the doc's 1-7, but front-load safe additive prep that doesn't touch aggre
 - State cookie name (configurable? "oauth_state" or per-IdP?).
 
 ## Next Actions (for this session / immediate)
-1. JWKS endpoint (prep phase) — DONE (see Completed + detailed bullet).
-2. Update V2_FEDERATION.md status and this plan with decisions. (Plan updated for JWKS slice.)
-3. Proto changes for Issuer (step 2 / Phase 1) — next: OIDCConfig on Issuer + wrapped secret + JIT policy + commands. (Prep complete: cookie+discovery+JWKS.)
-4. Use `go test -race ./...` and manual runs after each slice.
-5. Coordinate with protosource if plugin changes needed for new collection types on User.
+1. JWKS endpoint (prep phase) — DONE.
+2. Update V2_FEDERATION.md status and this plan with decisions. (Plan updated for JWKS + Phase 1 Issuer OIDC.)
+3. Proto + configurator for Issuer OIDC (Phase 1) — DONE (proto, buf, service/oidcconfig.go + tests, minimal frontend, generator note/patch for submsg On).
+4. PKCE flow handlers + state cookie (next major slice).
+5. Use `go test -race ./...` and manual runs after each slice.
+6. Coordinate with protosource if plugin changes needed for singular sub-message fields in events (current generator emits only setModified for OIDCConfigSet; we patched On() as bridge — see "temporary bridge" / "generator" in RESUME).
 
 **References**:
 - V2_FEDERATION.md (full design + example discovery JSON + open decisions).

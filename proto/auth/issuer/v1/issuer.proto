@@ -24,6 +24,9 @@ enum Kind {
   KIND_SELF = 1;
   // KIND_EXTERNAL issuers are JWTs we only verify (Google, Auth0, peer
   // services). We keep jwks_url or a pinned public key, never a private.
+  // For KIND_EXTERNAL, populate the embedded oidc (client_id + wrapped
+  // client_secret via KeyProvider, endpoints or discovery_url, claim_map,
+  // per-IdP JIT policy). See OIDCConfig.
   KIND_EXTERNAL = 2;
 }
 
@@ -45,10 +48,66 @@ message Issuer {
   string default_algorithm = 10;
   string jwks_url          = 11;
   State  state             = 12 [(funinthecloud.protosource.options.v1.protosource_opaque_field) = { attributes: [ { type: OPAQUE_KEY_TYPE_GSI2PK } ] }];
+  // oidc is populated only for KIND_EXTERNAL. It is ignored (and should be
+  // left unset) for KIND_SELF. The wrapped secret and provider metadata
+  // are set by the hand-written configurator (never directly via raw
+  // commands from untrusted callers).
+  OIDCConfig oidc = 13;
 }
 
 message IssuerList {
   repeated Issuer items = 1;
+}
+
+// OIDCJITPolicy controls just-in-time user provisioning behavior when an
+// external IdP returns a successful authentication for a subject that has
+// no prior LinkedIdentity under this issuer.
+enum OIDCJITPolicy {
+  // JIT_REJECT (default): do not create a User; return an error to the
+  // federation callback. Admin must pre-create the User + link (or use
+  // mgr / future admin UI).
+  JIT_REJECT = 0;
+
+  // JIT_AUTO_NO_ROLES: create a new User (no password_hash) + LinkedIdentity
+  // automatically. No roles granted by default — admin assigns via Role
+  // grants afterward.
+  JIT_AUTO_NO_ROLES = 1;
+
+  // JIT_DOMAIN_RULE: if the email_at_link (per claim_map) domain matches
+  // jit_domain (exact or suffix match), create the User and assign
+  // jit_default_role_id. Otherwise reject. Enables "anyone @corp.com gets X".
+  JIT_DOMAIN_RULE = 2;
+}
+
+// OIDCConfig holds the client configuration for a KIND_EXTERNAL issuer
+// (Google, Entra, Auth0, peer, ...). The client_secret is envelope-encrypted
+// via a KeyProvider exactly like signing-key private material (see Key
+// aggregate: wrapped_private + key_provider + master_key_ref). Plaintext
+// secret exists only transiently in the hand-written OIDC configurator and
+// in the per-process decrypt cache for the PKCE callback path.
+//
+// Either supply discovery_url (we will fetch the three endpoints at runtime)
+// or pin the three endpoints explicitly. claim_map tells us which IdP claims
+// to use for local identity (e.g. "email_at_link" -> "email").
+// jit_* fields drive the per-IdP JIT policy (default REJECT).
+message OIDCConfig {
+  string client_id                    = 1;
+  bytes  wrapped_client_secret        = 2;
+  string client_secret_key_provider   = 3;
+  string client_secret_master_key_ref = 4;
+  // discovery_url takes precedence if set; the three explicit endpoints
+  // are fallbacks for providers that don't publish discovery or for pinning.
+  string          discovery_url          = 5;
+  string          authorization_endpoint = 6;
+  string          token_endpoint         = 7;
+  string          jwks_uri               = 8;  // for ID token signature verification in /oauth/callback
+  repeated string allowed_audiences      = 9;
+  // claim_map keys are our internal names (e.g. "email_at_link", "display_name");
+  // values are the claim names in the IdP ID token (e.g. "email", "name").
+  map<string, string> claim_map           = 10;
+  OIDCJITPolicy       jit_policy          = 11;
+  string              jit_default_role_id = 12;
+  string              jit_domain          = 13;  // for JIT_DOMAIN_RULE, e.g. "example.com" or ".corp.example.com"
 }
 
 // ── Commands ──
@@ -65,6 +124,12 @@ message Register {
   Kind   kind              = 5;
   string default_algorithm = 6;
   string jwks_url          = 7;
+  // initial_oidc may be supplied when creating a KIND_EXTERNAL issuer so
+  // the OIDC client config (including wrapped secret) is set atomically
+  // with registration. For KIND_SELF it must be unset. The secret (if
+  // present) must already be wrapped by the caller (see service configurator
+  // or mgr helper); the raw command path does not perform encryption.
+  OIDCConfig initial_oidc = 8;
 }
 
 message Rename {
@@ -130,6 +195,34 @@ message Delete {
   string actor = 2;
 }
 
+// SetOIDCConfig (and its symmetric Clear) let operators configure or
+// rotate the OIDC client credentials + policy for an existing
+// KIND_EXTERNAL issuer without re-creating the aggregate. The command
+// must only be issued by trusted actors (mgr CLI, admin UI, bootstrap);
+// the wrapped secret bytes are produced by a KeyProvider.Encrypt call in
+// the hand-written layer (service/oidcconfig or equivalent) before the
+// command is built.
+message SetOIDCConfig {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "OIDCConfigSet" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string     id     = 1;
+  string     actor  = 2;
+  OIDCConfig config = 3;
+}
+
+message ClearOIDCConfig {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
+    produces_events: [ "OIDCConfigCleared" ]
+    lifecycle: COMMAND_LIFECYCLE_MUTATION
+    allowed_states: [ "STATE_ACTIVE" ]
+  };
+  string id    = 1;
+  string actor = 2;
+}
+
 // ── Events ──
 
 message Registered {
@@ -145,6 +238,10 @@ message Registered {
   Kind   kind              = 7;
   string default_algorithm = 8;
   string jwks_url          = 9;
+  // initial_oidc is echoed from the Register command when the issuer was
+  // created as KIND_EXTERNAL with OIDC config. Stored in the aggregate
+  // snapshot via On(Registered).
+  OIDCConfig initial_oidc = 10;
 }
 
 message Renamed {
@@ -200,6 +297,25 @@ message Reactivated {
 message Deleted {
   option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
     sets_state: "STATE_DELETED"
+  };
+  string id      = 1;
+  int64  version = 2;
+  int64  at      = 3;
+  string actor   = 4;
+}
+
+message OIDCConfigSet {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
+  };
+  string     id      = 1;
+  int64      version = 2;
+  int64      at      = 3;
+  string     actor   = 4;
+  OIDCConfig config  = 5;
+}
+
+message OIDCConfigCleared {
+  option (funinthecloud.protosource.options.v1.protosource_message_type).event = {
   };
   string id      = 1;
   int64  version = 2;

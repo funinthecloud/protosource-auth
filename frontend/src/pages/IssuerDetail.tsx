@@ -70,6 +70,14 @@ export default function IssuerDetail() {
           <DetailRow label="Kind">{issuerKinds[data.kind] ?? data.kind}</DetailRow>
           <DetailRow label="Algorithm">{data.defaultAlgorithm || "-"}</DetailRow>
           <DetailRow label="JWKS URL">{data.jwksUrl || "-"}</DetailRow>
+          {data.kind === 2 /* KIND_EXTERNAL */ && data.oidc && (
+            <>
+              <DetailRow label="OIDC Client ID">{data.oidc.clientId || "-"}</DetailRow>
+              <DetailRow label="OIDC Secret">{data.oidc.wrappedClientSecret && data.oidc.wrappedClientSecret.length > 0 ? <Badge color="green">configured (write-only)</Badge> : "-"}</DetailRow>
+              <DetailRow label="OIDC Discovery/Endpoints">{data.oidc.discoveryUrl || data.oidc.authorizationEndpoint || "-"}</DetailRow>
+              <DetailRow label="JIT Policy">{["REJECT","AUTO_NO_ROLES","DOMAIN_RULE"][data.oidc.jitPolicy ?? 0] || data.oidc.jitPolicy}</DetailRow>
+            </>
+          )}
           <DetailRow label="State">
             <Badge color={data.state === State.ACTIVE ? "green" : data.state === State.DEACTIVATED ? "yellow" : "red"}>
               {stateName(data.state, issuerStates)}

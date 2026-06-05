@@ -84,6 +84,9 @@ const (
 	Kind_KIND_SELF Kind = 1
 	// KIND_EXTERNAL issuers are JWTs we only verify (Google, Auth0, peer
 	// services). We keep jwks_url or a pinned public key, never a private.
+	// For KIND_EXTERNAL, populate the embedded oidc (client_id + wrapped
+	// client_secret via KeyProvider, endpoints or discovery_url, claim_map,
+	// per-IdP JIT policy). See OIDCConfig.
 	Kind_KIND_EXTERNAL Kind = 2
 )
 
@@ -128,6 +131,67 @@ func (Kind) EnumDescriptor() ([]byte, []int) {
 	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{1}
 }
 
+// OIDCJITPolicy controls just-in-time user provisioning behavior when an
+// external IdP returns a successful authentication for a subject that has
+// no prior LinkedIdentity under this issuer.
+type OIDCJITPolicy int32
+
+const (
+	// JIT_REJECT (default): do not create a User; return an error to the
+	// federation callback. Admin must pre-create the User + link (or use
+	// mgr / future admin UI).
+	OIDCJITPolicy_JIT_REJECT OIDCJITPolicy = 0
+	// JIT_AUTO_NO_ROLES: create a new User (no password_hash) + LinkedIdentity
+	// automatically. No roles granted by default — admin assigns via Role
+	// grants afterward.
+	OIDCJITPolicy_JIT_AUTO_NO_ROLES OIDCJITPolicy = 1
+	// JIT_DOMAIN_RULE: if the email_at_link (per claim_map) domain matches
+	// jit_domain (exact or suffix match), create the User and assign
+	// jit_default_role_id. Otherwise reject. Enables "anyone @corp.com gets X".
+	OIDCJITPolicy_JIT_DOMAIN_RULE OIDCJITPolicy = 2
+)
+
+// Enum value maps for OIDCJITPolicy.
+var (
+	OIDCJITPolicy_name = map[int32]string{
+		0: "JIT_REJECT",
+		1: "JIT_AUTO_NO_ROLES",
+		2: "JIT_DOMAIN_RULE",
+	}
+	OIDCJITPolicy_value = map[string]int32{
+		"JIT_REJECT":        0,
+		"JIT_AUTO_NO_ROLES": 1,
+		"JIT_DOMAIN_RULE":   2,
+	}
+)
+
+func (x OIDCJITPolicy) Enum() *OIDCJITPolicy {
+	p := new(OIDCJITPolicy)
+	*p = x
+	return p
+}
+
+func (x OIDCJITPolicy) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (OIDCJITPolicy) Descriptor() protoreflect.EnumDescriptor {
+	return file_auth_issuer_v1_issuer_proto_enumTypes[2].Descriptor()
+}
+
+func (OIDCJITPolicy) Type() protoreflect.EnumType {
+	return &file_auth_issuer_v1_issuer_proto_enumTypes[2]
+}
+
+func (x OIDCJITPolicy) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use OIDCJITPolicy.Descriptor instead.
+func (OIDCJITPolicy) EnumDescriptor() ([]byte, []int) {
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{2}
+}
+
 // Issuer represents a JWT issuer — either this service (KIND_SELF) or a
 // trusted third-party (KIND_EXTERNAL). Phase 4 models one active signing
 // algorithm per issuer; multi-algorithm support is deferred.
@@ -145,8 +209,13 @@ type Issuer struct {
 	DefaultAlgorithm string                 `protobuf:"bytes,10,opt,name=default_algorithm,json=defaultAlgorithm,proto3" json:"default_algorithm,omitempty"`
 	JwksUrl          string                 `protobuf:"bytes,11,opt,name=jwks_url,json=jwksUrl,proto3" json:"jwks_url,omitempty"`
 	State            State                  `protobuf:"varint,12,opt,name=state,proto3,enum=auth.issuer.v1.State" json:"state,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// oidc is populated only for KIND_EXTERNAL. It is ignored (and should be
+	// left unset) for KIND_SELF. The wrapped secret and provider metadata
+	// are set by the hand-written configurator (never directly via raw
+	// commands from untrusted callers).
+	Oidc          *OIDCConfig `protobuf:"bytes,13,opt,name=oidc,proto3" json:"oidc,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Issuer) Reset() {
@@ -263,6 +332,13 @@ func (x *Issuer) GetState() State {
 	return State_STATE_UNSPECIFIED
 }
 
+func (x *Issuer) GetOidc() *OIDCConfig {
+	if x != nil {
+		return x.Oidc
+	}
+	return nil
+}
+
 type IssuerList struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Items         []*Issuer              `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
@@ -307,6 +383,161 @@ func (x *IssuerList) GetItems() []*Issuer {
 	return nil
 }
 
+// OIDCConfig holds the client configuration for a KIND_EXTERNAL issuer
+// (Google, Entra, Auth0, peer, ...). The client_secret is envelope-encrypted
+// via a KeyProvider exactly like signing-key private material (see Key
+// aggregate: wrapped_private + key_provider + master_key_ref). Plaintext
+// secret exists only transiently in the hand-written OIDC configurator and
+// in the per-process decrypt cache for the PKCE callback path.
+//
+// Either supply discovery_url (we will fetch the three endpoints at runtime)
+// or pin the three endpoints explicitly. claim_map tells us which IdP claims
+// to use for local identity (e.g. "email_at_link" -> "email").
+// jit_* fields drive the per-IdP JIT policy (default REJECT).
+type OIDCConfig struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	ClientId                 string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	WrappedClientSecret      []byte                 `protobuf:"bytes,2,opt,name=wrapped_client_secret,json=wrappedClientSecret,proto3" json:"wrapped_client_secret,omitempty"`
+	ClientSecretKeyProvider  string                 `protobuf:"bytes,3,opt,name=client_secret_key_provider,json=clientSecretKeyProvider,proto3" json:"client_secret_key_provider,omitempty"`
+	ClientSecretMasterKeyRef string                 `protobuf:"bytes,4,opt,name=client_secret_master_key_ref,json=clientSecretMasterKeyRef,proto3" json:"client_secret_master_key_ref,omitempty"`
+	// discovery_url takes precedence if set; the three explicit endpoints
+	// are fallbacks for providers that don't publish discovery or for pinning.
+	DiscoveryUrl          string   `protobuf:"bytes,5,opt,name=discovery_url,json=discoveryUrl,proto3" json:"discovery_url,omitempty"`
+	AuthorizationEndpoint string   `protobuf:"bytes,6,opt,name=authorization_endpoint,json=authorizationEndpoint,proto3" json:"authorization_endpoint,omitempty"`
+	TokenEndpoint         string   `protobuf:"bytes,7,opt,name=token_endpoint,json=tokenEndpoint,proto3" json:"token_endpoint,omitempty"`
+	JwksUri               string   `protobuf:"bytes,8,opt,name=jwks_uri,json=jwksUri,proto3" json:"jwks_uri,omitempty"` // for ID token signature verification in /oauth/callback
+	AllowedAudiences      []string `protobuf:"bytes,9,rep,name=allowed_audiences,json=allowedAudiences,proto3" json:"allowed_audiences,omitempty"`
+	// claim_map keys are our internal names (e.g. "email_at_link", "display_name");
+	// values are the claim names in the IdP ID token (e.g. "email", "name").
+	ClaimMap         map[string]string `protobuf:"bytes,10,rep,name=claim_map,json=claimMap,proto3" json:"claim_map,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	JitPolicy        OIDCJITPolicy     `protobuf:"varint,11,opt,name=jit_policy,json=jitPolicy,proto3,enum=auth.issuer.v1.OIDCJITPolicy" json:"jit_policy,omitempty"`
+	JitDefaultRoleId string            `protobuf:"bytes,12,opt,name=jit_default_role_id,json=jitDefaultRoleId,proto3" json:"jit_default_role_id,omitempty"`
+	JitDomain        string            `protobuf:"bytes,13,opt,name=jit_domain,json=jitDomain,proto3" json:"jit_domain,omitempty"` // for JIT_DOMAIN_RULE, e.g. "example.com" or ".corp.example.com"
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *OIDCConfig) Reset() {
+	*x = OIDCConfig{}
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OIDCConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OIDCConfig) ProtoMessage() {}
+
+func (x *OIDCConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OIDCConfig.ProtoReflect.Descriptor instead.
+func (*OIDCConfig) Descriptor() ([]byte, []int) {
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *OIDCConfig) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *OIDCConfig) GetWrappedClientSecret() []byte {
+	if x != nil {
+		return x.WrappedClientSecret
+	}
+	return nil
+}
+
+func (x *OIDCConfig) GetClientSecretKeyProvider() string {
+	if x != nil {
+		return x.ClientSecretKeyProvider
+	}
+	return ""
+}
+
+func (x *OIDCConfig) GetClientSecretMasterKeyRef() string {
+	if x != nil {
+		return x.ClientSecretMasterKeyRef
+	}
+	return ""
+}
+
+func (x *OIDCConfig) GetDiscoveryUrl() string {
+	if x != nil {
+		return x.DiscoveryUrl
+	}
+	return ""
+}
+
+func (x *OIDCConfig) GetAuthorizationEndpoint() string {
+	if x != nil {
+		return x.AuthorizationEndpoint
+	}
+	return ""
+}
+
+func (x *OIDCConfig) GetTokenEndpoint() string {
+	if x != nil {
+		return x.TokenEndpoint
+	}
+	return ""
+}
+
+func (x *OIDCConfig) GetJwksUri() string {
+	if x != nil {
+		return x.JwksUri
+	}
+	return ""
+}
+
+func (x *OIDCConfig) GetAllowedAudiences() []string {
+	if x != nil {
+		return x.AllowedAudiences
+	}
+	return nil
+}
+
+func (x *OIDCConfig) GetClaimMap() map[string]string {
+	if x != nil {
+		return x.ClaimMap
+	}
+	return nil
+}
+
+func (x *OIDCConfig) GetJitPolicy() OIDCJITPolicy {
+	if x != nil {
+		return x.JitPolicy
+	}
+	return OIDCJITPolicy_JIT_REJECT
+}
+
+func (x *OIDCConfig) GetJitDefaultRoleId() string {
+	if x != nil {
+		return x.JitDefaultRoleId
+	}
+	return ""
+}
+
+func (x *OIDCConfig) GetJitDomain() string {
+	if x != nil {
+		return x.JitDomain
+	}
+	return ""
+}
+
 type Register struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -316,13 +547,19 @@ type Register struct {
 	Kind             Kind                   `protobuf:"varint,5,opt,name=kind,proto3,enum=auth.issuer.v1.Kind" json:"kind,omitempty"`
 	DefaultAlgorithm string                 `protobuf:"bytes,6,opt,name=default_algorithm,json=defaultAlgorithm,proto3" json:"default_algorithm,omitempty"`
 	JwksUrl          string                 `protobuf:"bytes,7,opt,name=jwks_url,json=jwksUrl,proto3" json:"jwks_url,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// initial_oidc may be supplied when creating a KIND_EXTERNAL issuer so
+	// the OIDC client config (including wrapped secret) is set atomically
+	// with registration. For KIND_SELF it must be unset. The secret (if
+	// present) must already be wrapped by the caller (see service configurator
+	// or mgr helper); the raw command path does not perform encryption.
+	InitialOidc   *OIDCConfig `protobuf:"bytes,8,opt,name=initial_oidc,json=initialOidc,proto3" json:"initial_oidc,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Register) Reset() {
 	*x = Register{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[2]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -334,7 +571,7 @@ func (x *Register) String() string {
 func (*Register) ProtoMessage() {}
 
 func (x *Register) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[2]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -347,7 +584,7 @@ func (x *Register) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Register.ProtoReflect.Descriptor instead.
 func (*Register) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{2}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Register) GetId() string {
@@ -399,6 +636,13 @@ func (x *Register) GetJwksUrl() string {
 	return ""
 }
 
+func (x *Register) GetInitialOidc() *OIDCConfig {
+	if x != nil {
+		return x.InitialOidc
+	}
+	return nil
+}
+
 type Rename struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -410,7 +654,7 @@ type Rename struct {
 
 func (x *Rename) Reset() {
 	*x = Rename{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[3]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -422,7 +666,7 @@ func (x *Rename) String() string {
 func (*Rename) ProtoMessage() {}
 
 func (x *Rename) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[3]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -435,7 +679,7 @@ func (x *Rename) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rename.ProtoReflect.Descriptor instead.
 func (*Rename) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{3}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Rename) GetId() string {
@@ -470,7 +714,7 @@ type SetDefaultAlgorithm struct {
 
 func (x *SetDefaultAlgorithm) Reset() {
 	*x = SetDefaultAlgorithm{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[4]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -482,7 +726,7 @@ func (x *SetDefaultAlgorithm) String() string {
 func (*SetDefaultAlgorithm) ProtoMessage() {}
 
 func (x *SetDefaultAlgorithm) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[4]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -495,7 +739,7 @@ func (x *SetDefaultAlgorithm) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDefaultAlgorithm.ProtoReflect.Descriptor instead.
 func (*SetDefaultAlgorithm) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{4}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SetDefaultAlgorithm) GetId() string {
@@ -530,7 +774,7 @@ type SetJWKSURL struct {
 
 func (x *SetJWKSURL) Reset() {
 	*x = SetJWKSURL{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[5]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -542,7 +786,7 @@ func (x *SetJWKSURL) String() string {
 func (*SetJWKSURL) ProtoMessage() {}
 
 func (x *SetJWKSURL) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[5]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -555,7 +799,7 @@ func (x *SetJWKSURL) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetJWKSURL.ProtoReflect.Descriptor instead.
 func (*SetJWKSURL) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{5}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SetJWKSURL) GetId() string {
@@ -589,7 +833,7 @@ type Deactivate struct {
 
 func (x *Deactivate) Reset() {
 	*x = Deactivate{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[6]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -601,7 +845,7 @@ func (x *Deactivate) String() string {
 func (*Deactivate) ProtoMessage() {}
 
 func (x *Deactivate) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[6]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -614,7 +858,7 @@ func (x *Deactivate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Deactivate.ProtoReflect.Descriptor instead.
 func (*Deactivate) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{6}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Deactivate) GetId() string {
@@ -641,7 +885,7 @@ type Reactivate struct {
 
 func (x *Reactivate) Reset() {
 	*x = Reactivate{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[7]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -653,7 +897,7 @@ func (x *Reactivate) String() string {
 func (*Reactivate) ProtoMessage() {}
 
 func (x *Reactivate) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[7]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -666,7 +910,7 @@ func (x *Reactivate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reactivate.ProtoReflect.Descriptor instead.
 func (*Reactivate) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{7}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Reactivate) GetId() string {
@@ -693,7 +937,7 @@ type Delete struct {
 
 func (x *Delete) Reset() {
 	*x = Delete{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[8]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -705,7 +949,7 @@ func (x *Delete) String() string {
 func (*Delete) ProtoMessage() {}
 
 func (x *Delete) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[8]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -718,7 +962,7 @@ func (x *Delete) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Delete.ProtoReflect.Descriptor instead.
 func (*Delete) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{8}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Delete) GetId() string {
@@ -729,6 +973,125 @@ func (x *Delete) GetId() string {
 }
 
 func (x *Delete) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+// SetOIDCConfig (and its symmetric Clear) let operators configure or
+// rotate the OIDC client credentials + policy for an existing
+// KIND_EXTERNAL issuer without re-creating the aggregate. The command
+// must only be issued by trusted actors (mgr CLI, admin UI, bootstrap);
+// the wrapped secret bytes are produced by a KeyProvider.Encrypt call in
+// the hand-written layer (service/oidcconfig or equivalent) before the
+// command is built.
+type SetOIDCConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Actor         string                 `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	Config        *OIDCConfig            `protobuf:"bytes,3,opt,name=config,proto3" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetOIDCConfig) Reset() {
+	*x = SetOIDCConfig{}
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetOIDCConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetOIDCConfig) ProtoMessage() {}
+
+func (x *SetOIDCConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetOIDCConfig.ProtoReflect.Descriptor instead.
+func (*SetOIDCConfig) Descriptor() ([]byte, []int) {
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *SetOIDCConfig) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SetOIDCConfig) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+func (x *SetOIDCConfig) GetConfig() *OIDCConfig {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+type ClearOIDCConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Actor         string                 `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClearOIDCConfig) Reset() {
+	*x = ClearOIDCConfig{}
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClearOIDCConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClearOIDCConfig) ProtoMessage() {}
+
+func (x *ClearOIDCConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClearOIDCConfig.ProtoReflect.Descriptor instead.
+func (*ClearOIDCConfig) Descriptor() ([]byte, []int) {
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ClearOIDCConfig) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ClearOIDCConfig) GetActor() string {
 	if x != nil {
 		return x.Actor
 	}
@@ -746,13 +1109,17 @@ type Registered struct {
 	Kind             Kind                   `protobuf:"varint,7,opt,name=kind,proto3,enum=auth.issuer.v1.Kind" json:"kind,omitempty"`
 	DefaultAlgorithm string                 `protobuf:"bytes,8,opt,name=default_algorithm,json=defaultAlgorithm,proto3" json:"default_algorithm,omitempty"`
 	JwksUrl          string                 `protobuf:"bytes,9,opt,name=jwks_url,json=jwksUrl,proto3" json:"jwks_url,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// initial_oidc is echoed from the Register command when the issuer was
+	// created as KIND_EXTERNAL with OIDC config. Stored in the aggregate
+	// snapshot via On(Registered).
+	InitialOidc   *OIDCConfig `protobuf:"bytes,10,opt,name=initial_oidc,json=initialOidc,proto3" json:"initial_oidc,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Registered) Reset() {
 	*x = Registered{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[9]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -764,7 +1131,7 @@ func (x *Registered) String() string {
 func (*Registered) ProtoMessage() {}
 
 func (x *Registered) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[9]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -777,7 +1144,7 @@ func (x *Registered) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Registered.ProtoReflect.Descriptor instead.
 func (*Registered) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{9}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Registered) GetId() string {
@@ -843,6 +1210,13 @@ func (x *Registered) GetJwksUrl() string {
 	return ""
 }
 
+func (x *Registered) GetInitialOidc() *OIDCConfig {
+	if x != nil {
+		return x.InitialOidc
+	}
+	return nil
+}
+
 type Renamed struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -856,7 +1230,7 @@ type Renamed struct {
 
 func (x *Renamed) Reset() {
 	*x = Renamed{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[10]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -868,7 +1242,7 @@ func (x *Renamed) String() string {
 func (*Renamed) ProtoMessage() {}
 
 func (x *Renamed) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[10]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -881,7 +1255,7 @@ func (x *Renamed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Renamed.ProtoReflect.Descriptor instead.
 func (*Renamed) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{10}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Renamed) GetId() string {
@@ -932,7 +1306,7 @@ type DefaultAlgorithmSet struct {
 
 func (x *DefaultAlgorithmSet) Reset() {
 	*x = DefaultAlgorithmSet{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[11]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -944,7 +1318,7 @@ func (x *DefaultAlgorithmSet) String() string {
 func (*DefaultAlgorithmSet) ProtoMessage() {}
 
 func (x *DefaultAlgorithmSet) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[11]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -957,7 +1331,7 @@ func (x *DefaultAlgorithmSet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DefaultAlgorithmSet.ProtoReflect.Descriptor instead.
 func (*DefaultAlgorithmSet) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{11}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *DefaultAlgorithmSet) GetId() string {
@@ -1008,7 +1382,7 @@ type JWKSURLSet struct {
 
 func (x *JWKSURLSet) Reset() {
 	*x = JWKSURLSet{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[12]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1020,7 +1394,7 @@ func (x *JWKSURLSet) String() string {
 func (*JWKSURLSet) ProtoMessage() {}
 
 func (x *JWKSURLSet) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[12]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1033,7 +1407,7 @@ func (x *JWKSURLSet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JWKSURLSet.ProtoReflect.Descriptor instead.
 func (*JWKSURLSet) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{12}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *JWKSURLSet) GetId() string {
@@ -1083,7 +1457,7 @@ type Deactivated struct {
 
 func (x *Deactivated) Reset() {
 	*x = Deactivated{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[13]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1095,7 +1469,7 @@ func (x *Deactivated) String() string {
 func (*Deactivated) ProtoMessage() {}
 
 func (x *Deactivated) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[13]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1108,7 +1482,7 @@ func (x *Deactivated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Deactivated.ProtoReflect.Descriptor instead.
 func (*Deactivated) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{13}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Deactivated) GetId() string {
@@ -1151,7 +1525,7 @@ type Reactivated struct {
 
 func (x *Reactivated) Reset() {
 	*x = Reactivated{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[14]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1163,7 +1537,7 @@ func (x *Reactivated) String() string {
 func (*Reactivated) ProtoMessage() {}
 
 func (x *Reactivated) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[14]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1176,7 +1550,7 @@ func (x *Reactivated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reactivated.ProtoReflect.Descriptor instead.
 func (*Reactivated) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{14}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *Reactivated) GetId() string {
@@ -1219,7 +1593,7 @@ type Deleted struct {
 
 func (x *Deleted) Reset() {
 	*x = Deleted{}
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[15]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1231,7 +1605,7 @@ func (x *Deleted) String() string {
 func (*Deleted) ProtoMessage() {}
 
 func (x *Deleted) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[15]
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1244,7 +1618,7 @@ func (x *Deleted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Deleted.ProtoReflect.Descriptor instead.
 func (*Deleted) Descriptor() ([]byte, []int) {
-	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{15}
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Deleted) GetId() string {
@@ -1275,11 +1649,155 @@ func (x *Deleted) GetActor() string {
 	return ""
 }
 
+type OIDCConfigSet struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	At            int64                  `protobuf:"varint,3,opt,name=at,proto3" json:"at,omitempty"`
+	Actor         string                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
+	Config        *OIDCConfig            `protobuf:"bytes,5,opt,name=config,proto3" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OIDCConfigSet) Reset() {
+	*x = OIDCConfigSet{}
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OIDCConfigSet) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OIDCConfigSet) ProtoMessage() {}
+
+func (x *OIDCConfigSet) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OIDCConfigSet.ProtoReflect.Descriptor instead.
+func (*OIDCConfigSet) Descriptor() ([]byte, []int) {
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *OIDCConfigSet) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *OIDCConfigSet) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *OIDCConfigSet) GetAt() int64 {
+	if x != nil {
+		return x.At
+	}
+	return 0
+}
+
+func (x *OIDCConfigSet) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+func (x *OIDCConfigSet) GetConfig() *OIDCConfig {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+type OIDCConfigCleared struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	At            int64                  `protobuf:"varint,3,opt,name=at,proto3" json:"at,omitempty"`
+	Actor         string                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OIDCConfigCleared) Reset() {
+	*x = OIDCConfigCleared{}
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OIDCConfigCleared) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OIDCConfigCleared) ProtoMessage() {}
+
+func (x *OIDCConfigCleared) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_issuer_v1_issuer_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OIDCConfigCleared.ProtoReflect.Descriptor instead.
+func (*OIDCConfigCleared) Descriptor() ([]byte, []int) {
+	return file_auth_issuer_v1_issuer_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *OIDCConfigCleared) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *OIDCConfigCleared) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *OIDCConfigCleared) GetAt() int64 {
+	if x != nil {
+		return x.At
+	}
+	return 0
+}
+
+func (x *OIDCConfigCleared) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
 var File_auth_issuer_v1_issuer_proto protoreflect.FileDescriptor
 
 const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\n" +
-	"\x1bauth/issuer/v1/issuer.proto\x12\x0eauth.issuer.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\x93\x03\n" +
+	"\x1bauth/issuer/v1/issuer.proto\x12\x0eauth.issuer.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\xc3\x03\n" +
 	"\x06Issuer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12$\n" +
@@ -1295,10 +1813,32 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	" \x01(\tR\x10defaultAlgorithm\x12\x19\n" +
 	"\bjwks_url\x18\v \x01(\tR\ajwksUrl\x124\n" +
 	"\x05state\x18\f \x01(\x0e2\x15.auth.issuer.v1.StateB\a\x82Q\x04\n" +
-	"\x02\b\x05R\x05state:\x05\x8aQ\x02\x1a\x00\":\n" +
+	"\x02\b\x05R\x05state\x12.\n" +
+	"\x04oidc\x18\r \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x04oidc:\x05\x8aQ\x02\x1a\x00\":\n" +
 	"\n" +
 	"IssuerList\x12,\n" +
-	"\x05items\x18\x01 \x03(\v2\x16.auth.issuer.v1.IssuerR\x05items\"\xf5\x01\n" +
+	"\x05items\x18\x01 \x03(\v2\x16.auth.issuer.v1.IssuerR\x05items\"\xb5\x05\n" +
+	"\n" +
+	"OIDCConfig\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x122\n" +
+	"\x15wrapped_client_secret\x18\x02 \x01(\fR\x13wrappedClientSecret\x12;\n" +
+	"\x1aclient_secret_key_provider\x18\x03 \x01(\tR\x17clientSecretKeyProvider\x12>\n" +
+	"\x1cclient_secret_master_key_ref\x18\x04 \x01(\tR\x18clientSecretMasterKeyRef\x12#\n" +
+	"\rdiscovery_url\x18\x05 \x01(\tR\fdiscoveryUrl\x125\n" +
+	"\x16authorization_endpoint\x18\x06 \x01(\tR\x15authorizationEndpoint\x12%\n" +
+	"\x0etoken_endpoint\x18\a \x01(\tR\rtokenEndpoint\x12\x19\n" +
+	"\bjwks_uri\x18\b \x01(\tR\ajwksUri\x12+\n" +
+	"\x11allowed_audiences\x18\t \x03(\tR\x10allowedAudiences\x12E\n" +
+	"\tclaim_map\x18\n" +
+	" \x03(\v2(.auth.issuer.v1.OIDCConfig.ClaimMapEntryR\bclaimMap\x12<\n" +
+	"\n" +
+	"jit_policy\x18\v \x01(\x0e2\x1d.auth.issuer.v1.OIDCJITPolicyR\tjitPolicy\x12-\n" +
+	"\x13jit_default_role_id\x18\f \x01(\tR\x10jitDefaultRoleId\x12\x1d\n" +
+	"\n" +
+	"jit_domain\x18\r \x01(\tR\tjitDomain\x1a;\n" +
+	"\rClaimMapEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb4\x02\n" +
 	"\bRegister\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05actor\x18\x02 \x01(\tR\x05actor\x12\x19\n" +
@@ -1306,7 +1846,8 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12(\n" +
 	"\x04kind\x18\x05 \x01(\x0e2\x14.auth.issuer.v1.KindR\x04kind\x12+\n" +
 	"\x11default_algorithm\x18\x06 \x01(\tR\x10defaultAlgorithm\x12\x19\n" +
-	"\bjwks_url\x18\a \x01(\tR\ajwksUrl:\x13\x8aQ\x10\n" +
+	"\bjwks_url\x18\a \x01(\tR\ajwksUrl\x12=\n" +
+	"\finitial_oidc\x18\b \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\vinitialOidc:\x13\x8aQ\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"Registered\x10\x01\"z\n" +
@@ -1346,7 +1887,18 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05actor\x18\x02 \x01(\tR\x05actor:1\x8aQ.\n" +
 	",\n" +
-	"\aDeleted\x10\x02\x1a\fSTATE_ACTIVE\x1a\x11STATE_DEACTIVATED\"\x98\x02\n" +
+	"\aDeleted\x10\x02\x1a\fSTATE_ACTIVE\x1a\x11STATE_DEACTIVATED\"\x8f\x01\n" +
+	"\rSetOIDCConfig\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05actor\x18\x02 \x01(\tR\x05actor\x122\n" +
+	"\x06config\x18\x03 \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x06config:$\x8aQ!\n" +
+	"\x1f\n" +
+	"\rOIDCConfigSet\x10\x02\x1a\fSTATE_ACTIVE\"a\n" +
+	"\x0fClearOIDCConfig\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05actor\x18\x02 \x01(\tR\x05actor:(\x8aQ%\n" +
+	"#\n" +
+	"\x11OIDCConfigCleared\x10\x02\x1a\fSTATE_ACTIVE\"\xd7\x02\n" +
 	"\n" +
 	"Registered\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
@@ -1357,7 +1909,9 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x06 \x01(\tR\vdisplayName\x12(\n" +
 	"\x04kind\x18\a \x01(\x0e2\x14.auth.issuer.v1.KindR\x04kind\x12+\n" +
 	"\x11default_algorithm\x18\b \x01(\tR\x10defaultAlgorithm\x12\x19\n" +
-	"\bjwks_url\x18\t \x01(\tR\ajwksUrl:\x13\x8aQ\x10\x12\x0e\x12\fSTATE_ACTIVE\"\x83\x01\n" +
+	"\bjwks_url\x18\t \x01(\tR\ajwksUrl\x12=\n" +
+	"\finitial_oidc\x18\n" +
+	" \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\vinitialOidc:\x13\x8aQ\x10\x12\x0e\x12\fSTATE_ACTIVE\"\x83\x01\n" +
 	"\aRenamed\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
@@ -1391,7 +1945,18 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
 	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
-	"\x05actor\x18\x04 \x01(\tR\x05actor:\x14\x8aQ\x11\x12\x0f\x12\rSTATE_DELETED*Z\n" +
+	"\x05actor\x18\x04 \x01(\tR\x05actor:\x14\x8aQ\x11\x12\x0f\x12\rSTATE_DELETED\"\x9a\x01\n" +
+	"\rOIDCConfigSet\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
+	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
+	"\x05actor\x18\x04 \x01(\tR\x05actor\x122\n" +
+	"\x06config\x18\x05 \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x06config:\x05\x8aQ\x02\x12\x00\"j\n" +
+	"\x11OIDCConfigCleared\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
+	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
+	"\x05actor\x18\x04 \x01(\tR\x05actor:\x05\x8aQ\x02\x12\x00*Z\n" +
 	"\x05State\x12\x15\n" +
 	"\x11STATE_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fSTATE_ACTIVE\x10\x01\x12\x15\n" +
@@ -1400,7 +1965,12 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\x04Kind\x12\x14\n" +
 	"\x10KIND_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tKIND_SELF\x10\x01\x12\x11\n" +
-	"\rKIND_EXTERNAL\x10\x02B\xc7\x01\x92Q\x02\b\x01\n" +
+	"\rKIND_EXTERNAL\x10\x02*K\n" +
+	"\rOIDCJITPolicy\x12\x0e\n" +
+	"\n" +
+	"JIT_REJECT\x10\x00\x12\x15\n" +
+	"\x11JIT_AUTO_NO_ROLES\x10\x01\x12\x13\n" +
+	"\x0fJIT_DOMAIN_RULE\x10\x02B\xc7\x01\x92Q\x02\b\x01\n" +
 	"\x12com.auth.issuer.v1B\vIssuerProtoP\x01ZEgithub.com/funinthecloud/protosource-auth/gen/auth/issuer/v1;issuerv1\xa2\x02\x03AIX\xaa\x02\x0eAuth.Issuer.V1\xca\x02\x0eAuth\\Issuer\\V1\xe2\x02\x1aAuth\\Issuer\\V1\\GPBMetadata\xea\x02\x10Auth::Issuer::V1b\x06proto3"
 
 var (
@@ -1415,39 +1985,53 @@ func file_auth_issuer_v1_issuer_proto_rawDescGZIP() []byte {
 	return file_auth_issuer_v1_issuer_proto_rawDescData
 }
 
-var file_auth_issuer_v1_issuer_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_auth_issuer_v1_issuer_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_auth_issuer_v1_issuer_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_auth_issuer_v1_issuer_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_auth_issuer_v1_issuer_proto_goTypes = []any{
 	(State)(0),                  // 0: auth.issuer.v1.State
 	(Kind)(0),                   // 1: auth.issuer.v1.Kind
-	(*Issuer)(nil),              // 2: auth.issuer.v1.Issuer
-	(*IssuerList)(nil),          // 3: auth.issuer.v1.IssuerList
-	(*Register)(nil),            // 4: auth.issuer.v1.Register
-	(*Rename)(nil),              // 5: auth.issuer.v1.Rename
-	(*SetDefaultAlgorithm)(nil), // 6: auth.issuer.v1.SetDefaultAlgorithm
-	(*SetJWKSURL)(nil),          // 7: auth.issuer.v1.SetJWKSURL
-	(*Deactivate)(nil),          // 8: auth.issuer.v1.Deactivate
-	(*Reactivate)(nil),          // 9: auth.issuer.v1.Reactivate
-	(*Delete)(nil),              // 10: auth.issuer.v1.Delete
-	(*Registered)(nil),          // 11: auth.issuer.v1.Registered
-	(*Renamed)(nil),             // 12: auth.issuer.v1.Renamed
-	(*DefaultAlgorithmSet)(nil), // 13: auth.issuer.v1.DefaultAlgorithmSet
-	(*JWKSURLSet)(nil),          // 14: auth.issuer.v1.JWKSURLSet
-	(*Deactivated)(nil),         // 15: auth.issuer.v1.Deactivated
-	(*Reactivated)(nil),         // 16: auth.issuer.v1.Reactivated
-	(*Deleted)(nil),             // 17: auth.issuer.v1.Deleted
+	(OIDCJITPolicy)(0),          // 2: auth.issuer.v1.OIDCJITPolicy
+	(*Issuer)(nil),              // 3: auth.issuer.v1.Issuer
+	(*IssuerList)(nil),          // 4: auth.issuer.v1.IssuerList
+	(*OIDCConfig)(nil),          // 5: auth.issuer.v1.OIDCConfig
+	(*Register)(nil),            // 6: auth.issuer.v1.Register
+	(*Rename)(nil),              // 7: auth.issuer.v1.Rename
+	(*SetDefaultAlgorithm)(nil), // 8: auth.issuer.v1.SetDefaultAlgorithm
+	(*SetJWKSURL)(nil),          // 9: auth.issuer.v1.SetJWKSURL
+	(*Deactivate)(nil),          // 10: auth.issuer.v1.Deactivate
+	(*Reactivate)(nil),          // 11: auth.issuer.v1.Reactivate
+	(*Delete)(nil),              // 12: auth.issuer.v1.Delete
+	(*SetOIDCConfig)(nil),       // 13: auth.issuer.v1.SetOIDCConfig
+	(*ClearOIDCConfig)(nil),     // 14: auth.issuer.v1.ClearOIDCConfig
+	(*Registered)(nil),          // 15: auth.issuer.v1.Registered
+	(*Renamed)(nil),             // 16: auth.issuer.v1.Renamed
+	(*DefaultAlgorithmSet)(nil), // 17: auth.issuer.v1.DefaultAlgorithmSet
+	(*JWKSURLSet)(nil),          // 18: auth.issuer.v1.JWKSURLSet
+	(*Deactivated)(nil),         // 19: auth.issuer.v1.Deactivated
+	(*Reactivated)(nil),         // 20: auth.issuer.v1.Reactivated
+	(*Deleted)(nil),             // 21: auth.issuer.v1.Deleted
+	(*OIDCConfigSet)(nil),       // 22: auth.issuer.v1.OIDCConfigSet
+	(*OIDCConfigCleared)(nil),   // 23: auth.issuer.v1.OIDCConfigCleared
+	nil,                         // 24: auth.issuer.v1.OIDCConfig.ClaimMapEntry
 }
 var file_auth_issuer_v1_issuer_proto_depIdxs = []int32{
-	1, // 0: auth.issuer.v1.Issuer.kind:type_name -> auth.issuer.v1.Kind
-	0, // 1: auth.issuer.v1.Issuer.state:type_name -> auth.issuer.v1.State
-	2, // 2: auth.issuer.v1.IssuerList.items:type_name -> auth.issuer.v1.Issuer
-	1, // 3: auth.issuer.v1.Register.kind:type_name -> auth.issuer.v1.Kind
-	1, // 4: auth.issuer.v1.Registered.kind:type_name -> auth.issuer.v1.Kind
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	1,  // 0: auth.issuer.v1.Issuer.kind:type_name -> auth.issuer.v1.Kind
+	0,  // 1: auth.issuer.v1.Issuer.state:type_name -> auth.issuer.v1.State
+	5,  // 2: auth.issuer.v1.Issuer.oidc:type_name -> auth.issuer.v1.OIDCConfig
+	3,  // 3: auth.issuer.v1.IssuerList.items:type_name -> auth.issuer.v1.Issuer
+	24, // 4: auth.issuer.v1.OIDCConfig.claim_map:type_name -> auth.issuer.v1.OIDCConfig.ClaimMapEntry
+	2,  // 5: auth.issuer.v1.OIDCConfig.jit_policy:type_name -> auth.issuer.v1.OIDCJITPolicy
+	1,  // 6: auth.issuer.v1.Register.kind:type_name -> auth.issuer.v1.Kind
+	5,  // 7: auth.issuer.v1.Register.initial_oidc:type_name -> auth.issuer.v1.OIDCConfig
+	5,  // 8: auth.issuer.v1.SetOIDCConfig.config:type_name -> auth.issuer.v1.OIDCConfig
+	1,  // 9: auth.issuer.v1.Registered.kind:type_name -> auth.issuer.v1.Kind
+	5,  // 10: auth.issuer.v1.Registered.initial_oidc:type_name -> auth.issuer.v1.OIDCConfig
+	5,  // 11: auth.issuer.v1.OIDCConfigSet.config:type_name -> auth.issuer.v1.OIDCConfig
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_auth_issuer_v1_issuer_proto_init() }
@@ -1460,8 +2044,8 @@ func file_auth_issuer_v1_issuer_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_issuer_v1_issuer_proto_rawDesc), len(file_auth_issuer_v1_issuer_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   16,
+			NumEnums:      3,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
