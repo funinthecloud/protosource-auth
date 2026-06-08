@@ -91,7 +91,9 @@ enum OIDCJITPolicy {
 // to use for local identity (e.g. "email_at_link" -> "email").
 // jit_* fields drive the per-IdP JIT policy (default REJECT).
 message OIDCConfig {
-  string client_id                    = 1;
+  // client_id is required — an OIDCConfig with no client_id is unusable and
+  // would only fail later at runtime, so reject it at the command boundary.
+  string client_id                    = 1 [(buf.validate.field).string.min_len = 1];
   bytes  wrapped_client_secret        = 2;
   string client_secret_key_provider   = 3;
   string client_secret_master_key_ref = 4;
@@ -116,6 +118,13 @@ message Register {
   option (funinthecloud.protosource.options.v1.protosource_message_type).command = {
     produces_events: [ "Registered" ]
     lifecycle: COMMAND_LIFECYCLE_CREATION
+  };
+  // initial_oidc only makes sense for KIND_EXTERNAL issuers; reject it for
+  // KIND_SELF (= 1) so the aggregate invariant can't be violated at creation.
+  option (buf.validate.message).cel = {
+    id: "register.initial_oidc.kind"
+    message: "initial_oidc must be unset for KIND_SELF issuers"
+    expression: "this.kind != 1 || !has(this.initial_oidc)"
   };
   string id                = 1;
   string actor             = 2;

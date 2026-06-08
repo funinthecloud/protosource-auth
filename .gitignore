@@ -22,3 +22,8 @@ gen/**/*mgr/*mgr
 
 # Terraform crap
 .terraform/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { issuerClient } from "../clients";
 import { State } from "../gen/auth/issuer/v1/issuer_pb.js";
-import { useAsync, fmtMicroTime, stateName, issuerStates, issuerKinds } from "../hooks";
+import { useAsync, fmtMicroTime, stateName, issuerStates, issuerKinds, issuerJitPolicies } from "../hooks";
 import { PageHeader, Btn, Badge, Card, DetailRow, Loading, ErrorBox } from "../ui";
 
 export default function IssuerDetail() {
@@ -75,7 +75,7 @@ export default function IssuerDetail() {
               <DetailRow label="OIDC Client ID">{data.oidc.clientId || "-"}</DetailRow>
               <DetailRow label="OIDC Secret">{data.oidc.wrappedClientSecret && data.oidc.wrappedClientSecret.length > 0 ? <Badge color="green">configured (write-only)</Badge> : "-"}</DetailRow>
               <DetailRow label="OIDC Discovery/Endpoints">{data.oidc.discoveryUrl || data.oidc.authorizationEndpoint || "-"}</DetailRow>
-              <DetailRow label="JIT Policy">{["REJECT","AUTO_NO_ROLES","DOMAIN_RULE"][data.oidc.jitPolicy ?? 0] || data.oidc.jitPolicy}</DetailRow>
+              <DetailRow label="JIT Policy">{stateName(data.oidc.jitPolicy ?? 0, issuerJitPolicies)}</DetailRow>
             </>
           )}
           <DetailRow label="State">

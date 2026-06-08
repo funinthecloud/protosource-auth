@@ -40,6 +40,6 @@ export function stateName(state: number, map: Record<number, string>): string {
 
 export { StateDisplay as userStates } from "./gen/auth/user/v1/user.protosource.enums.js";
 export { StateDisplay as roleStates } from "./gen/auth/role/v1/role.protosource.enums.js";
-export { StateDisplay as issuerStates, KindDisplay as issuerKinds } from "./gen/auth/issuer/v1/issuer.protosource.enums.js";
+export { StateDisplay as issuerStates, KindDisplay as issuerKinds, OIDCJITPolicyDisplay as issuerJitPolicies } from "./gen/auth/issuer/v1/issuer.protosource.enums.js";
 export { StateDisplay as keyStates } from "./gen/auth/key/v1/key.protosource.enums.js";
 export { StateDisplay as tokenStates } from "./gen/auth/token/v1/token.protosource.enums.js";

@@ -27,12 +27,14 @@ type OIDCConfigurator struct {
 	actor string // audit principal for the SetOIDCConfig command
 }
 
-// NewOIDCConfigurator wires the configurator. All arguments are required
-// (panics like NewLoginer / NewResolver on nil).
+// NewOIDCConfigurator wires the configurator. issuerRepo and provider are
+// required (panics like NewLoginer / NewResolver on nil). Behavior can be
+// tuned with options (e.g. WithOIDCConfiguratorActor).
 func NewOIDCConfigurator(
 	issuerRepo AggregateRepo,
 	provider keyproviders.KeyProvider,
 	masterKeyRef string,
+	opts ...OIDCConfiguratorOption,
 ) *OIDCConfigurator {
 	if issuerRepo == nil {
 		panic("service.NewOIDCConfigurator: issuerRepo must not be nil")
@@ -40,12 +42,16 @@ func NewOIDCConfigurator(
 	if provider == nil {
 		panic("service.NewOIDCConfigurator: provider must not be nil")
 	}
-	return &OIDCConfigurator{
+	c := &OIDCConfigurator{
 		issuerRepo:   issuerRepo,
 		provider:     provider,
 		masterKeyRef: masterKeyRef,
 		actor:        "oidc-configurator",
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // OIDCConfiguratorOption mutates at construction (e.g. WithActor).
@@ -81,20 +87,31 @@ type SetRequest struct {
 }
 
 // Set encrypts the client secret (if provided) and applies a SetOIDCConfig
-// command. It does not validate that the issuer is EXTERNAL or ACTIVE —
-// the aggregate command guards will reject invalid state transitions.
+// command. OIDC config is only meaningful for KIND_EXTERNAL issuers, so the
+// configurator loads the target issuer and rejects KIND_SELF here (the
+// generated command guards only enforce state, not kind).
+//
+// When ClientSecret is empty, the existing wrapped secret metadata is carried
+// forward so callers can update endpoints/policy without clobbering the stored
+// secret. Caller-owned slices/maps are deep-copied into the command so the
+// event log can't retain references to mutable caller state.
 func (c *OIDCConfigurator) Set(ctx context.Context, req SetRequest) error {
+	existing, err := c.loadExternalIssuer(ctx, req.IssuerID)
+	if err != nil {
+		return err
+	}
+
 	oc := &issuerv1.OIDCConfig{
-		ClientId:                req.ClientID,
-		DiscoveryUrl:            req.DiscoveryURL,
-		AuthorizationEndpoint:   req.AuthorizationEndpoint,
-		TokenEndpoint:           req.TokenEndpoint,
-		JwksUri:                 req.JWKSURI,
-		AllowedAudiences:        req.AllowedAudiences,
-		ClaimMap:                req.ClaimMap,
-		JitPolicy:               req.JITPolicy,
-		JitDefaultRoleId:        req.JITDefaultRoleID,
-		JitDomain:               req.JITDomain,
+		ClientId:              req.ClientID,
+		DiscoveryUrl:          req.DiscoveryURL,
+		AuthorizationEndpoint: req.AuthorizationEndpoint,
+		TokenEndpoint:         req.TokenEndpoint,
+		JwksUri:               req.JWKSURI,
+		AllowedAudiences:      append([]string(nil), req.AllowedAudiences...),
+		ClaimMap:              cloneStringMap(req.ClaimMap),
+		JitPolicy:             req.JITPolicy,
+		JitDefaultRoleId:      req.JITDefaultRoleID,
+		JitDomain:             req.JITDomain,
 	}
 
 	if len(req.ClientSecret) > 0 {
@@ -105,6 +122,12 @@ func (c *OIDCConfigurator) Set(ctx context.Context, req SetRequest) error {
 		oc.WrappedClientSecret = wrapped
 		oc.ClientSecretKeyProvider = c.provider.Name()
 		oc.ClientSecretMasterKeyRef = c.masterKeyRef
+	} else if prev := existing.GetOidc(); prev != nil {
+		// Preserve the previously wrapped secret + provider metadata so an
+		// endpoint/policy-only update doesn't silently clear credentials.
+		oc.WrappedClientSecret = append([]byte(nil), prev.GetWrappedClientSecret()...)
+		oc.ClientSecretKeyProvider = prev.GetClientSecretKeyProvider()
+		oc.ClientSecretMasterKeyRef = prev.GetClientSecretMasterKeyRef()
 	}
 
 	actor := req.Actor
@@ -112,20 +135,51 @@ func (c *OIDCConfigurator) Set(ctx context.Context, req SetRequest) error {
 		actor = c.actor
 	}
 
-	_, err := c.issuerRepo.Apply(ctx, &issuerv1.SetOIDCConfig{
+	if _, err := c.issuerRepo.Apply(ctx, &issuerv1.SetOIDCConfig{
 		Id:     req.IssuerID,
 		Actor:  actor,
 		Config: oc,
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("service: apply SetOIDCConfig: %w", err)
 	}
 	return nil
 }
 
+// loadExternalIssuer loads the issuer and verifies it is KIND_EXTERNAL.
+func (c *OIDCConfigurator) loadExternalIssuer(ctx context.Context, issuerID string) (*issuerv1.Issuer, error) {
+	agg, err := c.issuerRepo.Load(ctx, issuerID)
+	if err != nil {
+		return nil, fmt.Errorf("service: load issuer %q: %w", issuerID, err)
+	}
+	iss, ok := agg.(*issuerv1.Issuer)
+	if !ok {
+		return nil, fmt.Errorf("service: loaded %T, want *issuerv1.Issuer", agg)
+	}
+	if iss.GetKind() != issuerv1.Kind_KIND_EXTERNAL {
+		return nil, fmt.Errorf("service: OIDC config requires KIND_EXTERNAL issuer, %q is %s", issuerID, iss.GetKind())
+	}
+	return iss, nil
+}
+
+// cloneStringMap returns an independent copy so the command/event can't retain
+// a reference to a caller-owned map.
+func cloneStringMap(in map[string]string) map[string]string {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
 // Clear removes OIDC config from an issuer (e.g. to disable federation or
 // rotate to a different IdP registration).
 func (c *OIDCConfigurator) Clear(ctx context.Context, issuerID, actor string) error {
+	if _, err := c.loadExternalIssuer(ctx, issuerID); err != nil {
+		return err
+	}
 	if actor == "" {
 		actor = c.actor
 	}
@@ -159,13 +213,13 @@ func (c *OIDCConfigurator) DecryptClientSecret(ctx context.Context, wrapped []by
 // KIND_EXTERNAL issuer with initial OIDC config in one Register command.
 // It performs the Encrypt step and returns a populated OIDCConfig ready
 // for the Register.InitialOidc field (or zero if no secret).
-func (c *OIDCConfigurator) PrepareForRegister(plaintextSecret []byte, template *issuerv1.OIDCConfig) (*issuerv1.OIDCConfig, error) {
+func (c *OIDCConfigurator) PrepareForRegister(ctx context.Context, plaintextSecret []byte, template *issuerv1.OIDCConfig) (*issuerv1.OIDCConfig, error) {
 	if template == nil {
 		template = &issuerv1.OIDCConfig{}
 	}
-	out := protoCloneOIDCConfig(template) // shallow safe copy for our fields
+	out := protoCloneOIDCConfig(template) // deep copy for our fields
 	if len(plaintextSecret) > 0 {
-		wrapped, err := c.provider.Encrypt(context.Background(), c.masterKeyRef, plaintextSecret)
+		wrapped, err := c.provider.Encrypt(ctx, c.masterKeyRef, plaintextSecret)
 		if err != nil {
 			return nil, fmt.Errorf("service: wrap client secret for register: %w", err)
 		}

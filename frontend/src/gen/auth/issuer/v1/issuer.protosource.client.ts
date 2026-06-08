@@ -15,7 +15,7 @@ export class IssuerHTTPClient {
     this.client = client;
   }
 
-  async register(id: string, iss: string, displayName: string, kind: Kind, defaultAlgorithm: string, jwksUrl: string, initialOidc: OIDCConfig): Promise<CommandResponse> {
+  async register(id: string, iss: string, displayName: string, kind: Kind, defaultAlgorithm: string, jwksUrl: string, initialOidc?: OIDCConfig): Promise<CommandResponse> {
     return this.client.apply(routePath, RegisterSchema, { id, iss: iss, displayName: displayName, kind: kind, defaultAlgorithm: defaultAlgorithm, jwksUrl: jwksUrl, initialOidc: initialOidc });
   }
 
