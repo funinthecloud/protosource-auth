@@ -192,7 +192,42 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 		return nil, ErrInvalidCredentials
 	}
 
-	issuerAgg, err := l.issuerRepo.Load(ctx, req.IssuerID)
+	issuer, err := l.loadSelfIssuer(ctx, req.IssuerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return l.mintShadowToken(ctx, user.GetId(), req.IssuerID, issuer)
+}
+
+// IssueForUser mints a shadow token for an already-authenticated local user,
+// skipping the password/credential check. It is the hand-off point for the
+// federated-login (PKCE) callback: once an external IdP's ID token has been
+// verified and mapped to a local user id (see [IdentityResolver]), the
+// callback calls this to mint the same kind of shadow token + JWT that
+// [Loginer.Login] produces for the password flow.
+//
+// selfIssuerID names the SELF issuer whose key signs the JWT (the same issuer
+// the password flow uses); it is loaded and validated (STATE_ACTIVE +
+// KIND_SELF) exactly like Login, so the iss/default-algorithm come from the
+// aggregate, not the caller. userID is trusted — the caller is responsible
+// for having authenticated it.
+func (l *Loginer) IssueForUser(ctx context.Context, userID, selfIssuerID string) (*LoginResponse, error) {
+	if userID == "" {
+		return nil, fmt.Errorf("service: IssueForUser: userID must not be empty")
+	}
+	issuer, err := l.loadSelfIssuer(ctx, selfIssuerID)
+	if err != nil {
+		return nil, err
+	}
+	return l.mintShadowToken(ctx, userID, selfIssuerID, issuer)
+}
+
+// loadSelfIssuer loads the issuer and verifies it is an ACTIVE KIND_SELF
+// issuer (only SELF issuers mint our shadow tokens). Shared by Login and
+// IssueForUser.
+func (l *Loginer) loadSelfIssuer(ctx context.Context, issuerID string) (*issuerv1.Issuer, error) {
+	issuerAgg, err := l.issuerRepo.Load(ctx, issuerID)
 	if err != nil {
 		return nil, fmt.Errorf("service: load issuer: %w", err)
 	}
@@ -203,7 +238,15 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	if issuer.GetState() != issuerv1.State_STATE_ACTIVE || issuer.GetKind() != issuerv1.Kind_KIND_SELF {
 		return nil, ErrIssuerNotActive
 	}
+	return issuer, nil
+}
 
+// mintShadowToken is the shared claims→sign→Apply body used by both the
+// password (Login) and federated (IssueForUser) flows: it generates an opaque
+// token id, signs a JWT with the SELF issuer's current key, and persists the
+// Token aggregate. The caller has already authenticated userID and validated
+// the issuer.
+func (l *Loginer) mintShadowToken(ctx context.Context, userID, issuerID string, issuer *issuerv1.Issuer) (*LoginResponse, error) {
 	now := l.clock()
 	expiresAt := now.Add(l.tokenTTL)
 
@@ -214,7 +257,7 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 
 	claims := map[string]any{
 		"iss": issuer.GetIss(),
-		"sub": user.GetId(),
+		"sub": userID,
 		"aud": issuer.GetIss(),
 		"iat": now.Unix(),
 		"exp": expiresAt.Unix(),
@@ -225,7 +268,7 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 		return nil, fmt.Errorf("service: marshal claims: %w", err)
 	}
 
-	signingKey, err := l.resolver.SigningKey(ctx, req.IssuerID, issuer.GetDefaultAlgorithm())
+	signingKey, err := l.resolver.SigningKey(ctx, issuerID, issuer.GetDefaultAlgorithm())
 	if err != nil {
 		return nil, fmt.Errorf("service: resolve signing key: %w", err)
 	}
@@ -237,8 +280,8 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	if _, err := l.tokenRepo.Apply(ctx, &tokenv1.Issue{
 		Id:        tokenID,
 		Actor:     l.actor,
-		UserId:    user.GetId(),
-		IssuerId:  req.IssuerID,
+		UserId:    userID,
+		IssuerId:  issuerID,
 		Jwt:       jwt,
 		IssuedAt:  now.Unix(),
 		ExpiresAt: expiresAt.Unix(),

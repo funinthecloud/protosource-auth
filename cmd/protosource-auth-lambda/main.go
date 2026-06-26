@@ -62,7 +62,7 @@ func main() {
 		},
 	)
 
-	router := app.NewRouter(cfg, bundle, resolver)
+	router := app.NewRouter(cfg, bundle, resolver, provider, masterKeyRef)
 	handler := awslambda.WrapRouter(router)
 	lambda.Start(handler)
 }
