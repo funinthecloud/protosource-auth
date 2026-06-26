@@ -2,11 +2,18 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	issuerv1 "github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1"
 	"github.com/funinthecloud/protosource-auth/keyproviders"
 )
+
+// ErrIssuerNotExternal is returned when an OIDC config operation targets an
+// issuer that is not KIND_EXTERNAL. It is a client-input error (the caller
+// pointed SetOIDCConfig/ClearOIDCConfig at the wrong issuer kind), so callers
+// map it to 400 rather than 500. See applyError.
+var ErrIssuerNotExternal = errors.New("service: OIDC config requires a KIND_EXTERNAL issuer")
 
 // OIDCConfigurator is the hand-written orchestration for setting OIDC
 // client config (including client_secret) on KIND_EXTERNAL Issuers.
@@ -81,9 +88,9 @@ type SetRequest struct {
 	AllowedAudiences []string
 	ClaimMap         map[string]string
 
-	JITPolicy         issuerv1.OIDCJITPolicy
-	JITDefaultRoleID  string
-	JITDomain         string
+	JITPolicy        issuerv1.OIDCJITPolicy
+	JITDefaultRoleID string
+	JITDomain        string
 }
 
 // Set encrypts the client secret (if provided) and applies a SetOIDCConfig
@@ -156,7 +163,7 @@ func (c *OIDCConfigurator) loadExternalIssuer(ctx context.Context, issuerID stri
 		return nil, fmt.Errorf("service: loaded %T, want *issuerv1.Issuer", agg)
 	}
 	if iss.GetKind() != issuerv1.Kind_KIND_EXTERNAL {
-		return nil, fmt.Errorf("service: OIDC config requires KIND_EXTERNAL issuer, %q is %s", issuerID, iss.GetKind())
+		return nil, fmt.Errorf("%w: %q is %s", ErrIssuerNotExternal, issuerID, iss.GetKind())
 	}
 	return iss, nil
 }
@@ -238,19 +245,19 @@ func protoCloneOIDCConfig(in *issuerv1.OIDCConfig) *issuerv1.OIDCConfig {
 		return &issuerv1.OIDCConfig{}
 	}
 	out := &issuerv1.OIDCConfig{
-		ClientId:                  in.GetClientId(),
-		WrappedClientSecret:       append([]byte(nil), in.GetWrappedClientSecret()...),
-		ClientSecretKeyProvider:   in.GetClientSecretKeyProvider(),
-		ClientSecretMasterKeyRef:  in.GetClientSecretMasterKeyRef(),
-		DiscoveryUrl:              in.GetDiscoveryUrl(),
-		AuthorizationEndpoint:     in.GetAuthorizationEndpoint(),
-		TokenEndpoint:             in.GetTokenEndpoint(),
-		JwksUri:                   in.GetJwksUri(),
-		AllowedAudiences:          append([]string(nil), in.GetAllowedAudiences()...),
-		ClaimMap:                  map[string]string{},
-		JitPolicy:                 in.GetJitPolicy(),
-		JitDefaultRoleId:          in.GetJitDefaultRoleId(),
-		JitDomain:                 in.GetJitDomain(),
+		ClientId:                 in.GetClientId(),
+		WrappedClientSecret:      append([]byte(nil), in.GetWrappedClientSecret()...),
+		ClientSecretKeyProvider:  in.GetClientSecretKeyProvider(),
+		ClientSecretMasterKeyRef: in.GetClientSecretMasterKeyRef(),
+		DiscoveryUrl:             in.GetDiscoveryUrl(),
+		AuthorizationEndpoint:    in.GetAuthorizationEndpoint(),
+		TokenEndpoint:            in.GetTokenEndpoint(),
+		JwksUri:                  in.GetJwksUri(),
+		AllowedAudiences:         append([]string(nil), in.GetAllowedAudiences()...),
+		ClaimMap:                 map[string]string{},
+		JitPolicy:                in.GetJitPolicy(),
+		JitDefaultRoleId:         in.GetJitDefaultRoleId(),
+		JitDomain:                in.GetJitDomain(),
 	}
 	for k, v := range in.GetClaimMap() {
 		out.ClaimMap[k] = v

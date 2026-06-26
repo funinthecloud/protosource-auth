@@ -2,11 +2,12 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/funinthecloud/protosource"
-	"github.com/funinthecloud/protosource/stores/memorystore"
 	"github.com/funinthecloud/protosource/serializers/protobinaryserializer"
+	"github.com/funinthecloud/protosource/stores/memorystore"
 
 	issuerv1 "github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1"
 	"github.com/funinthecloud/protosource-auth/keyproviders/local"
@@ -222,11 +223,13 @@ func TestOIDCConfigurator_RejectsNonExternalIssuer(t *testing.T) {
 	}
 	cfg := service.NewOIDCConfigurator(issuerRepo, provider, "local-master")
 
-	if err := cfg.Set(ctx, service.SetRequest{IssuerID: "self-1", ClientID: "cid", ClientSecret: []byte("x")}); err == nil {
-		t.Error("Set on KIND_SELF issuer should be rejected")
+	// It must surface as ErrIssuerNotExternal so admin handlers map it to a
+	// 400 client error rather than a 500 (see applyError).
+	if err := cfg.Set(ctx, service.SetRequest{IssuerID: "self-1", ClientID: "cid", ClientSecret: []byte("x")}); !errors.Is(err, service.ErrIssuerNotExternal) {
+		t.Errorf("Set on KIND_SELF: err = %v, want ErrIssuerNotExternal", err)
 	}
-	if err := cfg.Clear(ctx, "self-1", "test"); err == nil {
-		t.Error("Clear on KIND_SELF issuer should be rejected")
+	if err := cfg.Clear(ctx, "self-1", "test"); !errors.Is(err, service.ErrIssuerNotExternal) {
+		t.Errorf("Clear on KIND_SELF: err = %v, want ErrIssuerNotExternal", err)
 	}
 }
 

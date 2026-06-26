@@ -312,12 +312,15 @@ func (x *RoleGrant) GetAssignedAt() int64 {
 // the IdP asserted at link time (it is NOT kept in sync with the IdP);
 // linked_at is the unix-second link timestamp.
 type LinkedIdentity struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	LinkKey       string                 `protobuf:"bytes,1,opt,name=link_key,json=linkKey,proto3" json:"link_key,omitempty"`
-	IssuerId      string                 `protobuf:"bytes,2,opt,name=issuer_id,json=issuerId,proto3" json:"issuer_id,omitempty"`
-	Subject       string                 `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
-	EmailAtLink   string                 `protobuf:"bytes,4,opt,name=email_at_link,json=emailAtLink,proto3" json:"email_at_link,omitempty"`
-	LinkedAt      int64                  `protobuf:"varint,5,opt,name=linked_at,json=linkedAt,proto3" json:"linked_at,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// link_key, issuer_id, and subject define the identity's uniqueness and the
+	// collection map key; an empty value would collide on the "" map key and
+	// produce ambiguous links, so reject empties at the command boundary.
+	LinkKey       string `protobuf:"bytes,1,opt,name=link_key,json=linkKey,proto3" json:"link_key,omitempty"`
+	IssuerId      string `protobuf:"bytes,2,opt,name=issuer_id,json=issuerId,proto3" json:"issuer_id,omitempty"`
+	Subject       string `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	EmailAtLink   string `protobuf:"bytes,4,opt,name=email_at_link,json=emailAtLink,proto3" json:"email_at_link,omitempty"`
+	LinkedAt      int64  `protobuf:"varint,5,opt,name=linked_at,json=linkedAt,proto3" json:"linked_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1705,11 +1708,11 @@ const file_auth_user_v1_user_proto_rawDesc = "" +
 	"\tRoleGrant\x12\x17\n" +
 	"\arole_id\x18\x01 \x01(\tR\x06roleId\x12\x1f\n" +
 	"\vassigned_at\x18\x02 \x01(\x03R\n" +
-	"assignedAt\"\xa3\x01\n" +
-	"\x0eLinkedIdentity\x12\x19\n" +
-	"\blink_key\x18\x01 \x01(\tR\alinkKey\x12\x1b\n" +
-	"\tissuer_id\x18\x02 \x01(\tR\bissuerId\x12\x18\n" +
-	"\asubject\x18\x03 \x01(\tR\asubject\x12\"\n" +
+	"assignedAt\"\xbe\x01\n" +
+	"\x0eLinkedIdentity\x12\"\n" +
+	"\blink_key\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\alinkKey\x12$\n" +
+	"\tissuer_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\bissuerId\x12!\n" +
+	"\asubject\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\asubject\x12\"\n" +
 	"\remail_at_link\x18\x04 \x01(\tR\vemailAtLink\x12\x1b\n" +
 	"\tlinked_at\x18\x05 \x01(\x03R\blinkedAt\"\x8d\x01\n" +
 	"\x06Create\x12\x0e\n" +

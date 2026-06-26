@@ -426,3 +426,36 @@ func TestResolveOrProvision_UnlinkThenSubjectIsRejected(t *testing.T) {
 		t.Fatalf("link %q should be removed: %v", linkKey, u.GetLinkedIdentities())
 	}
 }
+
+// LinkIdentity must reject empty uniqueness fields — an empty link_key would
+// collide on the "" map key and produce ambiguous links.
+func TestLinkIdentity_RejectsEmptyKeyFields(t *testing.T) {
+	ctx := context.Background()
+	repo := newUserRepo()
+	if _, err := repo.Apply(ctx, &userv1.Create{
+		Id: "u1", Actor: "t", Email: "a@b.co", PasswordHash: []byte("h"),
+	}); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name     string
+		identity *userv1.LinkedIdentity
+	}{
+		{"empty link_key", &userv1.LinkedIdentity{LinkKey: "", IssuerId: "iss", Subject: "sub"}},
+		{"empty issuer_id", &userv1.LinkedIdentity{LinkKey: "iss:sub", IssuerId: "", Subject: "sub"}},
+		{"empty subject", &userv1.LinkedIdentity{LinkKey: "iss:sub", IssuerId: "iss", Subject: ""}},
+	} {
+		if _, err := repo.Apply(ctx, &userv1.LinkIdentity{Id: "u1", Actor: "t", Identity: tc.identity}); err == nil {
+			t.Errorf("LinkIdentity with %s should fail validation", tc.name)
+		}
+	}
+
+	// Fully populated keys succeed.
+	if _, err := repo.Apply(ctx, &userv1.LinkIdentity{
+		Id: "u1", Actor: "t",
+		Identity: &userv1.LinkedIdentity{LinkKey: "iss:sub", IssuerId: "iss", Subject: "sub"},
+	}); err != nil {
+		t.Errorf("LinkIdentity with valid keys: %v", err)
+	}
+}

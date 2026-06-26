@@ -326,3 +326,47 @@ func TestAccessRefreshRejectsRevokedShadow(t *testing.T) {
 		t.Fatalf("status = %d, want 401; body=%s", resp.StatusCode, resp.Body)
 	}
 }
+
+type stubIdentifier struct {
+	userID string
+	err    error
+}
+
+func (s stubIdentifier) Identify(_ context.Context, _ string) (string, error) {
+	return s.userID, s.err
+}
+
+type stubMinter struct{ err error }
+
+func (s stubMinter) IssueAccessToken(_ context.Context, _, _ string) (string, int64, error) {
+	return "", 0, s.err
+}
+
+// A backend failure minting the access token must return a 503 with the stable
+// machine code "service_unavailable" (underscore, not a space) in both the
+// JSON error and code fields.
+func TestAccessRefreshUnavailableCode(t *testing.T) {
+	h := NewAccessHandler(
+		stubIdentifier{userID: "user-1"},
+		stubMinter{err: errors.New("mint boom")},
+		"default", "shadow", "shadow_access",
+	)
+	router := protosource.NewRouter(h)
+	resp := router.Dispatch(context.Background(), "POST", "/auth/refresh", protosource.Request{
+		Headers: map[string]string{
+			"x-forwarded-proto": "https",
+			"host":              "auth.example.com",
+			"cookie":            "shadow=anything",
+		},
+	})
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503; body=%s", resp.StatusCode, resp.Body)
+	}
+	var body map[string]string
+	if err := json.Unmarshal([]byte(resp.Body), &body); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	if body["code"] != "service_unavailable" || body["error"] != "service_unavailable" {
+		t.Errorf("body = %v, want code/error = service_unavailable", body)
+	}
+}

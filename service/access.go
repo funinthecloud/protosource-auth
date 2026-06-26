@@ -202,18 +202,18 @@ func (h *AccessHandler) handleRefresh(ctx context.Context, req protosource.Reque
 		if errors.Is(err, authz.ErrUnauthenticated) {
 			return accessError(http.StatusUnauthorized, "unauthenticated")
 		}
-		return accessError(http.StatusServiceUnavailable, "service unavailable")
+		return accessError(http.StatusServiceUnavailable, "service_unavailable")
 	}
 
 	jwt, expiresAt, err := h.minter.IssueAccessToken(ctx, userID, h.selfIssuerID)
 	if err != nil {
-		return accessError(http.StatusServiceUnavailable, "service unavailable")
+		return accessError(http.StatusServiceUnavailable, "service_unavailable")
 	}
 
 	now := h.now()
 	maxAge := int(time.Unix(expiresAt, 0).Sub(now).Seconds())
 	if maxAge <= 0 {
-		return accessError(http.StatusServiceUnavailable, "service unavailable")
+		return accessError(http.StatusServiceUnavailable, "service_unavailable")
 	}
 
 	cookie := newAccessCookie(h.accessCookieName, jwt, reqHost(req), maxAge)
