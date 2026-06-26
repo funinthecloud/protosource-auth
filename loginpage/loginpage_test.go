@@ -3,6 +3,7 @@ package loginpage
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -77,7 +78,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	})
 
 	loginer := service.NewLoginer(userRepo, issuerRepo, tokenRepo, dir, resolver)
-	page := New("default", "shadow", loginer)
+	page := New("default", "shadow", "shadow_access", loginer)
 
 	return &testEnv{page: page}
 }
@@ -277,7 +278,7 @@ func TestNewPanicsOnNilLoginer(t *testing.T) {
 			t.Fatalf("unexpected panic: %v", r)
 		}
 	}()
-	New("issuer", "shadow", nil)
+	New("issuer", "shadow", "shadow_access", nil)
 }
 
 // -- handleLogin tests --
@@ -386,19 +387,26 @@ func TestHandleLoginSuccess(t *testing.T) {
 			}
 
 			// Verify response body.
-			var body map[string]bool
+			var body map[string]any
 			if err := json.Unmarshal([]byte(resp.Body), &body); err != nil {
 				t.Fatalf("unmarshal body: %v", err)
 			}
-			if !body["ok"] {
+			if ok, _ := body["ok"].(bool); !ok {
 				t.Error("body[ok] = false")
 			}
 
-			// Verify Set-Cookie header.
-			cookie := resp.Headers["Set-Cookie"]
-			if cookie == "" {
-				t.Fatal("missing Set-Cookie header")
+			// Verify shadow cookie (now delivered via Response.Cookies,
+			// alongside the companion access cookie).
+			var shadow *http.Cookie
+			for _, c := range resp.Cookies {
+				if c != nil && c.Name == "shadow" {
+					shadow = c
+				}
 			}
+			if shadow == nil {
+				t.Fatalf("missing shadow cookie; cookies=%v", resp.Cookies)
+			}
+			cookie := shadow.String()
 			if !strings.Contains(cookie, "shadow=") {
 				t.Errorf("cookie missing shadow= prefix: %s", cookie)
 			}
@@ -467,7 +475,7 @@ func TestHandleLoginExpiredToken(t *testing.T) {
 		service.WithLoginerClock(pastClock),
 		service.WithTokenTTL(1*time.Hour),
 	)
-	page := New("default", "shadow", loginer)
+	page := New("default", "shadow", "shadow_access", loginer)
 
 	resp := page.handleLogin(ctx, protosource.Request{
 		Headers: secureHeaders("auth.drhayt.com"),

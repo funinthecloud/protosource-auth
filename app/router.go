@@ -44,10 +44,18 @@ func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver, provider ke
 		bundle.UserRepo, bundle.IssuerRepo, bundle.TokenRepo,
 		bundle.Directory, resolver,
 		service.WithTokenTTL(cfg.TokenTTL),
+		service.WithAccessTTL(cfg.AccessTokenTTL),
+		service.WithAccessAudience(cfg.AccessAudience),
 	)
 	checker := service.NewChecker(bundle.TokenRepo, bundle.UserRepo, bundle.RoleRepo)
 	svc := service.NewService(loginer, checker)
-	lp := loginpage.New(cfg.IssuerID, cfg.ShadowCookieName, loginer)
+	lp := loginpage.New(cfg.IssuerID, cfg.ShadowCookieName, cfg.AccessCookieName, loginer)
+	// POST /auth/refresh: exchange the live shadow cookie for a fresh
+	// short-lived access-JWT cookie (the browser's silent-refresh path).
+	accessRefresh := service.NewAccessHandler(
+		checker, loginer,
+		cfg.IssuerID, cfg.ShadowCookieName, cfg.AccessCookieName,
+	)
 	disc := service.NewDiscovery(cfg.IssuerIss, cfg.ShadowCookieName)
 	jwks := service.NewJWKS(resolver, cfg.IssuerID)
 
@@ -68,9 +76,10 @@ func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver, provider ke
 		bundle.IssuerRepo, configurator, resolver, loginer,
 		identityResolver,
 		cfg.IssuerID, cfg.IssuerIss, cfg.ShadowCookieName,
+		service.WithOAuthAccessCookieName(cfg.AccessCookieName),
 	)
 
-	registrars := []protosource.RouteRegistrar{svc, lp, disc, jwks, oauthHandler}
+	registrars := []protosource.RouteRegistrar{svc, lp, disc, jwks, oauthHandler, accessRefresh}
 
 	// The v1 admin handlers + whoami + adminUser require the
 	// opaquedata-backed clients. Memory backend leaves them nil; see

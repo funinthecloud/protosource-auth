@@ -48,10 +48,11 @@ type OAuthHandler struct {
 	issuerIss    string
 	stateAlg     string // algorithm used to sign the state cookie (e.g. EdDSA)
 
-	// shadowCookieName / stateCookieName are the cookie names; stateTTL is
-	// the state cookie + JWT lifetime.
+	// shadowCookieName / stateCookieName / accessCookieName are the cookie
+	// names; stateTTL is the state cookie + JWT lifetime.
 	shadowCookieName string
 	stateCookieName  string
+	accessCookieName string
 	stateTTL         time.Duration
 
 	// httpClient and now are injectable for tests. httpClient is handed to
@@ -110,6 +111,17 @@ func WithOAuthStateTTL(d time.Duration) OAuthHandlerOption {
 	}
 }
 
+// WithOAuthAccessCookieName overrides the name of the access-JWT cookie
+// set on a successful callback. Empty leaves the default
+// (shadowCookieName + "_access").
+func WithOAuthAccessCookieName(name string) OAuthHandlerOption {
+	return func(h *OAuthHandler) {
+		if name != "" {
+			h.accessCookieName = name
+		}
+	}
+}
+
 // NewOAuthHandler wires the PKCE handler. issuerRepo, configurator, resolver,
 // loginer, and identity are required (nil panics, consistent with the other
 // service constructors). selfIssuerID defaults to "default", shadowCookieName
@@ -155,6 +167,7 @@ func NewOAuthHandler(
 		stateAlg:         preferredAlg(resolver),
 		shadowCookieName: shadowCookieName,
 		stateCookieName:  shadowCookieName + "_oauth_state",
+		accessCookieName: shadowCookieName + "_access",
 		stateTTL:         DefaultStateTTL,
 		httpClient:       http.DefaultClient,
 		now:              time.Now,
@@ -304,15 +317,6 @@ func (h *OAuthHandler) HandleCallback(ctx context.Context, req protosource.Reque
 		return oauthRedirectError(http.StatusBadRequest, "invalid_state")
 	}
 
-	// NOTE: the state cookie cannot be cleared here. protosource's Response
-	// carries Headers as map[string]string, so the adapter can emit only ONE
-	// Set-Cookie per response (it does w.Header().Set per key). We must set
-	// the shadow cookie, so the state cookie is left to self-expire (short
-	// MaxAge, Path=/oauth/callback). Replay is harmless: the authorization
-	// code is single-use at the IdP, so a re-POST of the same callback fails
-	// the exchange. See docs/decisions and the handoff notes; revisit if the
-	// Response gains a multi-cookie field.
-
 	oc, resp, ok := h.loadExternalOIDC(ctx, claims.IDP)
 	if !ok {
 		return resp
@@ -375,16 +379,43 @@ func (h *OAuthHandler) HandleCallback(ctx context.Context, req protosource.Reque
 		return oauthRedirectError(http.StatusServiceUnavailable, "token_issue_failed")
 	}
 
-	maxAge := int(time.Unix(loginResp.ExpiresAt, 0).Sub(now).Seconds())
-	if maxAge <= 0 {
+	// Companion access JWT: short-lived, offline-verifiable, delivered as a
+	// separate HttpOnly cookie alongside the shadow. The shadow stays the
+	// long-lived session/refresh handle; the access cookie is the thing
+	// downstream resource servers verify via JWKS without a /authz/check hop.
+	accessJWT, accessExp, err := h.loginer.IssueAccessToken(ctx, userID, h.selfIssuerID)
+	if err != nil {
 		return oauthRedirectError(http.StatusServiceUnavailable, "token_issue_failed")
 	}
+
+	host := reqHost(req)
+	shadowMaxAge := int(time.Unix(loginResp.ExpiresAt, 0).Sub(now).Seconds())
+	accessMaxAge := int(time.Unix(accessExp, 0).Sub(now).Seconds())
+	if shadowMaxAge <= 0 || accessMaxAge <= 0 {
+		return oauthRedirectError(http.StatusServiceUnavailable, "token_issue_failed")
+	}
+
 	shadowCookie := &http.Cookie{
 		Name:     h.shadowCookieName,
 		Value:    loginResp.ShadowToken,
 		Path:     "/",
-		Domain:   parentCookieDomain(reqHost(req)),
-		MaxAge:   maxAge,
+		Domain:   parentCookieDomain(host),
+		MaxAge:   shadowMaxAge,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	}
+	accessCookie := newAccessCookie(h.accessCookieName, accessJWT, host, accessMaxAge)
+
+	// Now that protosource v0.8.0 Response carries Cookies []*http.Cookie
+	// (one Set-Cookie per entry), actively clear the single-use state cookie
+	// in the same response — no longer relying on it self-expiring.
+	clearedState := &http.Cookie{
+		Name:     h.stateCookieName,
+		Value:    "",
+		Path:     "/oauth/callback",
+		Domain:   parentCookieDomain(host),
+		MaxAge:   -1,
 		Secure:   true,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
@@ -392,10 +423,8 @@ func (h *OAuthHandler) HandleCallback(ctx context.Context, req protosource.Reque
 
 	return protosource.Response{
 		StatusCode: http.StatusFound,
-		Headers: map[string]string{
-			"Location":   claims.RedirectURI,
-			"Set-Cookie": shadowCookie.String(),
-		},
+		Headers:    map[string]string{"Location": claims.RedirectURI},
+		Cookies:    []*http.Cookie{shadowCookie, accessCookie, clearedState},
 	}
 }
 

@@ -33,22 +33,32 @@ var loginTmpl = template.Must(template.New("login").Parse(loginHTML))
 // The cookie name is configurable to support the v2 federation cookie-rename
 // + discovery arc (V2_FEDERATION.md); it defaults to "shadow" for compatibility.
 type Page struct {
-	issuerID   string
-	cookieName string
-	loginer    *service.Loginer
+	issuerID         string
+	cookieName       string
+	accessCookieName string
+	loginer          *service.Loginer
 }
 
 // New returns a Page that serves the login form and handles
 // authentication via the provided Loginer. Panics if loginer is nil.
-// cookieName defaults to "shadow" if empty.
-func New(issuerID string, cookieName string, loginer *service.Loginer) *Page {
+// cookieName defaults to "shadow" if empty; accessCookieName (the
+// companion HttpOnly access-JWT cookie) defaults to cookieName+"_access".
+func New(issuerID string, cookieName, accessCookieName string, loginer *service.Loginer) *Page {
 	if loginer == nil {
 		panic("loginpage.New: loginer must not be nil")
 	}
 	if cookieName == "" {
 		cookieName = "shadow"
 	}
-	return &Page{issuerID: issuerID, cookieName: cookieName, loginer: loginer}
+	if accessCookieName == "" {
+		accessCookieName = cookieName + "_access"
+	}
+	return &Page{
+		issuerID:         issuerID,
+		cookieName:       cookieName,
+		accessCookieName: accessCookieName,
+		loginer:          loginer,
+	}
 }
 
 // RegisterRoutes registers GET / (form) and POST / (login) on the router.
@@ -116,25 +126,48 @@ func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protoso
 		return jsonError(http.StatusServiceUnavailable, "token already expired")
 	}
 
-	c := &http.Cookie{
+	host := reqHost(req)
+	domain := parentDomain(host)
+
+	shadowCookie := &http.Cookie{
 		Name:     p.cookieName,
 		Value:    result.ShadowToken,
 		Path:     "/",
-		Domain:   parentDomain(reqHost(req)),
+		Domain:   domain,
 		MaxAge:   maxAge,
 		Secure:   true,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
 
-	body, _ := json.Marshal(map[string]bool{"ok": true})
+	// Companion access JWT: a short-lived, offline-verifiable HttpOnly
+	// cookie minted for the same user. The break-glass form login gets the
+	// same access-token posture as the federated callback. The token never
+	// reaches JS (HttpOnly); the SPA learns only its lifetime via expires_in.
+	cookies := []*http.Cookie{shadowCookie}
+	accessExpiresIn := 0
+	if accessJWT, accessExp, aerr := p.loginer.IssueAccessToken(ctx, result.UserID, p.issuerID); aerr == nil {
+		if accessMaxAge := int(time.Until(time.Unix(accessExp, 0)).Seconds()); accessMaxAge > 0 {
+			cookies = append(cookies, &http.Cookie{
+				Name:     p.accessCookieName,
+				Value:    accessJWT,
+				Path:     "/",
+				Domain:   domain,
+				MaxAge:   accessMaxAge,
+				Secure:   true,
+				HttpOnly: true,
+				SameSite: http.SameSiteLaxMode,
+			})
+			accessExpiresIn = accessMaxAge
+		}
+	}
+
+	body, _ := json.Marshal(map[string]any{"ok": true, "expires_in": accessExpiresIn})
 	return protosource.Response{
 		StatusCode: http.StatusOK,
 		Body:       string(body),
-		Headers: map[string]string{
-			"Content-Type": "application/json",
-			"Set-Cookie":   c.String(),
-		},
+		Headers:    map[string]string{"Content-Type": "application/json"},
+		Cookies:    cookies,
 	}
 }
 

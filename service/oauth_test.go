@@ -306,6 +306,16 @@ func driveAuthorize(t *testing.T, rig *oauthRig) (state, cookiePair string) {
 	return state, cookiePair
 }
 
+// findCookie returns the first cookie with the given name, or nil.
+func findCookie(cookies []*http.Cookie, name string) *http.Cookie {
+	for _, c := range cookies {
+		if c != nil && c.Name == name {
+			return c
+		}
+	}
+	return nil
+}
+
 func TestCallbackHappyPathSetsShadowCookie(t *testing.T) {
 	now := time.Now().UTC()
 	rig := newOAuthRig(t, func() time.Time { return now }, fakeResolver{userID: "user-123"})
@@ -328,16 +338,31 @@ func TestCallbackHappyPathSetsShadowCookie(t *testing.T) {
 	if loc := resp.Headers["Location"]; loc != "https://app.example.com/home" {
 		t.Errorf("Location = %q, want original redirect_uri", loc)
 	}
-	sc := resp.Headers["Set-Cookie"]
-	if !strings.HasPrefix(sc, "shadow=") {
-		t.Fatalf("Set-Cookie = %q, want shadow cookie", sc)
+	// Multi-cookie response (protosource v0.8.0): shadow + access set,
+	// single-use state cookie cleared, all in one 302.
+	shadowCookie := findCookie(resp.Cookies, "shadow")
+	if shadowCookie == nil {
+		t.Fatalf("no shadow cookie in response; cookies=%v", resp.Cookies)
 	}
-	if !strings.Contains(sc, "HttpOnly") || !strings.Contains(sc, "Secure") {
-		t.Errorf("shadow cookie missing HttpOnly/Secure: %q", sc)
+	if !shadowCookie.HttpOnly || !shadowCookie.Secure {
+		t.Errorf("shadow cookie missing HttpOnly/Secure: %+v", shadowCookie)
+	}
+	accessCookie := findCookie(resp.Cookies, "shadow_access")
+	if accessCookie == nil {
+		t.Fatalf("no access cookie in response; cookies=%v", resp.Cookies)
+	}
+	if !accessCookie.HttpOnly || !accessCookie.Secure {
+		t.Errorf("access cookie missing HttpOnly/Secure: %+v", accessCookie)
+	}
+	if accessCookie.Value == "" {
+		t.Errorf("access cookie has empty value")
+	}
+	if stateCookie := findCookie(resp.Cookies, "shadow_oauth_state"); stateCookie == nil || stateCookie.MaxAge >= 0 {
+		t.Errorf("state cookie not actively cleared: %+v", stateCookie)
 	}
 
 	// The shadow token must dereference to an issued Token for user-123.
-	token := strings.TrimPrefix(strings.SplitN(sc, ";", 2)[0], "shadow=")
+	token := shadowCookie.Value
 	agg, err := rig.tokenRepo.Load(ctx, token)
 	if err != nil {
 		t.Fatalf("load minted token: %v", err)
