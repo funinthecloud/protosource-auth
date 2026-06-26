@@ -17,10 +17,13 @@ import (
 )
 
 // ErrLinkNotFound is returned by [LinkDirectory.FindUserByLink] when no User
-// is linked to the given link key. The IdentityProvisioner treats any lookup
-// error as "no link" and falls through to JIT policy, so the concrete sentinel
-// matters mostly for testing and for implementations that want to distinguish
-// "no link" from "lookup failed".
+// is linked to the given link key. The IdentityProvisioner falls through to
+// JIT policy ONLY on this sentinel (or a nil-error empty result); any other
+// lookup error is propagated so a transient store/index failure fails closed
+// instead of being mistaken for "no link" (which would reject a valid linked
+// user under JIT_REJECT, or needlessly re-provision under AUTO/DOMAIN).
+// Implementations MUST return this — not a bare nil/"" or an opaque error — to
+// signal a genuine miss.
 var ErrLinkNotFound = errors.New("service: linked identity not found")
 
 // noFederatedPassword is the sentinel password hash stored on JIT-provisioned
@@ -202,15 +205,27 @@ func DeterministicUserID(linkKey string) string {
 func (p *IdentityProvisioner) ResolveOrProvision(ctx context.Context, fi FederatedIdentity, oidc *issuerv1.OIDCConfig) (string, error) {
 	linkKey := LinkKey(fi.IssuerID, fi.Subject)
 
-	if userID, err := p.links.FindUserByLink(ctx, linkKey); err == nil && userID != "" {
+	switch userID, err := p.links.FindUserByLink(ctx, linkKey); {
+	case err == nil && userID != "":
 		return userID, nil
+	case err == nil, errors.Is(err, ErrLinkNotFound):
+		// No existing link — fall through to JIT policy below.
+	default:
+		// A real lookup failure (store/index error) must not be silently
+		// treated as "not linked": fail closed so the callback surfaces a
+		// 503 rather than wrongly rejecting (JIT_REJECT) or re-provisioning
+		// (AUTO/DOMAIN) a user that is in fact already linked.
+		return "", fmt.Errorf("service: lookup link %q: %w", linkKey, err)
 	}
 
 	switch oidc.GetJitPolicy() {
 	case issuerv1.OIDCJITPolicy_JIT_AUTO_NO_ROLES:
 		return p.provision(ctx, fi, linkKey, "")
 	case issuerv1.OIDCJITPolicy_JIT_DOMAIN_RULE:
-		if !emailDomainMatches(fi.Email, oidc.GetJitDomain()) {
+		// Domain-based auto-provisioning grants access purely from the email's
+		// domain, so the email MUST be provably the user's. Require BOTH a
+		// verified email claim and a domain match; either missing fails closed.
+		if !emailVerified(fi.Claims, oidc) || !emailDomainMatches(fi.Email, oidc.GetJitDomain()) {
 			return "", ErrJITRejected
 		}
 		return p.provision(ctx, fi, linkKey, oidc.GetJitDefaultRoleId())
@@ -302,6 +317,30 @@ func (p *IdentityProvisioner) loadUser(ctx context.Context, userID string) (*use
 		return nil, fmt.Errorf("service: loaded %T, want *userv1.User", agg)
 	}
 	return user, nil
+}
+
+// emailVerified reports whether the ID-token claims assert a verified email,
+// using the issuer's claim_map: claim_map["email_verified"] names the IdP
+// claim carrying the verification flag (default: the standard "email_verified"
+// claim). The OIDC spec types email_verified as a JSON boolean, but some
+// providers encode it as the string "true"; both are accepted. A missing
+// claim, a false value, or any other shape is treated as unverified — fail
+// closed. Only JIT_DOMAIN_RULE consults this, because it is the one policy that
+// grants access from the email domain rather than from the verified subject
+// link alone.
+func emailVerified(claims map[string]any, oc *issuerv1.OIDCConfig) bool {
+	name := oc.GetClaimMap()["email_verified"]
+	if name == "" {
+		name = "email_verified"
+	}
+	switch v := claims[name].(type) {
+	case bool:
+		return v
+	case string:
+		return strings.EqualFold(v, "true")
+	default:
+		return false
+	}
 }
 
 // emailDomainMatches reports whether email's domain satisfies a jit_domain

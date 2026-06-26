@@ -167,7 +167,10 @@ func TestResolveOrProvision_DomainRule(t *testing.T) {
 			links := service.NewMapLinkDirectory()
 			p := service.NewIdentityProvisioner(repo, links, service.WithIdentityProvisionerClock(fixedClock()))
 
-			fi := service.FederatedIdentity{IssuerID: "iss-corp", Subject: "sub-" + tc.name, Email: tc.email}
+			fi := service.FederatedIdentity{
+				IssuerID: "iss-corp", Subject: "sub-" + tc.name, Email: tc.email,
+				Claims: map[string]any{"email_verified": true},
+			}
 			got, err := p.ResolveOrProvision(context.Background(), fi, &issuerv1.OIDCConfig{
 				JitPolicy:        issuerv1.OIDCJITPolicy_JIT_DOMAIN_RULE,
 				JitDomain:        tc.jitDomain,
@@ -198,7 +201,10 @@ func TestResolveOrProvision_DomainRuleNoDefaultRole(t *testing.T) {
 	links := service.NewMapLinkDirectory()
 	p := service.NewIdentityProvisioner(repo, links, service.WithIdentityProvisionerClock(fixedClock()))
 
-	fi := service.FederatedIdentity{IssuerID: "iss-corp", Subject: "sub-norole", Email: "e@example.com"}
+	fi := service.FederatedIdentity{
+		IssuerID: "iss-corp", Subject: "sub-norole", Email: "e@example.com",
+		Claims: map[string]any{"email_verified": true},
+	}
 	got, err := p.ResolveOrProvision(context.Background(), fi, &issuerv1.OIDCConfig{
 		JitPolicy: issuerv1.OIDCJITPolicy_JIT_DOMAIN_RULE,
 		JitDomain: "example.com",
@@ -210,6 +216,97 @@ func TestResolveOrProvision_DomainRuleNoDefaultRole(t *testing.T) {
 	u := loadUser(t, repo, got)
 	if len(u.GetRoles()) != 0 {
 		t.Fatalf("expected no roles when jit_default_role_id is empty, got %v", u.GetRoles())
+	}
+}
+
+// TestResolveOrProvision_DomainRuleRequiresVerifiedEmail proves JIT_DOMAIN_RULE
+// fails closed unless the IdP asserts a verified email (PR #26 finding 1): a
+// matching domain alone is not enough, because the email claim may be
+// unverified or user-editable.
+func TestResolveOrProvision_DomainRuleRequiresVerifiedEmail(t *testing.T) {
+	cases := []struct {
+		name     string
+		claims   map[string]any
+		claimMap map[string]string
+		wantErr  bool
+	}{
+		{"verified bool true provisions", map[string]any{"email_verified": true}, nil, false},
+		{"verified string true provisions", map[string]any{"email_verified": "true"}, nil, false},
+		{"verified false rejects", map[string]any{"email_verified": false}, nil, true},
+		{"verified string false rejects", map[string]any{"email_verified": "false"}, nil, true},
+		{"missing claim rejects (fail closed)", map[string]any{}, nil, true},
+		{"nil claims rejects", nil, nil, true},
+		{"custom verified claim via claim_map", map[string]any{"verified": true}, map[string]string{"email_verified": "verified"}, false},
+		{"custom claim name, standard claim ignored", map[string]any{"email_verified": true}, map[string]string{"email_verified": "verified"}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newUserRepo()
+			links := service.NewMapLinkDirectory()
+			p := service.NewIdentityProvisioner(repo, links, service.WithIdentityProvisionerClock(fixedClock()))
+
+			fi := service.FederatedIdentity{
+				IssuerID: "iss-corp", Subject: "sub-" + tc.name,
+				Email: "user@example.com", Claims: tc.claims,
+			}
+			_, err := p.ResolveOrProvision(context.Background(), fi, &issuerv1.OIDCConfig{
+				JitPolicy:        issuerv1.OIDCJITPolicy_JIT_DOMAIN_RULE,
+				JitDomain:        "example.com",
+				JitDefaultRoleId: "role-eng",
+				ClaimMap:         tc.claimMap,
+			})
+			if tc.wantErr {
+				if !errors.Is(err, service.ErrJITRejected) {
+					t.Fatalf("got %v, want ErrJITRejected", err)
+				}
+				if links.Len() != 0 {
+					t.Fatalf("unverified-email provision leaked a link: %d", links.Len())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ResolveOrProvision: %v", err)
+			}
+		})
+	}
+}
+
+// erroringLinkDirectory is a LinkDirectory whose lookups always fail with a
+// non-ErrLinkNotFound error, modeling a transient store/index failure.
+type erroringLinkDirectory struct{ err error }
+
+func (d erroringLinkDirectory) FindUserByLink(context.Context, string) (string, error) {
+	return "", d.err
+}
+
+// TestResolveOrProvision_LookupErrorPropagates proves a transient link-lookup
+// failure is surfaced, not silently treated as "not linked" (PR #26 finding 2).
+// It must NOT be reported as ErrJITRejected and must NOT provision a user.
+func TestResolveOrProvision_LookupErrorPropagates(t *testing.T) {
+	repo := newUserRepo()
+	sentinel := errors.New("dynamodb: throttled")
+	p := service.NewIdentityProvisioner(repo, erroringLinkDirectory{err: sentinel},
+		service.WithIdentityProvisionerClock(fixedClock()))
+
+	_, err := p.ResolveOrProvision(context.Background(), service.FederatedIdentity{
+		IssuerID: "iss-google", Subject: "sub-throttle", Email: "x@example.com",
+		Claims: map[string]any{"email_verified": true},
+	}, &issuerv1.OIDCConfig{
+		JitPolicy:        issuerv1.OIDCJITPolicy_JIT_DOMAIN_RULE,
+		JitDomain:        "example.com",
+		JitDefaultRoleId: "role-eng",
+	})
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("got %v, want wrapped sentinel error", err)
+	}
+	if errors.Is(err, service.ErrJITRejected) {
+		t.Fatal("transient lookup error must not be reported as ErrJITRejected")
+	}
+	// No user provisioned for the deterministic id (load must report the
+	// aggregate as never created).
+	id := service.DeterministicUserID(service.LinkKey("iss-google", "sub-throttle"))
+	if _, err := repo.Load(context.Background(), id); err == nil {
+		t.Fatal("expected no provisioned user after lookup error")
 	}
 }
 
