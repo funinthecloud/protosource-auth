@@ -24,6 +24,8 @@ var usage = "Usage: usermgr [-json] <command> [args]\n\nFlags:\n" +
 	"  changepassword  <id>  <password_hash>\n" +
 	"  assignrole  <id>  <grant:json>\n" +
 	"  revokerole  <id>  <role_id>\n" +
+	"  linkidentity  <id>  <identity:json>\n" +
+	"  unlinkidentity  <id>  <link_key>\n" +
 	"  lock  <id>  <reason>\n" +
 	"  unlock  <id>\n" +
 	"  delete  <id>\n" +
@@ -115,6 +117,26 @@ func main() {
 			fatal("usage: usermgr revokerole <id> <role_id>")
 		}
 		result, err := client.RevokeRole(ctx, os.Args[2], os.Args[3])
+		if err != nil {
+			fatal(fmt.Sprintf("error: %v", err))
+		}
+		fmt.Printf("{\"id\":%q,\"version\":%d}\n", result.GetId(), result.GetVersion())
+
+	case "linkidentity":
+		if len(os.Args) != 4 {
+			fatal("usage: usermgr linkidentity <id> <identity:json>")
+		}
+		result, err := client.LinkIdentity(ctx, os.Args[2], mustParseJSON[*pkg.LinkedIdentity](os.Args[3], "identity"))
+		if err != nil {
+			fatal(fmt.Sprintf("error: %v", err))
+		}
+		fmt.Printf("{\"id\":%q,\"version\":%d}\n", result.GetId(), result.GetVersion())
+
+	case "unlinkidentity":
+		if len(os.Args) != 4 {
+			fatal("usage: usermgr unlinkidentity <id> <link_key>")
+		}
+		result, err := client.UnlinkIdentity(ctx, os.Args[2], os.Args[3])
 		if err != nil {
 			fatal(fmt.Sprintf("error: %v", err))
 		}

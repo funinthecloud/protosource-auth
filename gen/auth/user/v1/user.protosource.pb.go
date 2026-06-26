@@ -78,6 +78,7 @@ func (aggregate *User) RestoreSnapshot(snapshot *Snapshot) {
 	aggregate.PasswordHash = snapshot.GetSnapshot().GetPasswordHash()
 	aggregate.State = snapshot.GetSnapshot().GetState()
 	aggregate.Roles = snapshot.GetSnapshot().GetRoles()
+	aggregate.LinkedIdentities = snapshot.GetSnapshot().GetLinkedIdentities()
 	aggregate.Version = snapshot.GetVersion()
 }
 func (b *Builder) Snapshot(aggregate *User) {
@@ -132,6 +133,17 @@ func (aggregate *User) On(event protosource.Event) error {
 	case *RoleRevoked:
 		aggregate.setModified(e)
 		delete(aggregate.Roles, e.GetRoleId())
+	case *IdentityLinked:
+		aggregate.setModified(e)
+		if elem := e.GetIdentity(); elem != nil {
+			if aggregate.LinkedIdentities == nil {
+				aggregate.LinkedIdentities = make(map[string]*LinkedIdentity)
+			}
+			aggregate.LinkedIdentities[elem.GetLinkKey()] = elem
+		}
+	case *IdentityUnlinked:
+		aggregate.setModified(e)
+		delete(aggregate.LinkedIdentities, e.GetLinkKey())
 	case *Locked:
 		aggregate.setModified(e)
 		aggregate.State = State_STATE_LOCKED
@@ -526,6 +538,76 @@ func (m *RevokeRole) EmitEvents(aggregate protosource.Aggregate) []protosource.E
 	return b.Events
 }
 
+func (m *LinkIdentity) CommandName() string {
+	return "LinkIdentity"
+}
+
+func (m *LinkIdentity) ProtoValidate() error {
+	if err := validator().Validate(m); err != nil {
+		return fmt.Errorf("command %s: %w: %w", m.CommandName(), protosource.ErrValidationFailed, err)
+	}
+	return nil
+}
+
+func (m *LinkIdentity) ValidateVersion(version int64) error {
+	if version == 0 {
+		return fmt.Errorf("command %s requires an existing aggregate (version > 0), got version 0: %w", m.CommandName(), protosource.ErrNotCreatedYet)
+	}
+	return nil
+}
+func (m *LinkIdentity) GuardState(aggregate protosource.Aggregate) error {
+	a := aggregate.(*User)
+	switch a.GetState() {
+	case State_STATE_ACTIVE:
+		return nil
+	default:
+		return fmt.Errorf("command %s not allowed in state %s: %w", m.CommandName(), a.GetState(), protosource.ErrStateNotAllowed)
+	}
+}
+func (m *LinkIdentity) EmitEvents(aggregate protosource.Aggregate) []protosource.Event {
+	b := NewBuilder(m.GetId(), aggregate.GetVersion())
+	a := proto.Clone(aggregate).(*User)
+	b.IdentityLinked(m.GetActor(), m.GetIdentity())
+	_ = a.On(b.Events[len(b.Events)-1]) // safe: On only errors on unhandled event types, and we only emit events defined in this file
+	b.Snapshot(a)                       // Snapshot calls AfterOn() internally only when a snapshot is actually emitted
+	return b.Events
+}
+
+func (m *UnlinkIdentity) CommandName() string {
+	return "UnlinkIdentity"
+}
+
+func (m *UnlinkIdentity) ProtoValidate() error {
+	if err := validator().Validate(m); err != nil {
+		return fmt.Errorf("command %s: %w: %w", m.CommandName(), protosource.ErrValidationFailed, err)
+	}
+	return nil
+}
+
+func (m *UnlinkIdentity) ValidateVersion(version int64) error {
+	if version == 0 {
+		return fmt.Errorf("command %s requires an existing aggregate (version > 0), got version 0: %w", m.CommandName(), protosource.ErrNotCreatedYet)
+	}
+	return nil
+}
+func (m *UnlinkIdentity) GuardState(aggregate protosource.Aggregate) error {
+	a := aggregate.(*User)
+	switch a.GetState() {
+	case State_STATE_ACTIVE:
+		return nil
+	default:
+		return fmt.Errorf("command %s not allowed in state %s: %w", m.CommandName(), a.GetState(), protosource.ErrStateNotAllowed)
+	}
+}
+func (m *UnlinkIdentity) EmitEvents(aggregate protosource.Aggregate) []protosource.Event {
+	b := NewBuilder(m.GetId(), aggregate.GetVersion())
+	a := proto.Clone(aggregate).(*User)
+	b.IdentityUnlinked(m.GetActor(), m.GetLinkKey())
+	_ = a.On(b.Events[len(b.Events)-1]) // safe: On only errors on unhandled event types, and we only emit events defined in this file
+	b.Snapshot(a)                       // Snapshot calls AfterOn() internally only when a snapshot is actually emitted
+	return b.Events
+}
+
 func (m *Lock) CommandName() string {
 	return "Lock"
 }
@@ -689,6 +771,38 @@ func (b *Builder) RoleRevoked(Actor string, RoleId string) {
 		Id:     b.id,
 		Actor:  Actor,
 		RoleId: RoleId,
+
+		Version: b.nextVersion(),
+		At:      protosource.NowMicros(),
+	}
+	b.Events = append(b.Events, event)
+}
+
+func (m *IdentityLinked) EventName() string {
+	return "IdentityLinked"
+}
+
+func (b *Builder) IdentityLinked(Actor string, Identity *LinkedIdentity) {
+	event := &IdentityLinked{
+		Id:       b.id,
+		Actor:    Actor,
+		Identity: Identity,
+
+		Version: b.nextVersion(),
+		At:      protosource.NowMicros(),
+	}
+	b.Events = append(b.Events, event)
+}
+
+func (m *IdentityUnlinked) EventName() string {
+	return "IdentityUnlinked"
+}
+
+func (b *Builder) IdentityUnlinked(Actor string, LinkKey string) {
+	event := &IdentityUnlinked{
+		Id:      b.id,
+		Actor:   Actor,
+		LinkKey: LinkKey,
 
 		Version: b.nextVersion(),
 		At:      protosource.NowMicros(),
