@@ -63,6 +63,24 @@ func (c *HTTPClient) RevokeRole(ctx context.Context, id string, roleId string) (
 	return c.c.Apply(ctx, routePath, cmd)
 }
 
+// LinkIdentity sends the LinkIdentity command.
+func (c *HTTPClient) LinkIdentity(ctx context.Context, id string, identity *LinkedIdentity) (responsev1.Responseer, error) {
+	cmd := &LinkIdentity{
+		Id:       id,
+		Identity: identity,
+	}
+	return c.c.Apply(ctx, routePath, cmd)
+}
+
+// UnlinkIdentity sends the UnlinkIdentity command.
+func (c *HTTPClient) UnlinkIdentity(ctx context.Context, id string, linkKey string) (responsev1.Responseer, error) {
+	cmd := &UnlinkIdentity{
+		Id:      id,
+		LinkKey: linkKey,
+	}
+	return c.c.Apply(ctx, routePath, cmd)
+}
+
 // Lock sends the Lock command.
 func (c *HTTPClient) Lock(ctx context.Context, id string, reason string) (responsev1.Responseer, error) {
 	cmd := &Lock{

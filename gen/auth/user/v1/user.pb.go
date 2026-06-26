@@ -80,19 +80,23 @@ func (State) EnumDescriptor() ([]byte, []int) {
 // indexed via GSI1 so the login endpoint can look up a user by email
 // without a full scan.
 type User struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
-	CreateAt      int64                  `protobuf:"varint,3,opt,name=create_at,json=createAt,proto3" json:"create_at,omitempty"`
-	CreateBy      string                 `protobuf:"bytes,4,opt,name=create_by,json=createBy,proto3" json:"create_by,omitempty"`
-	ModifyAt      int64                  `protobuf:"varint,5,opt,name=modify_at,json=modifyAt,proto3" json:"modify_at,omitempty"`
-	ModifyBy      string                 `protobuf:"bytes,6,opt,name=modify_by,json=modifyBy,proto3" json:"modify_by,omitempty"`
-	Email         string                 `protobuf:"bytes,7,opt,name=email,proto3" json:"email,omitempty"`
-	PasswordHash  []byte                 `protobuf:"bytes,8,opt,name=password_hash,json=passwordHash,proto3" json:"password_hash,omitempty"`
-	State         State                  `protobuf:"varint,9,opt,name=state,proto3,enum=auth.user.v1.State" json:"state,omitempty"`
-	Roles         map[string]*RoleGrant  `protobuf:"bytes,10,rep,name=roles,proto3" json:"roles,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Id           string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version      int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	CreateAt     int64                  `protobuf:"varint,3,opt,name=create_at,json=createAt,proto3" json:"create_at,omitempty"`
+	CreateBy     string                 `protobuf:"bytes,4,opt,name=create_by,json=createBy,proto3" json:"create_by,omitempty"`
+	ModifyAt     int64                  `protobuf:"varint,5,opt,name=modify_at,json=modifyAt,proto3" json:"modify_at,omitempty"`
+	ModifyBy     string                 `protobuf:"bytes,6,opt,name=modify_by,json=modifyBy,proto3" json:"modify_by,omitempty"`
+	Email        string                 `protobuf:"bytes,7,opt,name=email,proto3" json:"email,omitempty"`
+	PasswordHash []byte                 `protobuf:"bytes,8,opt,name=password_hash,json=passwordHash,proto3" json:"password_hash,omitempty"`
+	State        State                  `protobuf:"varint,9,opt,name=state,proto3,enum=auth.user.v1.State" json:"state,omitempty"`
+	Roles        map[string]*RoleGrant  `protobuf:"bytes,10,rep,name=roles,proto3" json:"roles,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// linked_identities maps external IdP identities to this User. The map key
+	// is the link key "{issuer_id}:{subject}" — globally unique per IdP subject.
+	// Populated by the JIT/federation layer (LinkIdentity), never via login.
+	LinkedIdentities map[string]*LinkedIdentity `protobuf:"bytes,11,rep,name=linked_identities,json=linkedIdentities,proto3" json:"linked_identities,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -195,6 +199,13 @@ func (x *User) GetRoles() map[string]*RoleGrant {
 	return nil
 }
 
+func (x *User) GetLinkedIdentities() map[string]*LinkedIdentity {
+	if x != nil {
+		return x.LinkedIdentities
+	}
+	return nil
+}
+
 type UserList struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Items         []*User                `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
@@ -293,6 +304,89 @@ func (x *RoleGrant) GetAssignedAt() int64 {
 	return 0
 }
 
+// LinkedIdentity is a collection element on User.linked_identities. It records
+// one external IdP identity bound to this User. link_key is the map key,
+// formed as "{issuer_id}:{subject}" — it is both a real field and the
+// collection key (mirroring RoleGrant.role_id). issuer_id and subject are kept
+// denormalized for auditing/admin display; email_at_link snapshots the email
+// the IdP asserted at link time (it is NOT kept in sync with the IdP);
+// linked_at is the unix-second link timestamp.
+type LinkedIdentity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LinkKey       string                 `protobuf:"bytes,1,opt,name=link_key,json=linkKey,proto3" json:"link_key,omitempty"`
+	IssuerId      string                 `protobuf:"bytes,2,opt,name=issuer_id,json=issuerId,proto3" json:"issuer_id,omitempty"`
+	Subject       string                 `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	EmailAtLink   string                 `protobuf:"bytes,4,opt,name=email_at_link,json=emailAtLink,proto3" json:"email_at_link,omitempty"`
+	LinkedAt      int64                  `protobuf:"varint,5,opt,name=linked_at,json=linkedAt,proto3" json:"linked_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkedIdentity) Reset() {
+	*x = LinkedIdentity{}
+	mi := &file_auth_user_v1_user_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkedIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkedIdentity) ProtoMessage() {}
+
+func (x *LinkedIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_user_v1_user_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkedIdentity.ProtoReflect.Descriptor instead.
+func (*LinkedIdentity) Descriptor() ([]byte, []int) {
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *LinkedIdentity) GetLinkKey() string {
+	if x != nil {
+		return x.LinkKey
+	}
+	return ""
+}
+
+func (x *LinkedIdentity) GetIssuerId() string {
+	if x != nil {
+		return x.IssuerId
+	}
+	return ""
+}
+
+func (x *LinkedIdentity) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *LinkedIdentity) GetEmailAtLink() string {
+	if x != nil {
+		return x.EmailAtLink
+	}
+	return ""
+}
+
+func (x *LinkedIdentity) GetLinkedAt() int64 {
+	if x != nil {
+		return x.LinkedAt
+	}
+	return 0
+}
+
 type Create struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -305,7 +399,7 @@ type Create struct {
 
 func (x *Create) Reset() {
 	*x = Create{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[3]
+	mi := &file_auth_user_v1_user_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -317,7 +411,7 @@ func (x *Create) String() string {
 func (*Create) ProtoMessage() {}
 
 func (x *Create) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[3]
+	mi := &file_auth_user_v1_user_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -330,7 +424,7 @@ func (x *Create) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Create.ProtoReflect.Descriptor instead.
 func (*Create) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{3}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Create) GetId() string {
@@ -372,7 +466,7 @@ type ChangePassword struct {
 
 func (x *ChangePassword) Reset() {
 	*x = ChangePassword{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[4]
+	mi := &file_auth_user_v1_user_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -384,7 +478,7 @@ func (x *ChangePassword) String() string {
 func (*ChangePassword) ProtoMessage() {}
 
 func (x *ChangePassword) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[4]
+	mi := &file_auth_user_v1_user_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -397,7 +491,7 @@ func (x *ChangePassword) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangePassword.ProtoReflect.Descriptor instead.
 func (*ChangePassword) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{4}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ChangePassword) GetId() string {
@@ -432,7 +526,7 @@ type AssignRole struct {
 
 func (x *AssignRole) Reset() {
 	*x = AssignRole{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[5]
+	mi := &file_auth_user_v1_user_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -444,7 +538,7 @@ func (x *AssignRole) String() string {
 func (*AssignRole) ProtoMessage() {}
 
 func (x *AssignRole) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[5]
+	mi := &file_auth_user_v1_user_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -457,7 +551,7 @@ func (x *AssignRole) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssignRole.ProtoReflect.Descriptor instead.
 func (*AssignRole) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{5}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *AssignRole) GetId() string {
@@ -492,7 +586,7 @@ type RevokeRole struct {
 
 func (x *RevokeRole) Reset() {
 	*x = RevokeRole{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[6]
+	mi := &file_auth_user_v1_user_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -504,7 +598,7 @@ func (x *RevokeRole) String() string {
 func (*RevokeRole) ProtoMessage() {}
 
 func (x *RevokeRole) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[6]
+	mi := &file_auth_user_v1_user_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -517,7 +611,7 @@ func (x *RevokeRole) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeRole.ProtoReflect.Descriptor instead.
 func (*RevokeRole) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{6}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RevokeRole) GetId() string {
@@ -541,6 +635,126 @@ func (x *RevokeRole) GetRoleId() string {
 	return ""
 }
 
+type LinkIdentity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Actor         string                 `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	Identity      *LinkedIdentity        `protobuf:"bytes,3,opt,name=identity,proto3" json:"identity,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkIdentity) Reset() {
+	*x = LinkIdentity{}
+	mi := &file_auth_user_v1_user_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkIdentity) ProtoMessage() {}
+
+func (x *LinkIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_user_v1_user_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkIdentity.ProtoReflect.Descriptor instead.
+func (*LinkIdentity) Descriptor() ([]byte, []int) {
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *LinkIdentity) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *LinkIdentity) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+func (x *LinkIdentity) GetIdentity() *LinkedIdentity {
+	if x != nil {
+		return x.Identity
+	}
+	return nil
+}
+
+type UnlinkIdentity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Actor         string                 `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
+	LinkKey       string                 `protobuf:"bytes,3,opt,name=link_key,json=linkKey,proto3" json:"link_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnlinkIdentity) Reset() {
+	*x = UnlinkIdentity{}
+	mi := &file_auth_user_v1_user_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnlinkIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnlinkIdentity) ProtoMessage() {}
+
+func (x *UnlinkIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_user_v1_user_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnlinkIdentity.ProtoReflect.Descriptor instead.
+func (*UnlinkIdentity) Descriptor() ([]byte, []int) {
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *UnlinkIdentity) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UnlinkIdentity) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+func (x *UnlinkIdentity) GetLinkKey() string {
+	if x != nil {
+		return x.LinkKey
+	}
+	return ""
+}
+
 type Lock struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -552,7 +766,7 @@ type Lock struct {
 
 func (x *Lock) Reset() {
 	*x = Lock{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[7]
+	mi := &file_auth_user_v1_user_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -564,7 +778,7 @@ func (x *Lock) String() string {
 func (*Lock) ProtoMessage() {}
 
 func (x *Lock) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[7]
+	mi := &file_auth_user_v1_user_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -577,7 +791,7 @@ func (x *Lock) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Lock.ProtoReflect.Descriptor instead.
 func (*Lock) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{7}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Lock) GetId() string {
@@ -611,7 +825,7 @@ type Unlock struct {
 
 func (x *Unlock) Reset() {
 	*x = Unlock{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[8]
+	mi := &file_auth_user_v1_user_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -623,7 +837,7 @@ func (x *Unlock) String() string {
 func (*Unlock) ProtoMessage() {}
 
 func (x *Unlock) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[8]
+	mi := &file_auth_user_v1_user_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -636,7 +850,7 @@ func (x *Unlock) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Unlock.ProtoReflect.Descriptor instead.
 func (*Unlock) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{8}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Unlock) GetId() string {
@@ -663,7 +877,7 @@ type Delete struct {
 
 func (x *Delete) Reset() {
 	*x = Delete{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[9]
+	mi := &file_auth_user_v1_user_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -675,7 +889,7 @@ func (x *Delete) String() string {
 func (*Delete) ProtoMessage() {}
 
 func (x *Delete) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[9]
+	mi := &file_auth_user_v1_user_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -688,7 +902,7 @@ func (x *Delete) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Delete.ProtoReflect.Descriptor instead.
 func (*Delete) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{9}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Delete) GetId() string {
@@ -719,7 +933,7 @@ type Created struct {
 
 func (x *Created) Reset() {
 	*x = Created{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[10]
+	mi := &file_auth_user_v1_user_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -731,7 +945,7 @@ func (x *Created) String() string {
 func (*Created) ProtoMessage() {}
 
 func (x *Created) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[10]
+	mi := &file_auth_user_v1_user_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -744,7 +958,7 @@ func (x *Created) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Created.ProtoReflect.Descriptor instead.
 func (*Created) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{10}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Created) GetId() string {
@@ -802,7 +1016,7 @@ type PasswordChanged struct {
 
 func (x *PasswordChanged) Reset() {
 	*x = PasswordChanged{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[11]
+	mi := &file_auth_user_v1_user_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -814,7 +1028,7 @@ func (x *PasswordChanged) String() string {
 func (*PasswordChanged) ProtoMessage() {}
 
 func (x *PasswordChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[11]
+	mi := &file_auth_user_v1_user_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -827,7 +1041,7 @@ func (x *PasswordChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PasswordChanged.ProtoReflect.Descriptor instead.
 func (*PasswordChanged) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{11}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *PasswordChanged) GetId() string {
@@ -878,7 +1092,7 @@ type RoleAssigned struct {
 
 func (x *RoleAssigned) Reset() {
 	*x = RoleAssigned{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[12]
+	mi := &file_auth_user_v1_user_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -890,7 +1104,7 @@ func (x *RoleAssigned) String() string {
 func (*RoleAssigned) ProtoMessage() {}
 
 func (x *RoleAssigned) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[12]
+	mi := &file_auth_user_v1_user_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -903,7 +1117,7 @@ func (x *RoleAssigned) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoleAssigned.ProtoReflect.Descriptor instead.
 func (*RoleAssigned) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{12}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RoleAssigned) GetId() string {
@@ -954,7 +1168,7 @@ type RoleRevoked struct {
 
 func (x *RoleRevoked) Reset() {
 	*x = RoleRevoked{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[13]
+	mi := &file_auth_user_v1_user_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -966,7 +1180,7 @@ func (x *RoleRevoked) String() string {
 func (*RoleRevoked) ProtoMessage() {}
 
 func (x *RoleRevoked) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[13]
+	mi := &file_auth_user_v1_user_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -979,7 +1193,7 @@ func (x *RoleRevoked) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoleRevoked.ProtoReflect.Descriptor instead.
 func (*RoleRevoked) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{13}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RoleRevoked) GetId() string {
@@ -1017,6 +1231,158 @@ func (x *RoleRevoked) GetRoleId() string {
 	return ""
 }
 
+type IdentityLinked struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	At            int64                  `protobuf:"varint,3,opt,name=at,proto3" json:"at,omitempty"`
+	Actor         string                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
+	Identity      *LinkedIdentity        `protobuf:"bytes,5,opt,name=identity,proto3" json:"identity,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IdentityLinked) Reset() {
+	*x = IdentityLinked{}
+	mi := &file_auth_user_v1_user_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdentityLinked) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdentityLinked) ProtoMessage() {}
+
+func (x *IdentityLinked) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_user_v1_user_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdentityLinked.ProtoReflect.Descriptor instead.
+func (*IdentityLinked) Descriptor() ([]byte, []int) {
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *IdentityLinked) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *IdentityLinked) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *IdentityLinked) GetAt() int64 {
+	if x != nil {
+		return x.At
+	}
+	return 0
+}
+
+func (x *IdentityLinked) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+func (x *IdentityLinked) GetIdentity() *LinkedIdentity {
+	if x != nil {
+		return x.Identity
+	}
+	return nil
+}
+
+type IdentityUnlinked struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	At            int64                  `protobuf:"varint,3,opt,name=at,proto3" json:"at,omitempty"`
+	Actor         string                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
+	LinkKey       string                 `protobuf:"bytes,5,opt,name=link_key,json=linkKey,proto3" json:"link_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IdentityUnlinked) Reset() {
+	*x = IdentityUnlinked{}
+	mi := &file_auth_user_v1_user_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdentityUnlinked) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdentityUnlinked) ProtoMessage() {}
+
+func (x *IdentityUnlinked) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_user_v1_user_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdentityUnlinked.ProtoReflect.Descriptor instead.
+func (*IdentityUnlinked) Descriptor() ([]byte, []int) {
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *IdentityUnlinked) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *IdentityUnlinked) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *IdentityUnlinked) GetAt() int64 {
+	if x != nil {
+		return x.At
+	}
+	return 0
+}
+
+func (x *IdentityUnlinked) GetActor() string {
+	if x != nil {
+		return x.Actor
+	}
+	return ""
+}
+
+func (x *IdentityUnlinked) GetLinkKey() string {
+	if x != nil {
+		return x.LinkKey
+	}
+	return ""
+}
+
 type Locked struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1030,7 +1396,7 @@ type Locked struct {
 
 func (x *Locked) Reset() {
 	*x = Locked{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[14]
+	mi := &file_auth_user_v1_user_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1042,7 +1408,7 @@ func (x *Locked) String() string {
 func (*Locked) ProtoMessage() {}
 
 func (x *Locked) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[14]
+	mi := &file_auth_user_v1_user_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1055,7 +1421,7 @@ func (x *Locked) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Locked.ProtoReflect.Descriptor instead.
 func (*Locked) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{14}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Locked) GetId() string {
@@ -1105,7 +1471,7 @@ type Unlocked struct {
 
 func (x *Unlocked) Reset() {
 	*x = Unlocked{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[15]
+	mi := &file_auth_user_v1_user_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1117,7 +1483,7 @@ func (x *Unlocked) String() string {
 func (*Unlocked) ProtoMessage() {}
 
 func (x *Unlocked) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[15]
+	mi := &file_auth_user_v1_user_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1130,7 +1496,7 @@ func (x *Unlocked) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Unlocked.ProtoReflect.Descriptor instead.
 func (*Unlocked) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{15}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Unlocked) GetId() string {
@@ -1173,7 +1539,7 @@ type Deleted struct {
 
 func (x *Deleted) Reset() {
 	*x = Deleted{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[16]
+	mi := &file_auth_user_v1_user_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1185,7 +1551,7 @@ func (x *Deleted) String() string {
 func (*Deleted) ProtoMessage() {}
 
 func (x *Deleted) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[16]
+	mi := &file_auth_user_v1_user_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1198,7 +1564,7 @@ func (x *Deleted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Deleted.ProtoReflect.Descriptor instead.
 func (*Deleted) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{16}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Deleted) GetId() string {
@@ -1242,7 +1608,7 @@ type Snapshot struct {
 
 func (x *Snapshot) Reset() {
 	*x = Snapshot{}
-	mi := &file_auth_user_v1_user_proto_msgTypes[17]
+	mi := &file_auth_user_v1_user_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1254,7 +1620,7 @@ func (x *Snapshot) String() string {
 func (*Snapshot) ProtoMessage() {}
 
 func (x *Snapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_user_v1_user_proto_msgTypes[17]
+	mi := &file_auth_user_v1_user_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1267,7 +1633,7 @@ func (x *Snapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Snapshot.ProtoReflect.Descriptor instead.
 func (*Snapshot) Descriptor() ([]byte, []int) {
-	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{17}
+	return file_auth_user_v1_user_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Snapshot) GetId() string {
@@ -1309,7 +1675,7 @@ var File_auth_user_v1_user_proto protoreflect.FileDescriptor
 
 const file_auth_user_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x17auth/user/v1/user.proto\x12\fauth.user.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\xb8\x03\n" +
+	"\x17auth/user/v1/user.proto\x12\fauth.user.v1\x1a\x1bbuf/validate/validate.proto\x1a5funinthecloud/protosource/options/v1/options_v1.proto\"\xf2\x04\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12(\n" +
@@ -1325,17 +1691,27 @@ const file_auth_user_v1_user_proto_rawDesc = "" +
 	"\x05state\x18\t \x01(\x0e2\x13.auth.user.v1.StateB\a\x82Q\x04\n" +
 	"\x02\b\x05R\x05state\x123\n" +
 	"\x05roles\x18\n" +
-	" \x03(\v2\x1d.auth.user.v1.User.RolesEntryR\x05roles\x1aQ\n" +
+	" \x03(\v2\x1d.auth.user.v1.User.RolesEntryR\x05roles\x12U\n" +
+	"\x11linked_identities\x18\v \x03(\v2(.auth.user.v1.User.LinkedIdentitiesEntryR\x10linkedIdentities\x1aQ\n" +
 	"\n" +
 	"RolesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12-\n" +
-	"\x05value\x18\x02 \x01(\v2\x17.auth.user.v1.RoleGrantR\x05value:\x028\x01:\x05\x8aQ\x02\x1a\x00\"4\n" +
+	"\x05value\x18\x02 \x01(\v2\x17.auth.user.v1.RoleGrantR\x05value:\x028\x01\x1aa\n" +
+	"\x15LinkedIdentitiesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x122\n" +
+	"\x05value\x18\x02 \x01(\v2\x1c.auth.user.v1.LinkedIdentityR\x05value:\x028\x01:\x05\x8aQ\x02\x1a\x00\"4\n" +
 	"\bUserList\x12(\n" +
 	"\x05items\x18\x01 \x03(\v2\x12.auth.user.v1.UserR\x05items\"E\n" +
 	"\tRoleGrant\x12\x17\n" +
 	"\arole_id\x18\x01 \x01(\tR\x06roleId\x12\x1f\n" +
 	"\vassigned_at\x18\x02 \x01(\x03R\n" +
-	"assignedAt\"\x8d\x01\n" +
+	"assignedAt\"\xa3\x01\n" +
+	"\x0eLinkedIdentity\x12\x19\n" +
+	"\blink_key\x18\x01 \x01(\tR\alinkKey\x12\x1b\n" +
+	"\tissuer_id\x18\x02 \x01(\tR\bissuerId\x12\x18\n" +
+	"\asubject\x18\x03 \x01(\tR\asubject\x12\"\n" +
+	"\remail_at_link\x18\x04 \x01(\tR\vemailAtLink\x12\x1b\n" +
+	"\tlinked_at\x18\x05 \x01(\x03R\blinkedAt\"\x8d\x01\n" +
 	"\x06Create\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05actor\x18\x02 \x01(\tR\x05actor\x12\x1d\n" +
@@ -1362,7 +1738,19 @@ const file_auth_user_v1_user_proto_rawDesc = "" +
 	"\x05actor\x18\x02 \x01(\tR\x05actor\x12 \n" +
 	"\arole_id\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06roleId:\"\x8aQ\x1f\n" +
 	"\x1d\n" +
-	"\vRoleRevoked\x10\x02\x1a\fSTATE_ACTIVE\"c\n" +
+	"\vRoleRevoked\x10\x02\x1a\fSTATE_ACTIVE\"\x95\x01\n" +
+	"\fLinkIdentity\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05actor\x18\x02 \x01(\tR\x05actor\x128\n" +
+	"\bidentity\x18\x03 \x01(\v2\x1c.auth.user.v1.LinkedIdentityR\bidentity:%\x8aQ\"\n" +
+	" \n" +
+	"\x0eIdentityLinked\x10\x02\x1a\fSTATE_ACTIVE\"\x83\x01\n" +
+	"\x0eUnlinkIdentity\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05actor\x18\x02 \x01(\tR\x05actor\x12\"\n" +
+	"\blink_key\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\alinkKey:'\x8aQ$\n" +
+	"\"\n" +
+	"\x10IdentityUnlinked\x10\x02\x1a\fSTATE_ACTIVE\"c\n" +
 	"\x04Lock\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05actor\x18\x02 \x01(\tR\x05actor\x12\x16\n" +
@@ -1405,7 +1793,21 @@ const file_auth_user_v1_user_proto_rawDesc = "" +
 	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
 	"\x05actor\x18\x04 \x01(\tR\x05actor\x12\x17\n" +
 	"\arole_id\x18\x05 \x01(\tR\x06roleId:\x19\x8aQ\x16\x12\x14\x1a\x12\n" +
-	"\x05roles\x10\x02\x1a\arole_id\"\x85\x01\n" +
+	"\x05roles\x10\x02\x1a\arole_id\"\xc2\x01\n" +
+	"\x0eIdentityLinked\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
+	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
+	"\x05actor\x18\x04 \x01(\tR\x05actor\x128\n" +
+	"\bidentity\x18\x05 \x01(\v2\x1c.auth.user.v1.LinkedIdentityR\bidentity:&\x8aQ#\x12!\x1a\x1f\n" +
+	"\x11linked_identities\x10\x01\x1a\blink_key\"\xa5\x01\n" +
+	"\x10IdentityUnlinked\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
+	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
+	"\x05actor\x18\x04 \x01(\tR\x05actor\x12\x19\n" +
+	"\blink_key\x18\x05 \x01(\tR\alinkKey:&\x8aQ#\x12!\x1a\x1f\n" +
+	"\x11linked_identities\x10\x02\x1a\blink_key\"\x85\x01\n" +
 	"\x06Locked\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
@@ -1448,42 +1850,52 @@ func file_auth_user_v1_user_proto_rawDescGZIP() []byte {
 }
 
 var file_auth_user_v1_user_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_auth_user_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_auth_user_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_auth_user_v1_user_proto_goTypes = []any{
-	(State)(0),              // 0: auth.user.v1.State
-	(*User)(nil),            // 1: auth.user.v1.User
-	(*UserList)(nil),        // 2: auth.user.v1.UserList
-	(*RoleGrant)(nil),       // 3: auth.user.v1.RoleGrant
-	(*Create)(nil),          // 4: auth.user.v1.Create
-	(*ChangePassword)(nil),  // 5: auth.user.v1.ChangePassword
-	(*AssignRole)(nil),      // 6: auth.user.v1.AssignRole
-	(*RevokeRole)(nil),      // 7: auth.user.v1.RevokeRole
-	(*Lock)(nil),            // 8: auth.user.v1.Lock
-	(*Unlock)(nil),          // 9: auth.user.v1.Unlock
-	(*Delete)(nil),          // 10: auth.user.v1.Delete
-	(*Created)(nil),         // 11: auth.user.v1.Created
-	(*PasswordChanged)(nil), // 12: auth.user.v1.PasswordChanged
-	(*RoleAssigned)(nil),    // 13: auth.user.v1.RoleAssigned
-	(*RoleRevoked)(nil),     // 14: auth.user.v1.RoleRevoked
-	(*Locked)(nil),          // 15: auth.user.v1.Locked
-	(*Unlocked)(nil),        // 16: auth.user.v1.Unlocked
-	(*Deleted)(nil),         // 17: auth.user.v1.Deleted
-	(*Snapshot)(nil),        // 18: auth.user.v1.Snapshot
-	nil,                     // 19: auth.user.v1.User.RolesEntry
+	(State)(0),               // 0: auth.user.v1.State
+	(*User)(nil),             // 1: auth.user.v1.User
+	(*UserList)(nil),         // 2: auth.user.v1.UserList
+	(*RoleGrant)(nil),        // 3: auth.user.v1.RoleGrant
+	(*LinkedIdentity)(nil),   // 4: auth.user.v1.LinkedIdentity
+	(*Create)(nil),           // 5: auth.user.v1.Create
+	(*ChangePassword)(nil),   // 6: auth.user.v1.ChangePassword
+	(*AssignRole)(nil),       // 7: auth.user.v1.AssignRole
+	(*RevokeRole)(nil),       // 8: auth.user.v1.RevokeRole
+	(*LinkIdentity)(nil),     // 9: auth.user.v1.LinkIdentity
+	(*UnlinkIdentity)(nil),   // 10: auth.user.v1.UnlinkIdentity
+	(*Lock)(nil),             // 11: auth.user.v1.Lock
+	(*Unlock)(nil),           // 12: auth.user.v1.Unlock
+	(*Delete)(nil),           // 13: auth.user.v1.Delete
+	(*Created)(nil),          // 14: auth.user.v1.Created
+	(*PasswordChanged)(nil),  // 15: auth.user.v1.PasswordChanged
+	(*RoleAssigned)(nil),     // 16: auth.user.v1.RoleAssigned
+	(*RoleRevoked)(nil),      // 17: auth.user.v1.RoleRevoked
+	(*IdentityLinked)(nil),   // 18: auth.user.v1.IdentityLinked
+	(*IdentityUnlinked)(nil), // 19: auth.user.v1.IdentityUnlinked
+	(*Locked)(nil),           // 20: auth.user.v1.Locked
+	(*Unlocked)(nil),         // 21: auth.user.v1.Unlocked
+	(*Deleted)(nil),          // 22: auth.user.v1.Deleted
+	(*Snapshot)(nil),         // 23: auth.user.v1.Snapshot
+	nil,                      // 24: auth.user.v1.User.RolesEntry
+	nil,                      // 25: auth.user.v1.User.LinkedIdentitiesEntry
 }
 var file_auth_user_v1_user_proto_depIdxs = []int32{
 	0,  // 0: auth.user.v1.User.state:type_name -> auth.user.v1.State
-	19, // 1: auth.user.v1.User.roles:type_name -> auth.user.v1.User.RolesEntry
-	1,  // 2: auth.user.v1.UserList.items:type_name -> auth.user.v1.User
-	3,  // 3: auth.user.v1.AssignRole.grant:type_name -> auth.user.v1.RoleGrant
-	3,  // 4: auth.user.v1.RoleAssigned.grant:type_name -> auth.user.v1.RoleGrant
-	1,  // 5: auth.user.v1.Snapshot.snapshot:type_name -> auth.user.v1.User
-	3,  // 6: auth.user.v1.User.RolesEntry.value:type_name -> auth.user.v1.RoleGrant
-	7,  // [7:7] is the sub-list for method output_type
-	7,  // [7:7] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	24, // 1: auth.user.v1.User.roles:type_name -> auth.user.v1.User.RolesEntry
+	25, // 2: auth.user.v1.User.linked_identities:type_name -> auth.user.v1.User.LinkedIdentitiesEntry
+	1,  // 3: auth.user.v1.UserList.items:type_name -> auth.user.v1.User
+	3,  // 4: auth.user.v1.AssignRole.grant:type_name -> auth.user.v1.RoleGrant
+	4,  // 5: auth.user.v1.LinkIdentity.identity:type_name -> auth.user.v1.LinkedIdentity
+	3,  // 6: auth.user.v1.RoleAssigned.grant:type_name -> auth.user.v1.RoleGrant
+	4,  // 7: auth.user.v1.IdentityLinked.identity:type_name -> auth.user.v1.LinkedIdentity
+	1,  // 8: auth.user.v1.Snapshot.snapshot:type_name -> auth.user.v1.User
+	3,  // 9: auth.user.v1.User.RolesEntry.value:type_name -> auth.user.v1.RoleGrant
+	4,  // 10: auth.user.v1.User.LinkedIdentitiesEntry.value:type_name -> auth.user.v1.LinkedIdentity
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_auth_user_v1_user_proto_init() }
@@ -1497,7 +1909,7 @@ func file_auth_user_v1_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_user_v1_user_proto_rawDesc), len(file_auth_user_v1_user_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   19,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
