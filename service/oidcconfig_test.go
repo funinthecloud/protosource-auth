@@ -85,7 +85,7 @@ func TestOIDCConfigurator_SetRoundtripAndDecrypt(t *testing.T) {
 	}
 
 	// Decrypt must recover the exact secret.
-	got, err := cfg.DecryptClientSecret(ctx, oc.GetWrappedClientSecret())
+	got, err := cfg.DecryptClientSecret(ctx, oc)
 	if err != nil {
 		t.Fatalf("DecryptClientSecret: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestOIDCConfigurator_PrepareForRegister(t *testing.T) {
 		t.Error("secret not wrapped")
 	}
 	// decrypt via same provider instance
-	back, _ := c.DecryptClientSecret(context.Background(), prep.GetWrappedClientSecret())
+	back, _ := c.DecryptClientSecret(context.Background(), prep)
 	if string(back) != "reg-secret" {
 		t.Error("roundtrip via prepare failed")
 	}
@@ -196,7 +196,7 @@ func TestOIDCConfigurator_PreservesSecretOnEndpointOnlyUpdate(t *testing.T) {
 	if len(oc.GetWrappedClientSecret()) == 0 {
 		t.Fatal("wrapped secret was cleared by endpoint-only update")
 	}
-	got, err := cfg.DecryptClientSecret(ctx, oc.GetWrappedClientSecret())
+	got, err := cfg.DecryptClientSecret(ctx, oc)
 	if err != nil {
 		t.Fatalf("decrypt preserved secret: %v", err)
 	}
@@ -258,5 +258,103 @@ func TestSetOIDCConfig_RequiresClientID(t *testing.T) {
 	cfg, _ := newConfiguratorWithExternalIssuer(t, ctx, "ext-2")
 	if err := cfg.Set(ctx, service.SetRequest{IssuerID: "ext-2", ClientSecret: []byte("x")}); err == nil {
 		t.Error("SetOIDCConfig with empty client_id should fail validation")
+	}
+}
+
+// recordingProvider is a fake KeyProvider that records the masterKeyRef passed
+// to Decrypt so a test can prove DecryptClientSecret routes decryption through
+// the ref stored on the OIDCConfig, not the configurator's current default.
+// Encrypt/Decrypt use a trivial reversible "wrapped:" prefix (these tests assert
+// on routing, not on real cryptography).
+type recordingProvider struct {
+	name        string
+	decryptRefs []string
+}
+
+func (p *recordingProvider) Name() string { return p.name }
+
+func (p *recordingProvider) Encrypt(_ context.Context, _ string, pt []byte) ([]byte, error) {
+	return append([]byte("wrapped:"), pt...), nil
+}
+
+func (p *recordingProvider) Decrypt(_ context.Context, ref string, wrapped []byte) ([]byte, error) {
+	p.decryptRefs = append(p.decryptRefs, ref)
+	return wrapped[len("wrapped:"):], nil
+}
+
+func newRecordingConfigurator(t *testing.T, prov *recordingProvider, defaultRef string) *service.OIDCConfigurator {
+	t.Helper()
+	repo := issuerv1.NewRepository(memorystore.New(0), protobinaryserializer.NewSerializer())
+	return service.NewOIDCConfigurator(repo, prov, defaultRef)
+}
+
+// A secret wrapped under a pinned key ref must decrypt under THAT ref, even when
+// the configurator's current default ref has since rotated — otherwise Azure
+// Key Vault (version-pinned decrypt) and multi-ref deployments break.
+func TestOIDCConfigurator_DecryptUsesStoredMasterKeyRef(t *testing.T) {
+	ctx := context.Background()
+	prov := &recordingProvider{name: "local"}
+	cfg := newRecordingConfigurator(t, prov, "current-ref")
+
+	oc := &issuerv1.OIDCConfig{
+		WrappedClientSecret:      []byte("wrapped:hunter2"),
+		ClientSecretKeyProvider:  "local",
+		ClientSecretMasterKeyRef: "pinned-v3",
+	}
+	got, err := cfg.DecryptClientSecret(ctx, oc)
+	if err != nil {
+		t.Fatalf("DecryptClientSecret: %v", err)
+	}
+	if string(got) != "hunter2" {
+		t.Fatalf("plaintext = %q, want hunter2", got)
+	}
+	if len(prov.decryptRefs) != 1 || prov.decryptRefs[0] != "pinned-v3" {
+		t.Fatalf("decrypt ref = %v, want [pinned-v3] (stored ref, not configurator default)", prov.decryptRefs)
+	}
+}
+
+// A secret wrapped before the per-secret ref metadata existed has an empty
+// stored ref; decrypt must fall back to the configurator's default ref.
+func TestOIDCConfigurator_DecryptFallsBackToConfiguratorRef(t *testing.T) {
+	ctx := context.Background()
+	prov := &recordingProvider{name: "local"}
+	cfg := newRecordingConfigurator(t, prov, "default-ref")
+
+	oc := &issuerv1.OIDCConfig{WrappedClientSecret: []byte("wrapped:s")} // no provider, no ref
+	if _, err := cfg.DecryptClientSecret(ctx, oc); err != nil {
+		t.Fatalf("DecryptClientSecret: %v", err)
+	}
+	if len(prov.decryptRefs) != 1 || prov.decryptRefs[0] != "default-ref" {
+		t.Fatalf("decrypt ref = %v, want [default-ref] fallback", prov.decryptRefs)
+	}
+}
+
+// A secret wrapped by a different provider must refuse to decrypt rather than
+// hand the wrong KMS a blob it cannot interpret.
+func TestOIDCConfigurator_DecryptRejectsProviderMismatch(t *testing.T) {
+	ctx := context.Background()
+	prov := &recordingProvider{name: "local"}
+	cfg := newRecordingConfigurator(t, prov, "ref")
+
+	oc := &issuerv1.OIDCConfig{
+		WrappedClientSecret:     []byte("wrapped:x"),
+		ClientSecretKeyProvider: "awskms", // wrapped by a different provider
+	}
+	_, err := cfg.DecryptClientSecret(ctx, oc)
+	if !errors.Is(err, service.ErrClientSecretProviderMismatch) {
+		t.Fatalf("err = %v, want ErrClientSecretProviderMismatch", err)
+	}
+	if len(prov.decryptRefs) != 0 {
+		t.Fatal("provider mismatch must short-circuit before calling Decrypt")
+	}
+}
+
+// A nil/empty OIDCConfig returns (nil, nil) — no secret to decrypt.
+func TestOIDCConfigurator_DecryptEmptyIsNil(t *testing.T) {
+	prov := &recordingProvider{name: "local"}
+	cfg := newRecordingConfigurator(t, prov, "ref")
+	got, err := cfg.DecryptClientSecret(context.Background(), &issuerv1.OIDCConfig{})
+	if err != nil || got != nil {
+		t.Fatalf("DecryptClientSecret(empty) = (%q, %v), want (nil, nil)", got, err)
 	}
 }

@@ -323,7 +323,7 @@ func (h *OAuthHandler) HandleCallback(ctx context.Context, req protosource.Reque
 		return resp
 	}
 
-	secret, err := h.oidc.DecryptClientSecret(ctx, oc.GetWrappedClientSecret())
+	secret, err := h.oidc.DecryptClientSecret(ctx, oc)
 	if err != nil {
 		return oauthRedirectError(http.StatusServiceUnavailable, "idp_unavailable")
 	}

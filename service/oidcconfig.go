@@ -200,16 +200,40 @@ func (c *OIDCConfigurator) Clear(ctx context.Context, issuerID, actor string) er
 	return nil
 }
 
-// DecryptClientSecret is the runtime helper for the PKCE callback (and
-// tests) to obtain the plaintext secret for token exchange with the IdP.
-// It is the caller's responsibility to ensure the issuer's stored
-// client_secret_key_provider matches the process provider (current
-// deployments use a single provider).
-func (c *OIDCConfigurator) DecryptClientSecret(ctx context.Context, wrapped []byte) ([]byte, error) {
+// ErrClientSecretProviderMismatch is returned when an OIDCConfig's stored
+// client_secret_key_provider does not match the configurator's process
+// provider. Decrypting under the wrong provider would fail or (worse) produce
+// garbage, so the configurator refuses rather than calling the wrong KMS.
+var ErrClientSecretProviderMismatch = errors.New("service: client secret was wrapped by a different key provider")
+
+// DecryptClientSecret is the runtime helper for the PKCE callback (and tests)
+// to obtain the plaintext secret for token exchange with the IdP.
+//
+// It decrypts using the metadata the secret was wrapped under — the
+// OIDCConfig's own client_secret_master_key_ref and client_secret_key_provider
+// — not the configurator's current defaults. This matters when the master key
+// ref is rotated or version-pinned (e.g. Azure Key Vault, where decrypt must
+// use the same key version that encrypted), or when different external issuers
+// were wrapped under different refs: the persisted ref always stays correct.
+//
+// The stored provider name must match the configured provider (we only have
+// one provider wired in); a mismatch surfaces as ErrClientSecretProviderMismatch
+// rather than a confusing decrypt failure. An empty stored ref falls back to
+// the configurator's masterKeyRef for backward compatibility with secrets
+// wrapped before this metadata was persisted.
+func (c *OIDCConfigurator) DecryptClientSecret(ctx context.Context, oc *issuerv1.OIDCConfig) ([]byte, error) {
+	wrapped := oc.GetWrappedClientSecret()
 	if len(wrapped) == 0 {
 		return nil, nil
 	}
-	pt, err := c.provider.Decrypt(ctx, c.masterKeyRef, wrapped)
+	if name := oc.GetClientSecretKeyProvider(); name != "" && name != c.provider.Name() {
+		return nil, fmt.Errorf("%w: wrapped by %q, configured %q", ErrClientSecretProviderMismatch, name, c.provider.Name())
+	}
+	ref := oc.GetClientSecretMasterKeyRef()
+	if ref == "" {
+		ref = c.masterKeyRef
+	}
+	pt, err := c.provider.Decrypt(ctx, ref, wrapped)
 	if err != nil {
 		return nil, fmt.Errorf("service: decrypt client secret: %w", err)
 	}

@@ -88,7 +88,7 @@ func TestAdminSetOIDC_HappyPathWrapsSecret(t *testing.T) {
 	if len(oc.GetWrappedClientSecret()) == 0 {
 		t.Fatal("wrapped_client_secret not set")
 	}
-	plain, err := cfg.DecryptClientSecret(ctx, oc.GetWrappedClientSecret())
+	plain, err := cfg.DecryptClientSecret(ctx, oc)
 	if err != nil {
 		t.Fatalf("DecryptClientSecret: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestAdminSetOIDC_BlankSecretPreservesPriorWrapped(t *testing.T) {
 	}
 
 	oc := loadOIDC(t, ctx, repo, extID)
-	plain, err := cfg.DecryptClientSecret(ctx, oc.GetWrappedClientSecret())
+	plain, err := cfg.DecryptClientSecret(ctx, oc)
 	if err != nil {
 		t.Fatalf("DecryptClientSecret: %v", err)
 	}
