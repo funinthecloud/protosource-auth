@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file auth/user/v1/user.proto.
  */
 export const file_auth_user_v1_user: GenFile = /*@__PURE__*/
-  fileDesc("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aW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJOhOKURASDhIMU1RBVEVfQUNUSVZFIlcKB0RlbGV0ZWQSCgoCaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxIKCgJhdBgDIAEoAxINCgVhY3RvchgEIAEoCToUilEREg8SDVNUQVRFX0RFTEVURUQicQoIU25hcHNob3QSCgoCaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoAxIKCgJhdBgDIAEoAxINCgVhY3RvchgEIAEoCRIkCghzbmFwc2hvdBgFIAEoCzISLmF1dGgudXNlci52MS5Vc2VyOgeKUQQqAggyKlUKBVN0YXRlEhUKEVNUQVRFX1VOU1BFQ0lGSUVEEAASEAoMU1RBVEVfQUNUSVZFEAESEAoMU1RBVEVfTE9DS0VEEAISEQoNU1RBVEVfREVMRVRFRBADQrcBChBjb20uYXV0aC51c2VyLnYxQglVc2VyUHJvdG9QAVpBZ2l0aHViLmNvbS9mdW5pbnRoZWNsb3VkL3Byb3Rvc291cmNlLWF1dGgvZ2VuL2F1dGgvdXNlci92MTt1c2VydjGiAgNBVViqAgxBdXRoLlVzZXIuVjHKAgxBdXRoXFVzZXJcVjHiAhhBdXRoXFVzZXJcVjFcR1BCTWV0YWRhdGHqAg5BdXRoOjpVc2VyOjpWMZJRAggBYgZwcm90bzM", [file_buf_validate_validate, file_funinthecloud_protosource_options_v1_options_v1]);
+  fileDesc("ChdhdXRoL3VzZXIvdjEvdXNlci5wcm90bxIMYXV0aC51c2VyLnYxIvADCgRVc2VyEgoKAmlkGAEgASgJEg8KB3ZlcnNpb24YAiABKAMSHgoJY3JlYXRlX2F0GAMgASgDQguCUQgKAggECgIIBhIRCgljcmVhdGVfYnkYBCABKAkSEQoJbW9kaWZ5X2F0GAUgASgDEhEKCW1vZGlmeV9ieRgGIAEoCRIWCgVlbWFpbBgHIAEoCUIHglEECgIIAxIVCg1wYXNzd29yZF9oYXNoGAggASgMEisKBXN0YXRlGAkgASgOMhMuYXV0aC51c2VyLnYxLlN0YXRlQgeCUQQKAggFEiwKBXJvbGVzGAogAygLMh0uYXV0aC51c2VyLnYxLlVzZXIuUm9sZXNFbnRyeRJDChFsaW5rZWRfaWRlbnRpdGllcxgLIAMoCzIoLmF1dGgudXNlci52MS5Vc2VyLkxpbmtlZElkZW50aXRpZXNFbnRyeRpFCgpSb2xlc0VudHJ5EgsKA2tleRgBIAEoCRImCgV2YWx1ZRgCIAEoCzIXLmF1dGgudXNlci52MS5Sb2xlR3JhbnQ6AjgBGlUKFUxpbmtlZElkZW50aXRpZXNFbnRyeRILCgNrZXkYASABKAkSKwoFdmFsdWUYAiABKAsyHC5hdXRoLnVzZXIudjEuTGlua2VkSWRlbnRpdHk6AjgBOgWKUQIaACItCghVc2VyTGlzdBIhCgVpdGVtcxgBIAMoCzISLmF1dGgudXNlci52MS5Vc2VyIjEKCVJvbGVHcmFudBIPCgdyb2xlX2lkGAEgASgJEhMKC2Fzc2lnbmVkX2F0GAIgASgDInAKDkxpbmtlZElkZW50aXR5EhAKCGxpbmtfa2V5GAEgASgJEhEKCWlzc3Vlcl9pZBgCIAEoCRIPCgdzdWJqZWN0GAMgASgJEhUKDWVtYWlsX2F0X2xpbmsYBCABKAkSEQoJbGlua2VkX2F0GAUgASgDIm0KBkNyZWF0ZRIKCgJpZBgBIAEoCRINCgVhY3RvchgCIAEoCRIWCgVlbWFpbBgDIAEoCUIHukgEcgIQAxIeCg1wYXNzd29yZF9oYXNoGAQgASgMQge6SAR6AhABOhCKUQ0KCwoHQ3JlYXRlZBABIoEBCg5DaGFuZ2VQYXNzd29yZBIKCgJpZBgBIAEoCRINCgVhY3Rv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aW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJOhSKURESDxINU1RBVEVfREVMRVRFRCJxCghTbmFwc2hvdBIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgDEgoKAmF0GAMgASgDEg0KBWFjdG9yGAQgASgJEiQKCHNuYXBzaG90GAUgASgLMhIuYXV0aC51c2VyLnYxLlVzZXI6B4pRBCoCCDIqVQoFU3RhdGUSFQoRU1RBVEVfVU5TUEVDSUZJRUQQABIQCgxTVEFURV9BQ1RJVkUQARIQCgxTVEFURV9MT0NLRUQQAhIRCg1TVEFURV9ERUxFVEVEEANCtwEKEGNvbS5hdXRoLnVzZXIudjFCCVVzZXJQcm90b1ABWkFnaXRodWIuY29tL2Z1bmludGhlY2xvdWQvcHJvdG9zb3VyY2UtYXV0aC9nZW4vYXV0aC91c2VyL3YxO3VzZXJ2MaICA0FVWKoCDEF1dGguVXNlci5WMcoCDEF1dGhcVXNlclxWMeICGEF1dGhcVXNlclxWMVxHUEJNZXRhZGF0YeoCDkF1dGg6OlVzZXI6OlYxklECCAFiBnByb3RvMw", [file_buf_validate_validate, file_funinthecloud_protosource_options_v1_options_v1]);
 
 /**
  * User is the auth service's identity aggregate. Credentials are stored as
@@ -72,6 +72,15 @@ export type User = Message<"auth.user.v1.User"> & {
    * @generated from field: map<string, auth.user.v1.RoleGrant> roles = 10;
    */
   roles: { [key: string]: RoleGrant };
+
+  /**
+   * linked_identities maps external IdP identities to this User. The map key
+   * is the link key "{issuer_id}:{subject}" — globally unique per IdP subject.
+   * Populated by the JIT/federation layer (LinkIdentity), never via login.
+   *
+   * @generated from field: map<string, auth.user.v1.LinkedIdentity> linked_identities = 11;
+   */
+  linkedIdentities: { [key: string]: LinkedIdentity };
 };
 
 /**
@@ -124,6 +133,51 @@ export const RoleGrantSchema: GenMessage<RoleGrant> = /*@__PURE__*/
   messageDesc(file_auth_user_v1_user, 2);
 
 /**
+ * LinkedIdentity is a collection element on User.linked_identities. It records
+ * one external IdP identity bound to this User. link_key is the map key,
+ * formed as "{issuer_id}:{subject}" — it is both a real field and the
+ * collection key (mirroring RoleGrant.role_id). issuer_id and subject are kept
+ * denormalized for auditing/admin display; email_at_link snapshots the email
+ * the IdP asserted at link time (it is NOT kept in sync with the IdP);
+ * linked_at is the unix-second link timestamp.
+ *
+ * @generated from message auth.user.v1.LinkedIdentity
+ */
+export type LinkedIdentity = Message<"auth.user.v1.LinkedIdentity"> & {
+  /**
+   * @generated from field: string link_key = 1;
+   */
+  linkKey: string;
+
+  /**
+   * @generated from field: string issuer_id = 2;
+   */
+  issuerId: string;
+
+  /**
+   * @generated from field: string subject = 3;
+   */
+  subject: string;
+
+  /**
+   * @generated from field: string email_at_link = 4;
+   */
+  emailAtLink: string;
+
+  /**
+   * @generated from field: int64 linked_at = 5;
+   */
+  linkedAt: bigint;
+};
+
+/**
+ * Describes the message auth.user.v1.LinkedIdentity.
+ * Use `create(LinkedIdentitySchema)` to create a new message.
+ */
+export const LinkedIdentitySchema: GenMessage<LinkedIdentity> = /*@__PURE__*/
+  messageDesc(file_auth_user_v1_user, 3);
+
+/**
  * @generated from message auth.user.v1.Create
  */
 export type Create = Message<"auth.user.v1.Create"> & {
@@ -153,7 +207,7 @@ export type Create = Message<"auth.user.v1.Create"> & {
  * Use `create(CreateSchema)` to create a new message.
  */
 export const CreateSchema: GenMessage<Create> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 3);
+  messageDesc(file_auth_user_v1_user, 4);
 
 /**
  * @generated from message auth.user.v1.ChangePassword
@@ -180,7 +234,7 @@ export type ChangePassword = Message<"auth.user.v1.ChangePassword"> & {
  * Use `create(ChangePasswordSchema)` to create a new message.
  */
 export const ChangePasswordSchema: GenMessage<ChangePassword> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 4);
+  messageDesc(file_auth_user_v1_user, 5);
 
 /**
  * @generated from message auth.user.v1.AssignRole
@@ -207,7 +261,7 @@ export type AssignRole = Message<"auth.user.v1.AssignRole"> & {
  * Use `create(AssignRoleSchema)` to create a new message.
  */
 export const AssignRoleSchema: GenMessage<AssignRole> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 5);
+  messageDesc(file_auth_user_v1_user, 6);
 
 /**
  * @generated from message auth.user.v1.RevokeRole
@@ -234,7 +288,61 @@ export type RevokeRole = Message<"auth.user.v1.RevokeRole"> & {
  * Use `create(RevokeRoleSchema)` to create a new message.
  */
 export const RevokeRoleSchema: GenMessage<RevokeRole> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 6);
+  messageDesc(file_auth_user_v1_user, 7);
+
+/**
+ * @generated from message auth.user.v1.LinkIdentity
+ */
+export type LinkIdentity = Message<"auth.user.v1.LinkIdentity"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string actor = 2;
+   */
+  actor: string;
+
+  /**
+   * @generated from field: auth.user.v1.LinkedIdentity identity = 3;
+   */
+  identity?: LinkedIdentity | undefined;
+};
+
+/**
+ * Describes the message auth.user.v1.LinkIdentity.
+ * Use `create(LinkIdentitySchema)` to create a new message.
+ */
+export const LinkIdentitySchema: GenMessage<LinkIdentity> = /*@__PURE__*/
+  messageDesc(file_auth_user_v1_user, 8);
+
+/**
+ * @generated from message auth.user.v1.UnlinkIdentity
+ */
+export type UnlinkIdentity = Message<"auth.user.v1.UnlinkIdentity"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string actor = 2;
+   */
+  actor: string;
+
+  /**
+   * @generated from field: string link_key = 3;
+   */
+  linkKey: string;
+};
+
+/**
+ * Describes the message auth.user.v1.UnlinkIdentity.
+ * Use `create(UnlinkIdentitySchema)` to create a new message.
+ */
+export const UnlinkIdentitySchema: GenMessage<UnlinkIdentity> = /*@__PURE__*/
+  messageDesc(file_auth_user_v1_user, 9);
 
 /**
  * @generated from message auth.user.v1.Lock
@@ -261,7 +369,7 @@ export type Lock = Message<"auth.user.v1.Lock"> & {
  * Use `create(LockSchema)` to create a new message.
  */
 export const LockSchema: GenMessage<Lock> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 7);
+  messageDesc(file_auth_user_v1_user, 10);
 
 /**
  * @generated from message auth.user.v1.Unlock
@@ -283,7 +391,7 @@ export type Unlock = Message<"auth.user.v1.Unlock"> & {
  * Use `create(UnlockSchema)` to create a new message.
  */
 export const UnlockSchema: GenMessage<Unlock> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 8);
+  messageDesc(file_auth_user_v1_user, 11);
 
 /**
  * @generated from message auth.user.v1.Delete
@@ -305,7 +413,7 @@ export type Delete = Message<"auth.user.v1.Delete"> & {
  * Use `create(DeleteSchema)` to create a new message.
  */
 export const DeleteSchema: GenMessage<Delete> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 9);
+  messageDesc(file_auth_user_v1_user, 12);
 
 /**
  * @generated from message auth.user.v1.Created
@@ -347,7 +455,7 @@ export type Created = Message<"auth.user.v1.Created"> & {
  * Use `create(CreatedSchema)` to create a new message.
  */
 export const CreatedSchema: GenMessage<Created> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 10);
+  messageDesc(file_auth_user_v1_user, 13);
 
 /**
  * @generated from message auth.user.v1.PasswordChanged
@@ -384,7 +492,7 @@ export type PasswordChanged = Message<"auth.user.v1.PasswordChanged"> & {
  * Use `create(PasswordChangedSchema)` to create a new message.
  */
 export const PasswordChangedSchema: GenMessage<PasswordChanged> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 11);
+  messageDesc(file_auth_user_v1_user, 14);
 
 /**
  * @generated from message auth.user.v1.RoleAssigned
@@ -421,7 +529,7 @@ export type RoleAssigned = Message<"auth.user.v1.RoleAssigned"> & {
  * Use `create(RoleAssignedSchema)` to create a new message.
  */
 export const RoleAssignedSchema: GenMessage<RoleAssigned> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 12);
+  messageDesc(file_auth_user_v1_user, 15);
 
 /**
  * @generated from message auth.user.v1.RoleRevoked
@@ -458,7 +566,81 @@ export type RoleRevoked = Message<"auth.user.v1.RoleRevoked"> & {
  * Use `create(RoleRevokedSchema)` to create a new message.
  */
 export const RoleRevokedSchema: GenMessage<RoleRevoked> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 13);
+  messageDesc(file_auth_user_v1_user, 16);
+
+/**
+ * @generated from message auth.user.v1.IdentityLinked
+ */
+export type IdentityLinked = Message<"auth.user.v1.IdentityLinked"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: int64 version = 2;
+   */
+  version: bigint;
+
+  /**
+   * @generated from field: int64 at = 3;
+   */
+  at: bigint;
+
+  /**
+   * @generated from field: string actor = 4;
+   */
+  actor: string;
+
+  /**
+   * @generated from field: auth.user.v1.LinkedIdentity identity = 5;
+   */
+  identity?: LinkedIdentity | undefined;
+};
+
+/**
+ * Describes the message auth.user.v1.IdentityLinked.
+ * Use `create(IdentityLinkedSchema)` to create a new message.
+ */
+export const IdentityLinkedSchema: GenMessage<IdentityLinked> = /*@__PURE__*/
+  messageDesc(file_auth_user_v1_user, 17);
+
+/**
+ * @generated from message auth.user.v1.IdentityUnlinked
+ */
+export type IdentityUnlinked = Message<"auth.user.v1.IdentityUnlinked"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: int64 version = 2;
+   */
+  version: bigint;
+
+  /**
+   * @generated from field: int64 at = 3;
+   */
+  at: bigint;
+
+  /**
+   * @generated from field: string actor = 4;
+   */
+  actor: string;
+
+  /**
+   * @generated from field: string link_key = 5;
+   */
+  linkKey: string;
+};
+
+/**
+ * Describes the message auth.user.v1.IdentityUnlinked.
+ * Use `create(IdentityUnlinkedSchema)` to create a new message.
+ */
+export const IdentityUnlinkedSchema: GenMessage<IdentityUnlinked> = /*@__PURE__*/
+  messageDesc(file_auth_user_v1_user, 18);
 
 /**
  * @generated from message auth.user.v1.Locked
@@ -495,7 +677,7 @@ export type Locked = Message<"auth.user.v1.Locked"> & {
  * Use `create(LockedSchema)` to create a new message.
  */
 export const LockedSchema: GenMessage<Locked> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 14);
+  messageDesc(file_auth_user_v1_user, 19);
 
 /**
  * @generated from message auth.user.v1.Unlocked
@@ -527,7 +709,7 @@ export type Unlocked = Message<"auth.user.v1.Unlocked"> & {
  * Use `create(UnlockedSchema)` to create a new message.
  */
 export const UnlockedSchema: GenMessage<Unlocked> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 15);
+  messageDesc(file_auth_user_v1_user, 20);
 
 /**
  * @generated from message auth.user.v1.Deleted
@@ -559,7 +741,7 @@ export type Deleted = Message<"auth.user.v1.Deleted"> & {
  * Use `create(DeletedSchema)` to create a new message.
  */
 export const DeletedSchema: GenMessage<Deleted> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 16);
+  messageDesc(file_auth_user_v1_user, 21);
 
 /**
  * @generated from message auth.user.v1.Snapshot
@@ -596,7 +778,7 @@ export type Snapshot = Message<"auth.user.v1.Snapshot"> & {
  * Use `create(SnapshotSchema)` to create a new message.
  */
 export const SnapshotSchema: GenMessage<Snapshot> = /*@__PURE__*/
-  messageDesc(file_auth_user_v1_user, 17);
+  messageDesc(file_auth_user_v1_user, 22);
 
 /**
  * @generated from enum auth.user.v1.State
