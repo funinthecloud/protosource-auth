@@ -404,6 +404,9 @@ type OIDCConfig struct {
 	ClientSecretMasterKeyRef string `protobuf:"bytes,4,opt,name=client_secret_master_key_ref,json=clientSecretMasterKeyRef,proto3" json:"client_secret_master_key_ref,omitempty"`
 	// discovery_url takes precedence if set; the three explicit endpoints
 	// are fallbacks for providers that don't publish discovery or for pinning.
+	// Either the IdP issuer base (https://idp.example.com) or the full
+	// discovery-document URL (.../.well-known/openid-configuration) is accepted;
+	// the runtime normalizes the latter to the issuer base for go-oidc.
 	DiscoveryUrl          string   `protobuf:"bytes,5,opt,name=discovery_url,json=discoveryUrl,proto3" json:"discovery_url,omitempty"`
 	AuthorizationEndpoint string   `protobuf:"bytes,6,opt,name=authorization_endpoint,json=authorizationEndpoint,proto3" json:"authorization_endpoint,omitempty"`
 	TokenEndpoint         string   `protobuf:"bytes,7,opt,name=token_endpoint,json=tokenEndpoint,proto3" json:"token_endpoint,omitempty"`

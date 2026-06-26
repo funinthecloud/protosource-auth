@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -469,7 +470,12 @@ func (h *OAuthHandler) buildOIDCMeta(ctx context.Context, oc *issuerv1.OIDCConfi
 	cfg := &oidc.Config{ClientID: oc.GetClientId(), Now: h.now}
 
 	if du := oc.GetDiscoveryUrl(); du != "" {
-		provider, err := oidc.NewProvider(cctx, du)
+		// go-oidc's NewProvider takes the IdP *issuer base* URL and appends
+		// /.well-known/openid-configuration itself. Operators (and the admin
+		// UI placeholder) routinely paste the full discovery-document URL, so
+		// accept either form: strip a trailing well-known suffix before the
+		// fetch to avoid a double-/.well-known/ path that would 404.
+		provider, err := oidc.NewProvider(cctx, issuerBaseFromDiscoveryURL(du))
 		if err != nil {
 			return nil, err
 		}
@@ -487,8 +493,23 @@ func (h *OAuthHandler) buildOIDCMeta(ctx context.Context, oc *issuerv1.OIDCConfi
 	// issuer check. Prefer discovery_url for full iss validation.
 	// ponytail: acceptable for pinned deployments; tighten if an issuer field
 	// is added to OIDCConfig.
+	//
+	// All three endpoints are required: without authorization_endpoint or
+	// token_endpoint, /oauth/authorize would build a redirect (and later a
+	// token exchange) against an empty URL. Fail closed at config-resolution
+	// time instead of producing a malformed redirect at runtime.
+	var missing []string
+	if oc.GetAuthorizationEndpoint() == "" {
+		missing = append(missing, "authorization_endpoint")
+	}
+	if oc.GetTokenEndpoint() == "" {
+		missing = append(missing, "token_endpoint")
+	}
 	if oc.GetJwksUri() == "" {
-		return nil, errors.New("service: OIDC config has neither discovery_url nor jwks_uri")
+		missing = append(missing, "jwks_uri")
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("service: pinned OIDC config (no discovery_url) is missing required %s", strings.Join(missing, ", "))
 	}
 	cfg.SkipIssuerCheck = true
 	keySet := oidc.NewRemoteKeySet(cctx, oc.GetJwksUri())
@@ -497,6 +518,22 @@ func (h *OAuthHandler) buildOIDCMeta(ctx context.Context, oc *issuerv1.OIDCConfi
 		tokenURL: oc.GetTokenEndpoint(),
 		verifier: oidc.NewVerifier("", keySet, cfg),
 	}, nil
+}
+
+// issuerBaseFromDiscoveryURL normalizes a configured discovery_url to the IdP
+// issuer base that go-oidc's NewProvider expects. NewProvider appends
+// /.well-known/openid-configuration itself, so if the operator pasted the full
+// discovery-document URL (as the admin UI placeholder suggests) we strip that
+// suffix to avoid a duplicated path. A bare issuer base is returned unchanged.
+func issuerBaseFromDiscoveryURL(du string) string {
+	const wellKnown = "/.well-known/openid-configuration"
+	trimmed := strings.TrimRight(du, "/")
+	if base, ok := strings.CutSuffix(trimmed, wellKnown); ok {
+		return base
+	}
+	// A trailing slash on a bare issuer base would make go-oidc fetch a
+	// double-slash path and fail its exact issuer-string comparison, so drop it.
+	return trimmed
 }
 
 // idpContext returns a context carrying our injectable HTTP client for both

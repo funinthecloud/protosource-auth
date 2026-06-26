@@ -461,3 +461,101 @@ func TestCallbackMissingStateCookieRejected(t *testing.T) {
 		t.Fatalf("status = %d, want 400 for missing state cookie", resp.StatusCode)
 	}
 }
+
+// TestIssuerBaseFromDiscoveryURL covers the normalization that lets operators
+// paste either the IdP issuer base or the full discovery-document URL.
+func TestIssuerBaseFromDiscoveryURL(t *testing.T) {
+	for _, tc := range []struct {
+		in, want string
+	}{
+		{"https://idp.example.com", "https://idp.example.com"},
+		{"https://idp.example.com/", "https://idp.example.com"},
+		{"https://idp.example.com/.well-known/openid-configuration", "https://idp.example.com"},
+		{"https://idp.example.com/.well-known/openid-configuration/", "https://idp.example.com"},
+		{"https://idp.example.com/tenant/.well-known/openid-configuration", "https://idp.example.com/tenant"},
+		// Not a discovery suffix — left untouched.
+		{"https://idp.example.com/oidc", "https://idp.example.com/oidc"},
+	} {
+		if got := issuerBaseFromDiscoveryURL(tc.in); got != tc.want {
+			t.Errorf("issuerBaseFromDiscoveryURL(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+// TestBuildOIDCMetaDiscoveryAcceptsWellKnownSuffix verifies buildOIDCMeta
+// resolves the IdP endpoints whether discovery_url is the issuer base or the
+// full /.well-known/openid-configuration URL (the form the admin UI suggests).
+func TestBuildOIDCMetaDiscoveryAcceptsWellKnownSuffix(t *testing.T) {
+	now := time.Now().UTC()
+	rig := newOAuthRig(t, func() time.Time { return now }, fakeResolver{userID: "user-123"})
+	ctx := context.Background()
+
+	for _, du := range []string{
+		rig.idp.server.URL,
+		rig.idp.server.URL + "/.well-known/openid-configuration",
+	} {
+		m, err := rig.handler.buildOIDCMeta(ctx, &issuerv1.OIDCConfig{
+			ClientId:     rig.idp.clientID,
+			DiscoveryUrl: du,
+		})
+		if err != nil {
+			t.Fatalf("buildOIDCMeta(%q): %v", du, err)
+		}
+		if want := rig.idp.server.URL + "/authorize"; m.authURL != want {
+			t.Errorf("discovery_url %q: authURL = %q, want %q", du, m.authURL, want)
+		}
+		if want := rig.idp.server.URL + "/token"; m.tokenURL != want {
+			t.Errorf("discovery_url %q: tokenURL = %q, want %q", du, m.tokenURL, want)
+		}
+	}
+}
+
+// TestBuildOIDCMetaPinnedRequiresAllEndpoints verifies pinned mode (no
+// discovery_url) fails closed when any of authorization_endpoint,
+// token_endpoint, or jwks_uri is missing, and succeeds when all are present.
+func TestBuildOIDCMetaPinnedRequiresAllEndpoints(t *testing.T) {
+	now := time.Now().UTC()
+	rig := newOAuthRig(t, func() time.Time { return now }, fakeResolver{userID: "user-123"})
+	ctx := context.Background()
+
+	full := &issuerv1.OIDCConfig{
+		ClientId:              "client-x",
+		AuthorizationEndpoint: "https://idp.example/authorize",
+		TokenEndpoint:         "https://idp.example/token",
+		JwksUri:               "https://idp.example/jwks",
+	}
+
+	for _, tc := range []struct {
+		name    string
+		mutate  func(*issuerv1.OIDCConfig)
+		missing string
+	}{
+		{"missing authorization_endpoint", func(c *issuerv1.OIDCConfig) { c.AuthorizationEndpoint = "" }, "authorization_endpoint"},
+		{"missing token_endpoint", func(c *issuerv1.OIDCConfig) { c.TokenEndpoint = "" }, "token_endpoint"},
+		{"missing jwks_uri", func(c *issuerv1.OIDCConfig) { c.JwksUri = "" }, "jwks_uri"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			oc := &issuerv1.OIDCConfig{
+				ClientId: full.ClientId, AuthorizationEndpoint: full.AuthorizationEndpoint,
+				TokenEndpoint: full.TokenEndpoint, JwksUri: full.JwksUri,
+			}
+			tc.mutate(oc)
+			_, err := rig.handler.buildOIDCMeta(ctx, oc)
+			if err == nil {
+				t.Fatalf("buildOIDCMeta with %s should error", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.missing) {
+				t.Errorf("error %q should name %q", err, tc.missing)
+			}
+		})
+	}
+
+	// All endpoints present → builds without error (RemoteKeySet is lazy).
+	m, err := rig.handler.buildOIDCMeta(ctx, full)
+	if err != nil {
+		t.Fatalf("buildOIDCMeta(full pinned): %v", err)
+	}
+	if m.authURL != full.AuthorizationEndpoint || m.tokenURL != full.TokenEndpoint {
+		t.Errorf("pinned meta = {%q,%q}, want {%q,%q}", m.authURL, m.tokenURL, full.AuthorizationEndpoint, full.TokenEndpoint)
+	}
+}

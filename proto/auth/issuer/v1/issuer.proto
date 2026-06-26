@@ -99,6 +99,9 @@ message OIDCConfig {
   string client_secret_master_key_ref = 4;
   // discovery_url takes precedence if set; the three explicit endpoints
   // are fallbacks for providers that don't publish discovery or for pinning.
+  // Either the IdP issuer base (https://idp.example.com) or the full
+  // discovery-document URL (.../.well-known/openid-configuration) is accepted;
+  // the runtime normalizes the latter to the issuer base for go-oidc.
   string          discovery_url          = 5;
   string          authorization_endpoint = 6;
   string          token_endpoint         = 7;

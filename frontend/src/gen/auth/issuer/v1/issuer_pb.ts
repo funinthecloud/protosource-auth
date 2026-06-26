@@ -159,6 +159,9 @@ export type OIDCConfig = Message<"auth.issuer.v1.OIDCConfig"> & {
   /**
    * discovery_url takes precedence if set; the three explicit endpoints
    * are fallbacks for providers that don't publish discovery or for pinning.
+   * Either the IdP issuer base (https://idp.example.com) or the full
+   * discovery-document URL (.../.well-known/openid-configuration) is accepted;
+   * the runtime normalizes the latter to the issuer base for go-oidc.
    *
    * @generated from field: string discovery_url = 5;
    */
