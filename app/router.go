@@ -1,6 +1,7 @@
 package app
 
 import (
+	"log/slog"
 	"strings"
 
 	"github.com/funinthecloud/protosource"
@@ -68,10 +69,26 @@ func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver, provider ke
 	// work today — deterministic User ids + Create/ErrAlreadyCreated convergence
 	// recognize returning users even with a cold index. JIT_REJECT recognition of
 	// pre-linked users with arbitrary ids requires the persistent link-index GSI
-	// (a documented follow-up); until it lands, REJECT-policy issuers recognize
+	// (protosource-auth-i1z); until it lands, REJECT-policy issuers recognize
 	// only links seen by this instance since start (fail-closed otherwise).
 	linkDir := service.NewMapLinkDirectory()
 	identityResolver := service.NewIdentityProvisioner(bundle.UserRepo, linkDir)
+	if bundle.UserClient != nil {
+		// Persistent backend (DynamoDB/Cosmos), but the federated link index is
+		// still in-memory and starts cold on every restart. That makes
+		// JIT_REJECT — the default policy — a quiet operational footgun: an
+		// already-linked user can be rejected after a restart simply because
+		// this instance has not re-observed their link. Surface it loudly at
+		// startup rather than letting it ship silently. The durable fix is the
+		// link-index GSI projection (protosource-auth-i1z); see
+		// service.MapLinkDirectory for the full contract.
+		slog.Warn("federated link index is in-memory on a persistent backend: "+
+			"JIT_REJECT issuers will not recognize pre-linked users across process restarts "+
+			"until the link-index GSI lands; AUTO/DOMAIN policies are unaffected",
+			"code", "FEDERATION_LINK_INDEX_EPHEMERAL",
+			"followup", "protosource-auth-i1z",
+		)
+	}
 	oauthHandler := service.NewOAuthHandler(
 		bundle.IssuerRepo, configurator, resolver, loginer,
 		identityResolver,

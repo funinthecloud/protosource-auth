@@ -37,6 +37,11 @@ type Page struct {
 	cookieName       string
 	accessCookieName string
 	loginer          *service.Loginer
+	// minter mints the companion access JWT. It is the same *Loginer in
+	// production; the seam (the exported [service.AccessTokenMinter], also used
+	// by service.AccessHandler) lets tests inject a failing minter to exercise
+	// the fail-closed path.
+	minter service.AccessTokenMinter
 }
 
 // New returns a Page that serves the login form and handles
@@ -58,6 +63,7 @@ func New(issuerID string, cookieName, accessCookieName string, loginer *service.
 		cookieName:       cookieName,
 		accessCookieName: accessCookieName,
 		loginer:          loginer,
+		minter:           loginer,
 	}
 }
 
@@ -140,29 +146,49 @@ func (p *Page) handleLogin(ctx context.Context, req protosource.Request) protoso
 		SameSite: http.SameSiteLaxMode,
 	}
 
-	// Companion access JWT: a short-lived, offline-verifiable HttpOnly
-	// cookie minted for the same user. The break-glass form login gets the
-	// same access-token posture as the federated callback. The token never
-	// reaches JS (HttpOnly); the SPA learns only its lifetime via expires_in.
-	cookies := []*http.Cookie{shadowCookie}
-	accessExpiresIn := 0
-	if accessJWT, accessExp, aerr := p.loginer.IssueAccessToken(ctx, result.UserID, p.issuerID); aerr == nil {
-		if accessMaxAge := int(time.Until(time.Unix(accessExp, 0)).Seconds()); accessMaxAge > 0 {
-			cookies = append(cookies, &http.Cookie{
-				Name:     p.accessCookieName,
-				Value:    accessJWT,
-				Path:     "/",
-				Domain:   domain,
-				MaxAge:   accessMaxAge,
-				Secure:   true,
-				HttpOnly: true,
-				SameSite: http.SameSiteLaxMode,
-			})
-			accessExpiresIn = accessMaxAge
-		}
+	// Companion access JWT: a short-lived, offline-verifiable HttpOnly cookie
+	// minted for the same user, so the break-glass form login gets the same
+	// access-token posture as the federated callback. The token never reaches
+	// JS (HttpOnly); the SPA learns only its lifetime via expires_in.
+	//
+	// A mint failure — or a non-positive lifetime — fails the whole login with
+	// 503 rather than returning a partially-initialized session. A shadow cookie
+	// with no access cookie would break v2 flows that rely on the access cookie
+	// and would silently mask key/JWKS misconfiguration; failing closed makes
+	// the misconfiguration visible to operators. Mirrors POST /auth/refresh.
+	accessJWT, accessExp, err := p.minter.IssueAccessToken(ctx, result.UserID, p.issuerID)
+	if err != nil {
+		slog.ErrorContext(ctx, "loginpage: access token mint failed",
+			"code", "LOGINPAGE_ACCESS_MINT_FAILED",
+			"email", in.Email,
+			"error", err,
+		)
+		return jsonError(http.StatusServiceUnavailable, "service unavailable, please try again")
+	}
+	accessMaxAge := int(time.Until(time.Unix(accessExp, 0)).Seconds())
+	if accessMaxAge <= 0 {
+		slog.ErrorContext(ctx, "loginpage: minted access token already expired",
+			"code", "LOGINPAGE_ACCESS_EXPIRED",
+			"email", in.Email,
+		)
+		return jsonError(http.StatusServiceUnavailable, "service unavailable, please try again")
 	}
 
-	body, _ := json.Marshal(map[string]any{"ok": true, "expires_in": accessExpiresIn})
+	cookies := []*http.Cookie{
+		shadowCookie,
+		{
+			Name:     p.accessCookieName,
+			Value:    accessJWT,
+			Path:     "/",
+			Domain:   domain,
+			MaxAge:   accessMaxAge,
+			Secure:   true,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		},
+	}
+
+	body, _ := json.Marshal(map[string]any{"ok": true, "expires_in": accessMaxAge})
 	return protosource.Response{
 		StatusCode: http.StatusOK,
 		Body:       string(body),

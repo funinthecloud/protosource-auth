@@ -59,15 +59,25 @@ type linkIndexWriter interface {
 }
 
 // MapLinkDirectory is an in-memory link-key→user-id [LinkDirectory]. It mirrors
-// [MapDirectory]: the memorystore-backed binary populates it as identities are
-// linked, and it is repopulated on every process restart.
+// [MapDirectory]: it is populated as identities are linked and repopulated from
+// empty on every process restart.
 //
-// Production deployments that store User aggregates in DynamoDB should instead
-// provide a LinkDirectory backed by a GSI on the link key. That GSI is a
-// documented follow-up (miy.4): the projection writes one index row per
+// This is what the router actually wires today for ALL backends (see
+// app.NewRouter): the IdentityProvisioner is backed by this in-memory directory
+// even when User aggregates live in DynamoDB/Cosmos, because the persistent link
+// index does not exist yet. The operational consequence after a restart is that
+// the index starts cold — JIT_AUTO_NO_ROLES and JIT_DOMAIN_RULE still recognize
+// returning users (their User id is a deterministic function of the link key;
+// see DeterministicUserID, so Create/ErrAlreadyCreated converges on the same
+// User), but JIT_REJECT issuers can only recognize links this instance has seen
+// since startup and otherwise fail closed.
+//
+// Production deployments that store User aggregates in DynamoDB/Cosmos should
+// instead provide a LinkDirectory backed by a GSI on the link key — a documented
+// follow-up (protosource-auth-i1z): a projection writes one index row per
 // LinkedIdentity ("{issuer_id}:{subject}" → user_id) on IdentityLinked and
-// removes it on IdentityUnlinked. Until it lands, federation is wired with
-// this in-memory directory (and RejectAllResolver remains the default).
+// removes it on IdentityUnlinked, giving REJECT-policy recognition across
+// instances and restarts.
 //
 // Safe for concurrent use.
 type MapLinkDirectory struct {

@@ -3,6 +3,7 @@ package loginpage
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -426,7 +427,77 @@ func TestHandleLoginSuccess(t *testing.T) {
 			if !strings.Contains(cookie, wantDomain) {
 				t.Errorf("cookie missing %s: %s", wantDomain, cookie)
 			}
+
+			// The companion access cookie is now a guaranteed part of a
+			// successful login (fail-closed otherwise) — HttpOnly so JS can
+			// never read it, and reported via expires_in.
+			var access *http.Cookie
+			for _, c := range resp.Cookies {
+				if c != nil && c.Name == "shadow_access" {
+					access = c
+				}
+			}
+			if access == nil {
+				t.Fatalf("missing access cookie; cookies=%v", resp.Cookies)
+			}
+			if !strings.Contains(access.String(), "HttpOnly") {
+				t.Errorf("access cookie missing HttpOnly: %s", access.String())
+			}
+			if n, _ := body["expires_in"].(float64); n <= 0 {
+				t.Errorf("expires_in = %v, want > 0", body["expires_in"])
+			}
 		})
+	}
+}
+
+// stubMinter is an injectable [service.AccessTokenMinter] for exercising the
+// access-token failure paths deterministically (the real minter shares the
+// issuer+resolver path with shadow minting, so it cannot fail in isolation).
+type stubMinter struct {
+	jwt string
+	exp int64
+	err error
+}
+
+func (s stubMinter) IssueAccessToken(_ context.Context, _, _ string) (string, int64, error) {
+	return s.jwt, s.exp, s.err
+}
+
+// A failure minting the companion access token must fail the whole login with
+// 503 and set NO cookies — never a half-initialized session (shadow without
+// access), which would break v2 access-cookie flows and hide key/JWKS
+// misconfiguration. Mirrors POST /auth/refresh.
+func TestHandleLoginAccessMintFailureIs503(t *testing.T) {
+	env := newTestEnv(t)
+	env.page.minter = stubMinter{err: errors.New("kms down")}
+
+	resp := env.page.handleLogin(context.Background(), protosource.Request{
+		Headers: secureHeaders("auth.drhayt.com"),
+		Body:    `{"email":"test@example.com","password":"testpass"}`,
+	})
+	if resp.StatusCode != 503 {
+		t.Fatalf("status = %d, want 503; body = %s", resp.StatusCode, resp.Body)
+	}
+	if len(resp.Cookies) != 0 {
+		t.Fatalf("expected no cookies on failed login, got %v", resp.Cookies)
+	}
+}
+
+// A minted access token whose lifetime is already non-positive is also a
+// misconfiguration and must 503 rather than set an instantly-stale cookie.
+func TestHandleLoginAccessExpiredIs503(t *testing.T) {
+	env := newTestEnv(t)
+	env.page.minter = stubMinter{jwt: "x", exp: time.Now().Add(-time.Hour).Unix()}
+
+	resp := env.page.handleLogin(context.Background(), protosource.Request{
+		Headers: secureHeaders("auth.drhayt.com"),
+		Body:    `{"email":"test@example.com","password":"testpass"}`,
+	})
+	if resp.StatusCode != 503 {
+		t.Fatalf("status = %d, want 503; body = %s", resp.StatusCode, resp.Body)
+	}
+	if len(resp.Cookies) != 0 {
+		t.Fatalf("expected no cookies, got %v", resp.Cookies)
 	}
 }
 
