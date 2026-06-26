@@ -94,7 +94,7 @@ func Run(ctx context.Context, cfg *Config) (*App, error) {
 		},
 	)
 
-	router := NewRouter(cfg, bundle, resolver)
+	router := NewRouter(cfg, bundle, resolver, provider, masterKeyRef)
 	handler := httpstandard.WrapRouter(router)
 
 	app := &App{

@@ -99,12 +99,13 @@ func TestDiscoveryStubsReturnNotImplemented(t *testing.T) {
 	d := service.NewDiscovery("https://auth.example.com", "shadow")
 	router := protosource.NewRouter(d)
 
+	// NOTE: /oauth/authorize and /oauth/callback are no longer stubs — they
+	// are owned by the real OAuthHandler (PKCE flow). Discovery only stubs
+	// the endpoints that still lack a real implementation.
 	cases := []struct {
 		method string
 		path   string
 	}{
-		{"GET", "/oauth/authorize"},
-		{"GET", "/oauth/callback"},
 		{"POST", "/oauth/token"},
 		{"GET", "/oauth/userinfo"},
 		{"GET", "/oauth/logout"},

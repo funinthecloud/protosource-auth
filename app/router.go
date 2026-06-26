@@ -13,6 +13,7 @@ import (
 	rolev1 "github.com/funinthecloud/protosource-auth/gen/auth/role/v1"
 	tokenv1 "github.com/funinthecloud/protosource-auth/gen/auth/token/v1"
 	userv1 "github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
+	"github.com/funinthecloud/protosource-auth/keyproviders"
 	"github.com/funinthecloud/protosource-auth/keys"
 	"github.com/funinthecloud/protosource-auth/loginpage"
 	"github.com/funinthecloud/protosource-auth/service"
@@ -38,7 +39,7 @@ import (
 // the admin SPA. An empty CORSOrigin leaves CORS disabled — same-
 // origin deployments (admin SPA and API on one host) need no headers
 // and benefit from a smaller preflight surface.
-func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver) *protosource.Router {
+func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver, provider keyproviders.KeyProvider, masterKeyRef string) *protosource.Router {
 	loginer := service.NewLoginer(
 		bundle.UserRepo, bundle.IssuerRepo, bundle.TokenRepo,
 		bundle.Directory, resolver,
@@ -50,7 +51,22 @@ func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver) *protosourc
 	disc := service.NewDiscovery(cfg.IssuerIss, cfg.ShadowCookieName)
 	jwks := service.NewJWKS(resolver, cfg.IssuerID)
 
-	registrars := []protosource.RouteRegistrar{svc, lp, disc, jwks}
+	// Federated-login PKCE flow (GET /oauth/authorize + /oauth/callback).
+	// The OIDCConfigurator reuses the same KeyProvider as the key resolver
+	// to decrypt IdP client secrets at callback time.
+	configurator := service.NewOIDCConfigurator(bundle.IssuerRepo, provider, masterKeyRef)
+	// TODO(miy.4): swap RejectAllResolver for the real provisioner once the
+	// Phase 2 User linked-identities + JIT resolver lands. Until then,
+	// federated login authenticates at the IdP but rejects every unlinked
+	// identity (fail-closed), so the flow is wired and testable without
+	// auto-provisioning users.
+	oauthHandler := service.NewOAuthHandler(
+		bundle.IssuerRepo, configurator, resolver, loginer,
+		service.RejectAllResolver{},
+		cfg.IssuerID, cfg.IssuerIss, cfg.ShadowCookieName,
+	)
+
+	registrars := []protosource.RouteRegistrar{svc, lp, disc, jwks, oauthHandler}
 
 	// The v1 admin handlers + whoami + adminUser require the
 	// opaquedata-backed clients. Memory backend leaves them nil; see

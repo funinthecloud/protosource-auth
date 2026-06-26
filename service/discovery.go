@@ -56,10 +56,10 @@ func (d *Discovery) RegisterRoutes(router *protosource.Router) {
 
 	// Commit the endpoint shapes (GET/POST as appropriate for the future
 	// flows). Real implementations replace these stubs. Note: /oauth/jwks
-	// is implemented by the real JWKS handler (registered alongside
-	// Discovery) so we do not stub it here.
-	router.Handle("GET", "/oauth/authorize", d.stubNotImplemented)
-	router.Handle("GET", "/oauth/callback", d.stubNotImplemented)
+	// is implemented by the real JWKS handler, and /oauth/authorize +
+	// /oauth/callback are implemented by the real OAuthHandler (PKCE flow,
+	// Track A) — both registered alongside Discovery — so we do not stub
+	// those here (duplicate registration would panic the router).
 	router.Handle("POST", "/oauth/token", d.stubNotImplemented)
 	router.Handle("GET", "/oauth/userinfo", d.stubNotImplemented)
 	router.Handle("GET", "/oauth/logout", d.stubNotImplemented)
