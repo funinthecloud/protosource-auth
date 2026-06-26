@@ -20,14 +20,14 @@ import (
 var usage = "Usage: issuermgr [-json] <command> [args]\n\nFlags:\n" +
 	"  -json              Use JSON serialization (default: protobuf)\n\n" +
 	"Commands:\n" +
-	"  register  <id>  <iss>  <display_name>  <kind:num>  <default_algorithm>  <jwks_url>  <initial_oidc:json>\n" +
+	"  register  <id>  <iss>  <display_name>  <kind:num>  <default_algorithm>  <jwks_url>  <oidc:json>\n" +
 	"  rename  <id>  <display_name>\n" +
 	"  setdefaultalgorithm  <id>  <default_algorithm>\n" +
 	"  setjwksurl  <id>  <jwks_url>\n" +
 	"  deactivate  <id>\n" +
 	"  reactivate  <id>\n" +
 	"  delete  <id>\n" +
-	"  setoidcconfig  <id>  <config:json>\n" +
+	"  setoidcconfig  <id>  <oidc:json>\n" +
 	"  clearoidcconfig  <id>\n" +
 	"  get      <id>\n" +
 	"  load     <id>\n" +
@@ -83,9 +83,9 @@ func main() {
 
 	case "register":
 		if len(os.Args) != 9 {
-			fatal("usage: issuermgr register <id> <iss> <display_name> <kind:num> <default_algorithm> <jwks_url> <initial_oidc:json>")
+			fatal("usage: issuermgr register <id> <iss> <display_name> <kind:num> <default_algorithm> <jwks_url> <oidc:json>")
 		}
-		result, err := client.Register(ctx, os.Args[2], os.Args[3], os.Args[4], pkg.Kind(mustParseInt32(os.Args[5], "kind")), os.Args[6], os.Args[7], mustParseJSON[*pkg.OIDCConfig](os.Args[8], "initial_oidc"))
+		result, err := client.Register(ctx, os.Args[2], os.Args[3], os.Args[4], pkg.Kind(mustParseInt32(os.Args[5], "kind")), os.Args[6], os.Args[7], mustParseJSON[*pkg.OIDCConfig](os.Args[8], "oidc"))
 		if err != nil {
 			fatal(fmt.Sprintf("error: %v", err))
 		}
@@ -153,9 +153,9 @@ func main() {
 
 	case "setoidcconfig":
 		if len(os.Args) != 4 {
-			fatal("usage: issuermgr setoidcconfig <id> <config:json>")
+			fatal("usage: issuermgr setoidcconfig <id> <oidc:json>")
 		}
-		result, err := client.SetOIDCConfig(ctx, os.Args[2], mustParseJSON[*pkg.OIDCConfig](os.Args[3], "config"))
+		result, err := client.SetOIDCConfig(ctx, os.Args[2], mustParseJSON[*pkg.OIDCConfig](os.Args[3], "oidc"))
 		if err != nil {
 			fatal(fmt.Sprintf("error: %v", err))
 		}

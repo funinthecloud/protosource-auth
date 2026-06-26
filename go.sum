@@ -72,8 +72,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nosvA=
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
-github.com/funinthecloud/protosource v0.6.1 h1:vJNAjFg8JrBpcUIomLJtYZ3/SiWzkyD7SII/dXBYMbw=
-github.com/funinthecloud/protosource v0.6.1/go.mod h1:v6L+/bMuK5LnQ5Hy99mrSkzabDKgQnjDgqcoytTymis=
+github.com/funinthecloud/protosource v0.7.1 h1:Yt+JkGWOcruOJER+KK5YDnk5qXAlHgsa7CnrgVKoiXs=
+github.com/funinthecloud/protosource v0.7.1/go.mod h1:v6L+/bMuK5LnQ5Hy99mrSkzabDKgQnjDgqcoytTymis=
 github.com/goforj/wire v1.2.0 h1:F02xb36PwSJZCpazfWBs4Gc7qtm34NICH0QMAqfFtn4=
 github.com/goforj/wire v1.2.0/go.mod h1:liyCJqszv9cbeDz09W+/yAcWi05803Q4ncm7lhMO6QM=
 github.com/golang-jwt/jwt/v5 v5.3.0 h1:pv4AsKCKKZuqlgs5sUmn4x8UlGa0kEVt/puTpKx9vvo=

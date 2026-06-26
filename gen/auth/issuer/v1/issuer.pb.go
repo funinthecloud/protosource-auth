@@ -395,11 +395,13 @@ func (x *IssuerList) GetItems() []*Issuer {
 // to use for local identity (e.g. "email_at_link" -> "email").
 // jit_* fields drive the per-IdP JIT policy (default REJECT).
 type OIDCConfig struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	ClientId                 string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
-	WrappedClientSecret      []byte                 `protobuf:"bytes,2,opt,name=wrapped_client_secret,json=wrappedClientSecret,proto3" json:"wrapped_client_secret,omitempty"`
-	ClientSecretKeyProvider  string                 `protobuf:"bytes,3,opt,name=client_secret_key_provider,json=clientSecretKeyProvider,proto3" json:"client_secret_key_provider,omitempty"`
-	ClientSecretMasterKeyRef string                 `protobuf:"bytes,4,opt,name=client_secret_master_key_ref,json=clientSecretMasterKeyRef,proto3" json:"client_secret_master_key_ref,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// client_id is required — an OIDCConfig with no client_id is unusable and
+	// would only fail later at runtime, so reject it at the command boundary.
+	ClientId                 string `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	WrappedClientSecret      []byte `protobuf:"bytes,2,opt,name=wrapped_client_secret,json=wrappedClientSecret,proto3" json:"wrapped_client_secret,omitempty"`
+	ClientSecretKeyProvider  string `protobuf:"bytes,3,opt,name=client_secret_key_provider,json=clientSecretKeyProvider,proto3" json:"client_secret_key_provider,omitempty"`
+	ClientSecretMasterKeyRef string `protobuf:"bytes,4,opt,name=client_secret_master_key_ref,json=clientSecretMasterKeyRef,proto3" json:"client_secret_master_key_ref,omitempty"`
 	// discovery_url takes precedence if set; the three explicit endpoints
 	// are fallbacks for providers that don't publish discovery or for pinning.
 	DiscoveryUrl          string   `protobuf:"bytes,5,opt,name=discovery_url,json=discoveryUrl,proto3" json:"discovery_url,omitempty"`
@@ -547,12 +549,15 @@ type Register struct {
 	Kind             Kind                   `protobuf:"varint,5,opt,name=kind,proto3,enum=auth.issuer.v1.Kind" json:"kind,omitempty"`
 	DefaultAlgorithm string                 `protobuf:"bytes,6,opt,name=default_algorithm,json=defaultAlgorithm,proto3" json:"default_algorithm,omitempty"`
 	JwksUrl          string                 `protobuf:"bytes,7,opt,name=jwks_url,json=jwksUrl,proto3" json:"jwks_url,omitempty"`
-	// initial_oidc may be supplied when creating a KIND_EXTERNAL issuer so
+	// oidc may be supplied when creating a KIND_EXTERNAL issuer so
 	// the OIDC client config (including wrapped secret) is set atomically
 	// with registration. For KIND_SELF it must be unset. The secret (if
 	// present) must already be wrapped by the caller (see service configurator
 	// or mgr helper); the raw command path does not perform encryption.
-	InitialOidc   *OIDCConfig `protobuf:"bytes,8,opt,name=initial_oidc,json=initialOidc,proto3" json:"initial_oidc,omitempty"`
+	// Named to match the aggregate field "oidc" so the generator copies it
+	// into the Registered event and applies it via On() (by-name singular
+	// embedded convention, protosource v0.7.1).
+	Oidc          *OIDCConfig `protobuf:"bytes,8,opt,name=oidc,proto3" json:"oidc,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -636,9 +641,9 @@ func (x *Register) GetJwksUrl() string {
 	return ""
 }
 
-func (x *Register) GetInitialOidc() *OIDCConfig {
+func (x *Register) GetOidc() *OIDCConfig {
 	if x != nil {
-		return x.InitialOidc
+		return x.Oidc
 	}
 	return nil
 }
@@ -990,7 +995,7 @@ type SetOIDCConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Actor         string                 `protobuf:"bytes,2,opt,name=actor,proto3" json:"actor,omitempty"`
-	Config        *OIDCConfig            `protobuf:"bytes,3,opt,name=config,proto3" json:"config,omitempty"`
+	Oidc          *OIDCConfig            `protobuf:"bytes,3,opt,name=oidc,proto3" json:"oidc,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1039,9 +1044,9 @@ func (x *SetOIDCConfig) GetActor() string {
 	return ""
 }
 
-func (x *SetOIDCConfig) GetConfig() *OIDCConfig {
+func (x *SetOIDCConfig) GetOidc() *OIDCConfig {
 	if x != nil {
-		return x.Config
+		return x.Oidc
 	}
 	return nil
 }
@@ -1109,10 +1114,11 @@ type Registered struct {
 	Kind             Kind                   `protobuf:"varint,7,opt,name=kind,proto3,enum=auth.issuer.v1.Kind" json:"kind,omitempty"`
 	DefaultAlgorithm string                 `protobuf:"bytes,8,opt,name=default_algorithm,json=defaultAlgorithm,proto3" json:"default_algorithm,omitempty"`
 	JwksUrl          string                 `protobuf:"bytes,9,opt,name=jwks_url,json=jwksUrl,proto3" json:"jwks_url,omitempty"`
-	// initial_oidc is echoed from the Register command when the issuer was
+	// oidc is echoed from the Register command when the issuer was
 	// created as KIND_EXTERNAL with OIDC config. Stored in the aggregate
-	// snapshot via On(Registered).
-	InitialOidc   *OIDCConfig `protobuf:"bytes,10,opt,name=initial_oidc,json=initialOidc,proto3" json:"initial_oidc,omitempty"`
+	// snapshot via On(Registered) — name matches the aggregate field "oidc"
+	// so the generator emits the copy automatically.
+	Oidc          *OIDCConfig `protobuf:"bytes,10,opt,name=oidc,proto3" json:"oidc,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1210,9 +1216,9 @@ func (x *Registered) GetJwksUrl() string {
 	return ""
 }
 
-func (x *Registered) GetInitialOidc() *OIDCConfig {
+func (x *Registered) GetOidc() *OIDCConfig {
 	if x != nil {
-		return x.InitialOidc
+		return x.Oidc
 	}
 	return nil
 }
@@ -1655,7 +1661,7 @@ type OIDCConfigSet struct {
 	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
 	At            int64                  `protobuf:"varint,3,opt,name=at,proto3" json:"at,omitempty"`
 	Actor         string                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
-	Config        *OIDCConfig            `protobuf:"bytes,5,opt,name=config,proto3" json:"config,omitempty"`
+	Oidc          *OIDCConfig            `protobuf:"bytes,5,opt,name=oidc,proto3" json:"oidc,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1718,19 +1724,24 @@ func (x *OIDCConfigSet) GetActor() string {
 	return ""
 }
 
-func (x *OIDCConfigSet) GetConfig() *OIDCConfig {
+func (x *OIDCConfigSet) GetOidc() *OIDCConfig {
 	if x != nil {
-		return x.Config
+		return x.Oidc
 	}
 	return nil
 }
 
 type OIDCConfigCleared struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Version       int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
-	At            int64                  `protobuf:"varint,3,opt,name=at,proto3" json:"at,omitempty"`
-	Actor         string                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	At      int64                  `protobuf:"varint,3,opt,name=at,proto3" json:"at,omitempty"`
+	Actor   string                 `protobuf:"bytes,4,opt,name=actor,proto3" json:"actor,omitempty"`
+	// oidc is intentionally left unset on a clear. The generator emits the
+	// unconditional by-name copy (aggregate.Oidc = e.GetOidc()), so an empty
+	// value here nils the aggregate's oidc — the clear half of the by-name
+	// singular embedded convention (protosource v0.7.1).
+	Oidc          *OIDCConfig `protobuf:"bytes,5,opt,name=oidc,proto3" json:"oidc,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1793,6 +1804,13 @@ func (x *OIDCConfigCleared) GetActor() string {
 	return ""
 }
 
+func (x *OIDCConfigCleared) GetOidc() *OIDCConfig {
+	if x != nil {
+		return x.Oidc
+	}
+	return nil
+}
+
 var File_auth_issuer_v1_issuer_proto protoreflect.FileDescriptor
 
 const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
@@ -1817,10 +1835,10 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\x04oidc\x18\r \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x04oidc:\x05\x8aQ\x02\x1a\x00\":\n" +
 	"\n" +
 	"IssuerList\x12,\n" +
-	"\x05items\x18\x01 \x03(\v2\x16.auth.issuer.v1.IssuerR\x05items\"\xb5\x05\n" +
+	"\x05items\x18\x01 \x03(\v2\x16.auth.issuer.v1.IssuerR\x05items\"\xbe\x05\n" +
 	"\n" +
-	"OIDCConfig\x12\x1b\n" +
-	"\tclient_id\x18\x01 \x01(\tR\bclientId\x122\n" +
+	"OIDCConfig\x12$\n" +
+	"\tclient_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\bclientId\x122\n" +
 	"\x15wrapped_client_secret\x18\x02 \x01(\fR\x13wrappedClientSecret\x12;\n" +
 	"\x1aclient_secret_key_provider\x18\x03 \x01(\tR\x17clientSecretKeyProvider\x12>\n" +
 	"\x1cclient_secret_master_key_ref\x18\x04 \x01(\tR\x18clientSecretMasterKeyRef\x12#\n" +
@@ -1838,7 +1856,7 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"jit_domain\x18\r \x01(\tR\tjitDomain\x1a;\n" +
 	"\rClaimMapEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb4\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8b\x03\n" +
 	"\bRegister\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05actor\x18\x02 \x01(\tR\x05actor\x12\x19\n" +
@@ -1846,8 +1864,9 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12(\n" +
 	"\x04kind\x18\x05 \x01(\x0e2\x14.auth.issuer.v1.KindR\x04kind\x12+\n" +
 	"\x11default_algorithm\x18\x06 \x01(\tR\x10defaultAlgorithm\x12\x19\n" +
-	"\bjwks_url\x18\a \x01(\tR\ajwksUrl\x12=\n" +
-	"\finitial_oidc\x18\b \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\vinitialOidc:\x13\x8aQ\x10\n" +
+	"\bjwks_url\x18\a \x01(\tR\ajwksUrl\x12.\n" +
+	"\x04oidc\x18\b \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x04oidc:y\xbaHc\x1aa\n" +
+	"\x12register.oidc.kind\x12(oidc must be unset for KIND_SELF issuers\x1a!this.kind != 1 || !has(this.oidc)\x8aQ\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"Registered\x10\x01\"z\n" +
@@ -1887,18 +1906,18 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05actor\x18\x02 \x01(\tR\x05actor:1\x8aQ.\n" +
 	",\n" +
-	"\aDeleted\x10\x02\x1a\fSTATE_ACTIVE\x1a\x11STATE_DEACTIVATED\"\x8f\x01\n" +
+	"\aDeleted\x10\x02\x1a\fSTATE_ACTIVE\x1a\x11STATE_DEACTIVATED\"\x8b\x01\n" +
 	"\rSetOIDCConfig\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
-	"\x05actor\x18\x02 \x01(\tR\x05actor\x122\n" +
-	"\x06config\x18\x03 \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x06config:$\x8aQ!\n" +
+	"\x05actor\x18\x02 \x01(\tR\x05actor\x12.\n" +
+	"\x04oidc\x18\x03 \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x04oidc:$\x8aQ!\n" +
 	"\x1f\n" +
 	"\rOIDCConfigSet\x10\x02\x1a\fSTATE_ACTIVE\"a\n" +
 	"\x0fClearOIDCConfig\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05actor\x18\x02 \x01(\tR\x05actor:(\x8aQ%\n" +
 	"#\n" +
-	"\x11OIDCConfigCleared\x10\x02\x1a\fSTATE_ACTIVE\"\xd7\x02\n" +
+	"\x11OIDCConfigCleared\x10\x02\x1a\fSTATE_ACTIVE\"\xc8\x02\n" +
 	"\n" +
 	"Registered\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
@@ -1909,9 +1928,9 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x06 \x01(\tR\vdisplayName\x12(\n" +
 	"\x04kind\x18\a \x01(\x0e2\x14.auth.issuer.v1.KindR\x04kind\x12+\n" +
 	"\x11default_algorithm\x18\b \x01(\tR\x10defaultAlgorithm\x12\x19\n" +
-	"\bjwks_url\x18\t \x01(\tR\ajwksUrl\x12=\n" +
-	"\finitial_oidc\x18\n" +
-	" \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\vinitialOidc:\x13\x8aQ\x10\x12\x0e\x12\fSTATE_ACTIVE\"\x83\x01\n" +
+	"\bjwks_url\x18\t \x01(\tR\ajwksUrl\x12.\n" +
+	"\x04oidc\x18\n" +
+	" \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x04oidc:\x13\x8aQ\x10\x12\x0e\x12\fSTATE_ACTIVE\"\x83\x01\n" +
 	"\aRenamed\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
@@ -1945,18 +1964,19 @@ const file_auth_issuer_v1_issuer_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
 	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
-	"\x05actor\x18\x04 \x01(\tR\x05actor:\x14\x8aQ\x11\x12\x0f\x12\rSTATE_DELETED\"\x9a\x01\n" +
+	"\x05actor\x18\x04 \x01(\tR\x05actor:\x14\x8aQ\x11\x12\x0f\x12\rSTATE_DELETED\"\x96\x01\n" +
 	"\rOIDCConfigSet\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
 	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
-	"\x05actor\x18\x04 \x01(\tR\x05actor\x122\n" +
-	"\x06config\x18\x05 \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x06config:\x05\x8aQ\x02\x12\x00\"j\n" +
+	"\x05actor\x18\x04 \x01(\tR\x05actor\x12.\n" +
+	"\x04oidc\x18\x05 \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x04oidc:\x05\x8aQ\x02\x12\x00\"\x9a\x01\n" +
 	"\x11OIDCConfigCleared\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12\x0e\n" +
 	"\x02at\x18\x03 \x01(\x03R\x02at\x12\x14\n" +
-	"\x05actor\x18\x04 \x01(\tR\x05actor:\x05\x8aQ\x02\x12\x00*Z\n" +
+	"\x05actor\x18\x04 \x01(\tR\x05actor\x12.\n" +
+	"\x04oidc\x18\x05 \x01(\v2\x1a.auth.issuer.v1.OIDCConfigR\x04oidc:\x05\x8aQ\x02\x12\x00*Z\n" +
 	"\x05State\x12\x15\n" +
 	"\x11STATE_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fSTATE_ACTIVE\x10\x01\x12\x15\n" +
@@ -2022,16 +2042,17 @@ var file_auth_issuer_v1_issuer_proto_depIdxs = []int32{
 	24, // 4: auth.issuer.v1.OIDCConfig.claim_map:type_name -> auth.issuer.v1.OIDCConfig.ClaimMapEntry
 	2,  // 5: auth.issuer.v1.OIDCConfig.jit_policy:type_name -> auth.issuer.v1.OIDCJITPolicy
 	1,  // 6: auth.issuer.v1.Register.kind:type_name -> auth.issuer.v1.Kind
-	5,  // 7: auth.issuer.v1.Register.initial_oidc:type_name -> auth.issuer.v1.OIDCConfig
-	5,  // 8: auth.issuer.v1.SetOIDCConfig.config:type_name -> auth.issuer.v1.OIDCConfig
+	5,  // 7: auth.issuer.v1.Register.oidc:type_name -> auth.issuer.v1.OIDCConfig
+	5,  // 8: auth.issuer.v1.SetOIDCConfig.oidc:type_name -> auth.issuer.v1.OIDCConfig
 	1,  // 9: auth.issuer.v1.Registered.kind:type_name -> auth.issuer.v1.Kind
-	5,  // 10: auth.issuer.v1.Registered.initial_oidc:type_name -> auth.issuer.v1.OIDCConfig
-	5,  // 11: auth.issuer.v1.OIDCConfigSet.config:type_name -> auth.issuer.v1.OIDCConfig
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	5,  // 10: auth.issuer.v1.Registered.oidc:type_name -> auth.issuer.v1.OIDCConfig
+	5,  // 11: auth.issuer.v1.OIDCConfigSet.oidc:type_name -> auth.issuer.v1.OIDCConfig
+	5,  // 12: auth.issuer.v1.OIDCConfigCleared.oidc:type_name -> auth.issuer.v1.OIDCConfig
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_auth_issuer_v1_issuer_proto_init() }

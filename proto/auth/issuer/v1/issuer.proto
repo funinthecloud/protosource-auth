@@ -119,12 +119,12 @@ message Register {
     produces_events: [ "Registered" ]
     lifecycle: COMMAND_LIFECYCLE_CREATION
   };
-  // initial_oidc only makes sense for KIND_EXTERNAL issuers; reject it for
+  // oidc only makes sense for KIND_EXTERNAL issuers; reject it for
   // KIND_SELF (= 1) so the aggregate invariant can't be violated at creation.
   option (buf.validate.message).cel = {
-    id: "register.initial_oidc.kind"
-    message: "initial_oidc must be unset for KIND_SELF issuers"
-    expression: "this.kind != 1 || !has(this.initial_oidc)"
+    id: "register.oidc.kind"
+    message: "oidc must be unset for KIND_SELF issuers"
+    expression: "this.kind != 1 || !has(this.oidc)"
   };
   string id                = 1;
   string actor             = 2;
@@ -133,12 +133,15 @@ message Register {
   Kind   kind              = 5;
   string default_algorithm = 6;
   string jwks_url          = 7;
-  // initial_oidc may be supplied when creating a KIND_EXTERNAL issuer so
+  // oidc may be supplied when creating a KIND_EXTERNAL issuer so
   // the OIDC client config (including wrapped secret) is set atomically
   // with registration. For KIND_SELF it must be unset. The secret (if
   // present) must already be wrapped by the caller (see service configurator
   // or mgr helper); the raw command path does not perform encryption.
-  OIDCConfig initial_oidc = 8;
+  // Named to match the aggregate field "oidc" so the generator copies it
+  // into the Registered event and applies it via On() (by-name singular
+  // embedded convention, protosource v0.7.1).
+  OIDCConfig oidc = 8;
 }
 
 message Rename {
@@ -217,9 +220,9 @@ message SetOIDCConfig {
     lifecycle: COMMAND_LIFECYCLE_MUTATION
     allowed_states: [ "STATE_ACTIVE" ]
   };
-  string     id     = 1;
-  string     actor  = 2;
-  OIDCConfig config = 3;
+  string     id    = 1;
+  string     actor = 2;
+  OIDCConfig oidc  = 3;
 }
 
 message ClearOIDCConfig {
@@ -247,10 +250,11 @@ message Registered {
   Kind   kind              = 7;
   string default_algorithm = 8;
   string jwks_url          = 9;
-  // initial_oidc is echoed from the Register command when the issuer was
+  // oidc is echoed from the Register command when the issuer was
   // created as KIND_EXTERNAL with OIDC config. Stored in the aggregate
-  // snapshot via On(Registered).
-  OIDCConfig initial_oidc = 10;
+  // snapshot via On(Registered) — name matches the aggregate field "oidc"
+  // so the generator emits the copy automatically.
+  OIDCConfig oidc = 10;
 }
 
 message Renamed {
@@ -320,7 +324,7 @@ message OIDCConfigSet {
   int64      version = 2;
   int64      at      = 3;
   string     actor   = 4;
-  OIDCConfig config  = 5;
+  OIDCConfig oidc    = 5;
 }
 
 message OIDCConfigCleared {
@@ -330,4 +334,9 @@ message OIDCConfigCleared {
   int64  version = 2;
   int64  at      = 3;
   string actor   = 4;
+  // oidc is intentionally left unset on a clear. The generator emits the
+  // unconditional by-name copy (aggregate.Oidc = e.GetOidc()), so an empty
+  // value here nils the aggregate's oidc — the clear half of the by-name
+  // singular embedded convention (protosource v0.7.1).
+  OIDCConfig oidc = 5;
 }

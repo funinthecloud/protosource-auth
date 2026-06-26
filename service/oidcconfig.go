@@ -136,9 +136,9 @@ func (c *OIDCConfigurator) Set(ctx context.Context, req SetRequest) error {
 	}
 
 	if _, err := c.issuerRepo.Apply(ctx, &issuerv1.SetOIDCConfig{
-		Id:     req.IssuerID,
-		Actor:  actor,
-		Config: oc,
+		Id:    req.IssuerID,
+		Actor: actor,
+		Oidc:  oc,
 	}); err != nil {
 		return fmt.Errorf("service: apply SetOIDCConfig: %w", err)
 	}
@@ -212,7 +212,7 @@ func (c *OIDCConfigurator) DecryptClientSecret(ctx context.Context, wrapped []by
 // PrepareForRegister is a convenience for callers that want to create a
 // KIND_EXTERNAL issuer with initial OIDC config in one Register command.
 // It performs the Encrypt step and returns a populated OIDCConfig ready
-// for the Register.InitialOidc field (or zero if no secret).
+// for the Register.Oidc field (or zero if no secret).
 func (c *OIDCConfigurator) PrepareForRegister(ctx context.Context, plaintextSecret []byte, template *issuerv1.OIDCConfig) (*issuerv1.OIDCConfig, error) {
 	if template == nil {
 		template = &issuerv1.OIDCConfig{}

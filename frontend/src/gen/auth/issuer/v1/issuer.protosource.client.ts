@@ -15,8 +15,8 @@ export class IssuerHTTPClient {
     this.client = client;
   }
 
-  async register(id: string, iss: string, displayName: string, kind: Kind, defaultAlgorithm: string, jwksUrl: string, initialOidc?: OIDCConfig): Promise<CommandResponse> {
-    return this.client.apply(routePath, RegisterSchema, { id, iss: iss, displayName: displayName, kind: kind, defaultAlgorithm: defaultAlgorithm, jwksUrl: jwksUrl, initialOidc: initialOidc });
+  async register(id: string, iss: string, displayName: string, kind: Kind, defaultAlgorithm: string, jwksUrl: string, oidc: OIDCConfig): Promise<CommandResponse> {
+    return this.client.apply(routePath, RegisterSchema, { id, iss: iss, displayName: displayName, kind: kind, defaultAlgorithm: defaultAlgorithm, jwksUrl: jwksUrl, oidc: oidc });
   }
 
   async rename(id: string, displayName: string): Promise<CommandResponse> {
@@ -43,8 +43,8 @@ export class IssuerHTTPClient {
     return this.client.apply(routePath, DeleteSchema, { id });
   }
 
-  async setOIDCConfig(id: string, config: OIDCConfig): Promise<CommandResponse> {
-    return this.client.apply(routePath, SetOIDCConfigSchema, { id, config: config });
+  async setOIDCConfig(id: string, oidc: OIDCConfig): Promise<CommandResponse> {
+    return this.client.apply(routePath, SetOIDCConfigSchema, { id, oidc: oidc });
   }
 
   async clearOIDCConfig(id: string): Promise<CommandResponse> {

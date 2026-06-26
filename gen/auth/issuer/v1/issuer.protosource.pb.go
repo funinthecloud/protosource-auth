@@ -79,6 +79,7 @@ func (aggregate *Issuer) On(event protosource.Event) error {
 		aggregate.Kind = e.GetKind()
 		aggregate.DefaultAlgorithm = e.GetDefaultAlgorithm()
 		aggregate.JwksUrl = e.GetJwksUrl()
+		aggregate.Oidc = e.GetOidc()
 		aggregate.State = State_STATE_ACTIVE
 	case *Renamed:
 		aggregate.setModified(e)
@@ -100,12 +101,10 @@ func (aggregate *Issuer) On(event protosource.Event) error {
 		aggregate.State = State_STATE_DELETED
 	case *OIDCConfigSet:
 		aggregate.setModified(e)
-		if c := e.GetConfig(); c != nil {
-			aggregate.Oidc = c
-		}
+		aggregate.Oidc = e.GetOidc()
 	case *OIDCConfigCleared:
 		aggregate.setModified(e)
-		aggregate.Oidc = nil
+		aggregate.Oidc = e.GetOidc()
 	default:
 		return fmt.Errorf("%T: %w", e, protosource.ErrUnhandledEvent)
 	}
@@ -313,7 +312,7 @@ func (m *Register) ValidateVersion(version int64) error {
 }
 func (m *Register) EmitEvents(aggregate protosource.Aggregate) []protosource.Event {
 	b := NewBuilder(m.GetId(), aggregate.GetVersion())
-	b.Registered(m.GetActor(), m.GetIss(), m.GetDisplayName(), m.GetKind(), m.GetDefaultAlgorithm(), m.GetJwksUrl(), m.GetInitialOidc())
+	b.Registered(m.GetActor(), m.GetIss(), m.GetDisplayName(), m.GetKind(), m.GetDefaultAlgorithm(), m.GetJwksUrl(), m.GetOidc())
 	return b.Events
 }
 
@@ -537,7 +536,7 @@ func (m *SetOIDCConfig) GuardState(aggregate protosource.Aggregate) error {
 }
 func (m *SetOIDCConfig) EmitEvents(aggregate protosource.Aggregate) []protosource.Event {
 	b := NewBuilder(m.GetId(), aggregate.GetVersion())
-	b.OIDCConfigSet(m.GetActor(), m.GetConfig())
+	b.OIDCConfigSet(m.GetActor(), m.GetOidc())
 	return b.Events
 }
 
@@ -569,7 +568,7 @@ func (m *ClearOIDCConfig) GuardState(aggregate protosource.Aggregate) error {
 }
 func (m *ClearOIDCConfig) EmitEvents(aggregate protosource.Aggregate) []protosource.Event {
 	b := NewBuilder(m.GetId(), aggregate.GetVersion())
-	b.OIDCConfigCleared(m.GetActor())
+	b.OIDCConfigCleared(m.GetActor(), nil)
 	return b.Events
 }
 
@@ -577,7 +576,7 @@ func (m *Registered) EventName() string {
 	return "Registered"
 }
 
-func (b *Builder) Registered(Actor string, Iss string, DisplayName string, Kind Kind, DefaultAlgorithm string, JwksUrl string, InitialOidc *OIDCConfig) {
+func (b *Builder) Registered(Actor string, Iss string, DisplayName string, Kind Kind, DefaultAlgorithm string, JwksUrl string, Oidc *OIDCConfig) {
 	event := &Registered{
 		Id:               b.id,
 		Actor:            Actor,
@@ -586,7 +585,7 @@ func (b *Builder) Registered(Actor string, Iss string, DisplayName string, Kind 
 		Kind:             Kind,
 		DefaultAlgorithm: DefaultAlgorithm,
 		JwksUrl:          JwksUrl,
-		InitialOidc:      InitialOidc,
+		Oidc:             Oidc,
 
 		Version: b.nextVersion(),
 		At:      protosource.NowMicros(),
@@ -691,11 +690,11 @@ func (m *OIDCConfigSet) EventName() string {
 	return "OIDCConfigSet"
 }
 
-func (b *Builder) OIDCConfigSet(Actor string, Config *OIDCConfig) {
+func (b *Builder) OIDCConfigSet(Actor string, Oidc *OIDCConfig) {
 	event := &OIDCConfigSet{
-		Id:     b.id,
-		Actor:  Actor,
-		Config: Config,
+		Id:    b.id,
+		Actor: Actor,
+		Oidc:  Oidc,
 
 		Version: b.nextVersion(),
 		At:      protosource.NowMicros(),
@@ -707,10 +706,11 @@ func (m *OIDCConfigCleared) EventName() string {
 	return "OIDCConfigCleared"
 }
 
-func (b *Builder) OIDCConfigCleared(Actor string) {
+func (b *Builder) OIDCConfigCleared(Actor string, Oidc *OIDCConfig) {
 	event := &OIDCConfigCleared{
 		Id:    b.id,
 		Actor: Actor,
+		Oidc:  Oidc,
 
 		Version: b.nextVersion(),
 		At:      protosource.NowMicros(),

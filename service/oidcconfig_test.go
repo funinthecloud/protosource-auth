@@ -230,22 +230,22 @@ func TestOIDCConfigurator_RejectsNonExternalIssuer(t *testing.T) {
 	}
 }
 
-// Register validation (CEL) must reject initial_oidc for KIND_SELF issuers.
+// Register validation (CEL) must reject oidc for KIND_SELF issuers.
 func TestRegister_RejectsInitialOIDCForKindSelf(t *testing.T) {
 	ctx := context.Background()
 	repo := issuerv1.NewRepository(memorystore.New(0), protobinaryserializer.NewSerializer())
 
 	if _, err := repo.Apply(ctx, &issuerv1.Register{
 		Id: "self-x", Actor: "t", Iss: "https://auth.local", Kind: issuerv1.Kind_KIND_SELF,
-		InitialOidc: &issuerv1.OIDCConfig{ClientId: "cid"},
+		Oidc: &issuerv1.OIDCConfig{ClientId: "cid"},
 	}); err == nil {
-		t.Error("KIND_SELF register with initial_oidc should fail validation")
+		t.Error("KIND_SELF register with oidc should fail validation")
 	}
 
 	if _, err := repo.Apply(ctx, &issuerv1.Register{
 		Id: "self-ok", Actor: "t", Iss: "https://auth.local", Kind: issuerv1.Kind_KIND_SELF,
 	}); err != nil {
-		t.Errorf("KIND_SELF register without initial_oidc: %v", err)
+		t.Errorf("KIND_SELF register without oidc: %v", err)
 	}
 }
 
