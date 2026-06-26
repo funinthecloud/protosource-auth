@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { issuerClient } from "../clients";
-import { State } from "../gen/auth/issuer/v1/issuer_pb.js";
+import { Kind, State } from "../gen/auth/issuer/v1/issuer_pb.js";
 import { useAsync, fmtMicroTime, stateName, issuerStates, issuerKinds, issuerJitPolicies } from "../hooks";
 import { PageHeader, Btn, Badge, Card, DetailRow, Loading, ErrorBox } from "../ui";
+import IssuerOIDCForm from "./IssuerOIDCForm";
 
 export default function IssuerDetail() {
   const { id } = useParams<{ id: string }>();
   const { data, error, loading, reload } = useAsync(() => issuerClient.get(id!), [id]);
   const [busy, setBusy] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
+  const [editOidc, setEditOidc] = useState(false);
 
   async function exec(action: () => Promise<unknown>) {
     setBusy(true);
@@ -70,7 +72,7 @@ export default function IssuerDetail() {
           <DetailRow label="Kind">{issuerKinds[data.kind] ?? data.kind}</DetailRow>
           <DetailRow label="Algorithm">{data.defaultAlgorithm || "-"}</DetailRow>
           <DetailRow label="JWKS URL">{data.jwksUrl || "-"}</DetailRow>
-          {data.kind === 2 /* KIND_EXTERNAL */ && data.oidc && (
+          {data.kind === Kind.EXTERNAL && data.oidc && (
             <>
               <DetailRow label="OIDC Client ID">{data.oidc.clientId || "-"}</DetailRow>
               <DetailRow label="OIDC Secret">{data.oidc.wrappedClientSecret && data.oidc.wrappedClientSecret.length > 0 ? <Badge color="green">configured (write-only)</Badge> : "-"}</DetailRow>
@@ -87,6 +89,33 @@ export default function IssuerDetail() {
           <DetailRow label="Modified">{fmtMicroTime(data.modifyAt)}</DetailRow>
         </div>
       </Card>
+
+      {data.kind === Kind.EXTERNAL && (
+        <>
+          <div className="px-6">
+            <h2 className="text-sm font-semibold text-zinc-900">OIDC Federation</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Client config for verifying / federating logins from this external issuer.
+            </p>
+          </div>
+          {editOidc ? (
+            <IssuerOIDCForm
+              issuer={data}
+              onSaved={() => {
+                setEditOidc(false);
+                reload();
+              }}
+              onCancel={() => setEditOidc(false)}
+            />
+          ) : (
+            <Card>
+              <div className="p-4">
+                <Btn onClick={() => setEditOidc(true)}>{data.oidc ? "Edit OIDC config" : "Add OIDC config"}</Btn>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
     </>
   );
 }
