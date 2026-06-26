@@ -27,19 +27,13 @@ import { Btn, Card, Badge, ErrorBox } from "../ui";
 //     secret forward when the plaintext field is left blank.
 //
 // So the entire config — including the write-only plaintext secret — is POSTed
-// to a server admin endpoint that mirrors the existing admin/user/create
-// password path. That endpoint encrypts the secret and applies SetOIDCConfig
-// through OIDCConfigurator.Set.
-//
-// *** BACKEND FOLLOW-UP (NOT YET IMPLEMENTED) ***
-// This wire targets `POST /admin/issuer/setoidc`, which does not exist yet.
-// Until it ships, Save will 404. The server handler should:
-//   - authorize "admin.issuer.v1.SetOIDCConfig"
-//   - decode the JSON body below (snake_case, matching service.SetRequest)
-//   - call service.OIDCConfigurator.Set(ctx, service.SetRequest{...})
-//       (client_secret omitted/empty => preserve existing wrapped secret)
-// The "Remove OIDC config" button uses the generated ClearOIDCConfig command,
-// which already exists and works today.
+// to `POST /admin/issuer/setoidc` (service.AdminIssuer), which mirrors the
+// existing admin/user/create password path: it authorizes
+// "admin.issuer.v1.SetOIDCConfig", decodes the snake_case body below (matching
+// service.SetRequest), and calls service.OIDCConfigurator.Set — which encrypts
+// the secret and, when client_secret is omitted/empty, preserves the existing
+// wrapped secret. The "Remove OIDC config" button uses the generated
+// ClearOIDCConfig command directly.
 const SET_OIDC_ENDPOINT = "admin/issuer/setoidc";
 
 type EndpointMode = "discovery" | "pinned";
@@ -156,10 +150,10 @@ export default function IssuerOIDCForm({
     <Card>
       {error && <ErrorBox message={error} />}
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Saving requires the server endpoint <code>POST /{SET_OIDC_ENDPOINT}</code> (encrypts the
-          client secret via OIDCConfigurator). This endpoint is a pending backend follow-up — until it
-          ships, Save will fail. The client secret is write-only: leave it blank to keep the current value.
+        <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          The client secret is write-only: it is encrypted server-side (via{" "}
+          <code>POST /{SET_OIDC_ENDPOINT}</code>) and never read back. Leave it blank to keep the
+          current value.
         </div>
 
         <div>

@@ -55,14 +55,18 @@ func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver, provider ke
 	// The OIDCConfigurator reuses the same KeyProvider as the key resolver
 	// to decrypt IdP client secrets at callback time.
 	configurator := service.NewOIDCConfigurator(bundle.IssuerRepo, provider, masterKeyRef)
-	// TODO(miy.4): swap RejectAllResolver for the real provisioner once the
-	// Phase 2 User linked-identities + JIT resolver lands. Until then,
-	// federated login authenticates at the IdP but rejects every unlinked
-	// identity (fail-closed), so the flow is wired and testable without
-	// auto-provisioning users.
+	// Federated identity resolution (Phase 2): deterministic-id JIT provisioning
+	// backed by an in-memory link index. JIT_AUTO_NO_ROLES and JIT_DOMAIN_RULE
+	// work today — deterministic User ids + Create/ErrAlreadyCreated convergence
+	// recognize returning users even with a cold index. JIT_REJECT recognition of
+	// pre-linked users with arbitrary ids requires the persistent link-index GSI
+	// (a documented follow-up); until it lands, REJECT-policy issuers recognize
+	// only links seen by this instance since start (fail-closed otherwise).
+	linkDir := service.NewMapLinkDirectory()
+	identityResolver := service.NewIdentityProvisioner(bundle.UserRepo, linkDir)
 	oauthHandler := service.NewOAuthHandler(
 		bundle.IssuerRepo, configurator, resolver, loginer,
-		service.RejectAllResolver{},
+		identityResolver,
 		cfg.IssuerID, cfg.IssuerIss, cfg.ShadowCookieName,
 	)
 
@@ -76,10 +80,15 @@ func NewRouter(cfg *Config, bundle *Bundle, resolver *keys.Resolver, provider ke
 		authorizer := buildAuthorizer(checker, cfg.ShadowCookieName)
 		whoami := service.NewWhoami(bundle.TokenRepo, bundle.UserRepo, cfg.ShadowCookieName)
 		adminUser := service.NewAdminUser(bundle.UserRepo, authorizer)
+		// Secret-safe OIDC config intake for the admin SPA: takes the plaintext
+		// client_secret and delegates to the configurator (server-side encrypt +
+		// preserve-on-blank). Reuses the configurator already built above.
+		adminIssuer := service.NewAdminIssuer(configurator, authorizer)
 
 		registrars = append(registrars,
 			whoami,
 			adminUser,
+			adminIssuer,
 			userv1.NewHandler(bundle.UserRepo, bundle.UserClient, authorizer),
 			rolev1.NewHandler(bundle.RoleRepo, bundle.RoleClient, authorizer),
 			issuerv1.NewHandler(bundle.IssuerRepo, bundle.IssuerClient, authorizer),
