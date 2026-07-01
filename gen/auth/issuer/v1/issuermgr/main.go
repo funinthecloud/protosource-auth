@@ -20,13 +20,15 @@ import (
 var usage = "Usage: issuermgr [-json] <command> [args]\n\nFlags:\n" +
 	"  -json              Use JSON serialization (default: protobuf)\n\n" +
 	"Commands:\n" +
-	"  register  <id>  <iss>  <display_name>  <kind:num>  <default_algorithm>  <jwks_url>\n" +
+	"  register  <id>  <iss>  <display_name>  <kind:num>  <default_algorithm>  <jwks_url>  <oidc:json>\n" +
 	"  rename  <id>  <display_name>\n" +
 	"  setdefaultalgorithm  <id>  <default_algorithm>\n" +
 	"  setjwksurl  <id>  <jwks_url>\n" +
 	"  deactivate  <id>\n" +
 	"  reactivate  <id>\n" +
 	"  delete  <id>\n" +
+	"  setoidcconfig  <id>  <oidc:json>\n" +
+	"  clearoidcconfig  <id>\n" +
 	"  get      <id>\n" +
 	"  load     <id>\n" +
 	"  history  <id>\n" +
@@ -80,10 +82,10 @@ func main() {
 	switch subcmd {
 
 	case "register":
-		if len(os.Args) != 8 {
-			fatal("usage: issuermgr register <id> <iss> <display_name> <kind:num> <default_algorithm> <jwks_url>")
+		if len(os.Args) != 9 {
+			fatal("usage: issuermgr register <id> <iss> <display_name> <kind:num> <default_algorithm> <jwks_url> <oidc:json>")
 		}
-		result, err := client.Register(ctx, os.Args[2], os.Args[3], os.Args[4], pkg.Kind(mustParseInt32(os.Args[5], "kind")), os.Args[6], os.Args[7])
+		result, err := client.Register(ctx, os.Args[2], os.Args[3], os.Args[4], pkg.Kind(mustParseInt32(os.Args[5], "kind")), os.Args[6], os.Args[7], mustParseJSON[*pkg.OIDCConfig](os.Args[8], "oidc"))
 		if err != nil {
 			fatal(fmt.Sprintf("error: %v", err))
 		}
@@ -144,6 +146,26 @@ func main() {
 			fatal("usage: issuermgr delete <id>")
 		}
 		result, err := client.Delete(ctx, os.Args[2])
+		if err != nil {
+			fatal(fmt.Sprintf("error: %v", err))
+		}
+		fmt.Printf("{\"id\":%q,\"version\":%d}\n", result.GetId(), result.GetVersion())
+
+	case "setoidcconfig":
+		if len(os.Args) != 4 {
+			fatal("usage: issuermgr setoidcconfig <id> <oidc:json>")
+		}
+		result, err := client.SetOIDCConfig(ctx, os.Args[2], mustParseJSON[*pkg.OIDCConfig](os.Args[3], "oidc"))
+		if err != nil {
+			fatal(fmt.Sprintf("error: %v", err))
+		}
+		fmt.Printf("{\"id\":%q,\"version\":%d}\n", result.GetId(), result.GetVersion())
+
+	case "clearoidcconfig":
+		if len(os.Args) != 3 {
+			fatal("usage: issuermgr clearoidcconfig <id>")
+		}
+		result, err := client.ClearOIDCConfig(ctx, os.Args[2])
 		if err != nil {
 			fatal(fmt.Sprintf("error: %v", err))
 		}

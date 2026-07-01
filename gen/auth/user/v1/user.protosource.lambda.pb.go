@@ -63,6 +63,8 @@ func (h *Handler) RegisterRoutes(router *protosource.Router) {
 	router.Handle("POST", "auth/user/v1/changepassword", h.HandleChangePassword)
 	router.Handle("POST", "auth/user/v1/assignrole", h.HandleAssignRole)
 	router.Handle("POST", "auth/user/v1/revokerole", h.HandleRevokeRole)
+	router.Handle("POST", "auth/user/v1/linkidentity", h.HandleLinkIdentity)
+	router.Handle("POST", "auth/user/v1/unlinkidentity", h.HandleUnlinkIdentity)
 	router.Handle("POST", "auth/user/v1/lock", h.HandleLock)
 	router.Handle("POST", "auth/user/v1/unlock", h.HandleUnlock)
 	router.Handle("POST", "auth/user/v1/delete", h.HandleDelete)
@@ -210,6 +212,88 @@ func (h *Handler) HandleRevokeRole(ctx context.Context, request protosource.Requ
 	}
 
 	cmd := &RevokeRole{}
+	if err := unmarshalCommand(request, cmd); err != nil {
+		return errorResponse(request, http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
+	}
+
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
+	cmd.Actor = actor
+
+	version, err := h.repo.Apply(ctx, cmd)
+	if err != nil {
+		return commandErrorResponse(request, err)
+	}
+
+	resp := &responsev1.CommandResponse{Id: cmd.GetId(), Version: version}
+	body, contentType, err := marshalResponse(request, resp)
+	if err != nil {
+		return errorResponse(request, http.StatusInternalServerError, "CMD_MARSHAL", "failed to serialize response", err)
+	}
+	return protosource.Response{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+		Headers:    map[string]string{"Content-Type": contentType},
+	}
+}
+
+// HandleLinkIdentity processes a LinkIdentity command.
+func (h *Handler) HandleLinkIdentity(ctx context.Context, request protosource.Request) protosource.Response {
+	ctx, err := h.authorizer.Authorize(ctx, request, "auth.user.v1.LinkIdentity")
+	if err != nil {
+		return authzErrorResponse(request, err)
+	}
+
+	// Actor must be extracted by the Authorizer and put into ctx.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		return errorResponse(request, http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
+	}
+
+	cmd := &LinkIdentity{}
+	if err := unmarshalCommand(request, cmd); err != nil {
+		return errorResponse(request, http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
+	}
+
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
+	cmd.Actor = actor
+
+	version, err := h.repo.Apply(ctx, cmd)
+	if err != nil {
+		return commandErrorResponse(request, err)
+	}
+
+	resp := &responsev1.CommandResponse{Id: cmd.GetId(), Version: version}
+	body, contentType, err := marshalResponse(request, resp)
+	if err != nil {
+		return errorResponse(request, http.StatusInternalServerError, "CMD_MARSHAL", "failed to serialize response", err)
+	}
+	return protosource.Response{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+		Headers:    map[string]string{"Content-Type": contentType},
+	}
+}
+
+// HandleUnlinkIdentity processes a UnlinkIdentity command.
+func (h *Handler) HandleUnlinkIdentity(ctx context.Context, request protosource.Request) protosource.Response {
+	ctx, err := h.authorizer.Authorize(ctx, request, "auth.user.v1.UnlinkIdentity")
+	if err != nil {
+		return authzErrorResponse(request, err)
+	}
+
+	// Actor must be extracted by the Authorizer and put into ctx.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		return errorResponse(request, http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
+	}
+
+	cmd := &UnlinkIdentity{}
 	if err := unmarshalCommand(request, cmd); err != nil {
 		return errorResponse(request, http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
 	}

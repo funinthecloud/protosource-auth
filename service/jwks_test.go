@@ -85,7 +85,9 @@ func TestJWKSWithIssuerQueryParam(t *testing.T) {
 	if got.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", got.StatusCode)
 	}
-	var doc struct{ Keys []any `json:"keys"` }
+	var doc struct {
+		Keys []any `json:"keys"`
+	}
 	if err := json.Unmarshal([]byte(got.Body), &doc); err != nil {
 		t.Fatalf("decode jwks: %v", err)
 	}
@@ -101,7 +103,9 @@ func TestJWKSWithIssuerQueryParam(t *testing.T) {
 	if got2.StatusCode != http.StatusOK {
 		t.Fatalf("status %d for unknown issuer", got2.StatusCode)
 	}
-	var doc2 struct{ Keys []any `json:"keys"` }
+	var doc2 struct {
+		Keys []any `json:"keys"`
+	}
 	if err := json.Unmarshal([]byte(got2.Body), &doc2); err != nil {
 		t.Fatalf("decode jwks: %v", err)
 	}
@@ -127,7 +131,9 @@ func TestJWKSDefaultsIssuerID(t *testing.T) {
 	if got.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", got.StatusCode)
 	}
-	var doc struct{ Keys []any `json:"keys"` }
+	var doc struct {
+		Keys []any `json:"keys"`
+	}
 	if err := json.Unmarshal([]byte(got.Body), &doc); err != nil {
 		t.Fatalf("decode jwks: %v", err)
 	}

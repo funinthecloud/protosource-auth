@@ -111,6 +111,22 @@ type Config struct {
 	// V2_IMPLEMENTATION_PLAN.md). Advertised in OIDC discovery.
 	ShadowCookieName string
 
+	// AccessTokenTTL is the lifetime of the short, offline-verifiable
+	// access JWT minted alongside the shadow token (login page + OAuth
+	// callback) and refreshed at POST /auth/refresh. Its short TTL is
+	// its only revocation window; the shadow stays the instant-revoke
+	// handle. Default 10m.
+	AccessTokenTTL time.Duration
+
+	// AccessAudience overrides the "aud" claim on minted access JWTs.
+	// Empty defaults to IssuerIss at mint time. Set when downstream
+	// resource servers expect a specific audience value.
+	AccessAudience string
+
+	// AccessCookieName is the name of the HttpOnly cookie carrying the
+	// access JWT. Default ShadowCookieName+"_access".
+	AccessCookieName string
+
 	// Backend selects the storage backend wired behind the aggregate
 	// repositories. Default: [BackendMemory].
 	Backend Backend
@@ -244,6 +260,13 @@ const (
 	// The value is advertised in the OIDC discovery document's
 	// "cookie_name" field.
 	EnvShadowCookieName = "PROTOSOURCE_AUTH_SHADOW_COOKIE_NAME"
+
+	// EnvAccessTokenTTL / EnvAccessAudience / EnvAccessCookieName
+	// configure the short access JWT minted alongside the shadow token.
+	// TTL accepts a duration ("10m") or an integer number of seconds.
+	EnvAccessTokenTTL   = "PROTOSOURCE_AUTH_ACCESS_TOKEN_TTL"
+	EnvAccessAudience   = "PROTOSOURCE_AUTH_ACCESS_AUDIENCE"
+	EnvAccessCookieName = "PROTOSOURCE_AUTH_ACCESS_COOKIE_NAME"
 )
 
 // LoadConfigFromEnv returns a Config populated from the environment.
@@ -269,6 +292,8 @@ func LoadConfigFromEnv() (*Config, error) {
 		MasterKeyRef:           os.Getenv(EnvMasterKeyRef),
 		CORSOrigin:             os.Getenv(EnvCORSOrigin),
 		ShadowCookieName:       os.Getenv(EnvShadowCookieName),
+		AccessAudience:         os.Getenv(EnvAccessAudience),
+		AccessCookieName:       os.Getenv(EnvAccessCookieName),
 
 		CosmosEndpoint:             os.Getenv(EnvCosmosEndpoint),
 		CosmosKey:                  os.Getenv(EnvCosmosKey),
@@ -294,6 +319,16 @@ func LoadConfigFromEnv() (*Config, error) {
 			cfg.TokenTTL = time.Duration(n) * time.Second
 		} else {
 			return nil, fmt.Errorf("app: invalid %s: %q", EnvTokenTTL, raw)
+		}
+	}
+
+	if raw := os.Getenv(EnvAccessTokenTTL); raw != "" {
+		if d, err := time.ParseDuration(raw); err == nil {
+			cfg.AccessTokenTTL = d
+		} else if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			cfg.AccessTokenTTL = time.Duration(n) * time.Second
+		} else {
+			return nil, fmt.Errorf("app: invalid %s: %q", EnvAccessTokenTTL, raw)
 		}
 	}
 
@@ -332,6 +367,12 @@ func (c *Config) Normalize() error {
 	}
 	if c.ShadowCookieName == "" {
 		c.ShadowCookieName = "shadow"
+	}
+	if c.AccessTokenTTL == 0 {
+		c.AccessTokenTTL = 10 * time.Minute
+	}
+	if c.AccessCookieName == "" {
+		c.AccessCookieName = c.ShadowCookieName + "_access"
 	}
 	if c.BootstrapActor == "" {
 		c.BootstrapActor = "bootstrap"

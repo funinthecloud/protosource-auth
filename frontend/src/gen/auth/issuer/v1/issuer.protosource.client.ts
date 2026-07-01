@@ -3,8 +3,8 @@
 /* eslint-disable */
 
 import type { ProtosourceClient, CommandResponse, History } from "@protosource/client";
-import { RegisterSchema, RenameSchema, SetDefaultAlgorithmSchema, SetJWKSURLSchema, DeactivateSchema, ReactivateSchema, DeleteSchema, IssuerSchema, IssuerListSchema, Kind, State } from "./issuer_pb.js";
-import type { Issuer } from "./issuer_pb.js";
+import { RegisterSchema, RenameSchema, SetDefaultAlgorithmSchema, SetJWKSURLSchema, DeactivateSchema, ReactivateSchema, DeleteSchema, SetOIDCConfigSchema, ClearOIDCConfigSchema, IssuerSchema, IssuerListSchema, Kind, State } from "./issuer_pb.js";
+import type { Issuer, OIDCConfig } from "./issuer_pb.js";
 
 const routePath = "auth/issuer/v1";
 
@@ -15,8 +15,8 @@ export class IssuerHTTPClient {
     this.client = client;
   }
 
-  async register(id: string, iss: string, displayName: string, kind: Kind, defaultAlgorithm: string, jwksUrl: string): Promise<CommandResponse> {
-    return this.client.apply(routePath, RegisterSchema, { id, iss: iss, displayName: displayName, kind: kind, defaultAlgorithm: defaultAlgorithm, jwksUrl: jwksUrl });
+  async register(id: string, iss: string, displayName: string, kind: Kind, defaultAlgorithm: string, jwksUrl: string, oidc: OIDCConfig): Promise<CommandResponse> {
+    return this.client.apply(routePath, RegisterSchema, { id, iss: iss, displayName: displayName, kind: kind, defaultAlgorithm: defaultAlgorithm, jwksUrl: jwksUrl, oidc: oidc });
   }
 
   async rename(id: string, displayName: string): Promise<CommandResponse> {
@@ -41,6 +41,14 @@ export class IssuerHTTPClient {
 
   async delete(id: string): Promise<CommandResponse> {
     return this.client.apply(routePath, DeleteSchema, { id });
+  }
+
+  async setOIDCConfig(id: string, oidc: OIDCConfig): Promise<CommandResponse> {
+    return this.client.apply(routePath, SetOIDCConfigSchema, { id, oidc: oidc });
+  }
+
+  async clearOIDCConfig(id: string): Promise<CommandResponse> {
+    return this.client.apply(routePath, ClearOIDCConfigSchema, { id });
   }
 
   async load(id: string): Promise<Issuer> {

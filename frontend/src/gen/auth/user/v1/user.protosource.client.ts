@@ -3,8 +3,8 @@
 /* eslint-disable */
 
 import type { ProtosourceClient, CommandResponse, History } from "@protosource/client";
-import { CreateSchema, ChangePasswordSchema, AssignRoleSchema, RevokeRoleSchema, LockSchema, UnlockSchema, DeleteSchema, UserSchema, UserListSchema, State } from "./user_pb.js";
-import type { User, RoleGrant } from "./user_pb.js";
+import { CreateSchema, ChangePasswordSchema, AssignRoleSchema, RevokeRoleSchema, LinkIdentitySchema, UnlinkIdentitySchema, LockSchema, UnlockSchema, DeleteSchema, UserSchema, UserListSchema, State } from "./user_pb.js";
+import type { User, RoleGrant, LinkedIdentity } from "./user_pb.js";
 
 const routePath = "auth/user/v1";
 
@@ -29,6 +29,14 @@ export class UserHTTPClient {
 
   async revokeRole(id: string, roleId: string): Promise<CommandResponse> {
     return this.client.apply(routePath, RevokeRoleSchema, { id, roleId: roleId });
+  }
+
+  async linkIdentity(id: string, identity: LinkedIdentity): Promise<CommandResponse> {
+    return this.client.apply(routePath, LinkIdentitySchema, { id, identity: identity });
+  }
+
+  async unlinkIdentity(id: string, linkKey: string): Promise<CommandResponse> {
+    return this.client.apply(routePath, UnlinkIdentitySchema, { id, linkKey: linkKey });
   }
 
   async lock(id: string, reason: string): Promise<CommandResponse> {

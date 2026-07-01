@@ -27,9 +27,10 @@ import (
 )
 
 type rig struct {
-	auth    *directauthz.Authorizer
-	checker *service.Checker
-	loginer *service.Loginer
+	auth     *directauthz.Authorizer
+	checker  *service.Checker
+	loginer  *service.Loginer
+	resolver *keys.Resolver
 }
 
 type fakeDirectory struct {
@@ -119,9 +120,10 @@ func newRig(t *testing.T) *rig {
 	dir.emails["alice@example.com"] = "user-alice"
 
 	return &rig{
-		auth:    directauthz.New(checker),
-		checker: checker,
-		loginer: loginer,
+		auth:     directauthz.New(checker),
+		checker:  checker,
+		loginer:  loginer,
+		resolver: resolver,
 	}
 }
 
@@ -211,5 +213,84 @@ func TestAuthorizeWithCookieTokenSource(t *testing.T) {
 	)
 	if err != nil {
 		t.Errorf("Authorize(cookie source): %v", err)
+	}
+}
+
+// ── access-token identity (Identify) ──
+
+func TestIdentifyVerifiesAccessTokenAndEnrichesContext(t *testing.T) {
+	r := newRig(t)
+	auth := directauthz.New(r.checker,
+		directauthz.WithAccessTokenIdentity(r.resolver, httpauthz.Cookie("shadow_access"), ""),
+		directauthz.WithClock(func() time.Time { return time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC) }))
+
+	jwt, _, err := r.loginer.IssueAccessToken(context.Background(), "user-alice", "issuer-self")
+	if err != nil {
+		t.Fatalf("IssueAccessToken: %v", err)
+	}
+
+	ctx, err := auth.Identify(context.Background(), protosource.Request{
+		Headers: map[string]string{"Cookie": "shadow_access=" + jwt},
+	})
+	if err != nil {
+		t.Fatalf("Identify: %v", err)
+	}
+	if got := authz.UserIDFromContext(ctx); got != "user-alice" {
+		t.Errorf("UserIDFromContext = %q, want user-alice", got)
+	}
+}
+
+func TestIdentifyWithoutOptionFailsClosed(t *testing.T) {
+	r := newRig(t)
+	// r.auth was built without WithAccessTokenIdentity.
+	jwt, _, err := r.loginer.IssueAccessToken(context.Background(), "user-alice", "issuer-self")
+	if err != nil {
+		t.Fatalf("IssueAccessToken: %v", err)
+	}
+	_, err = r.auth.Identify(context.Background(), protosource.Request{
+		Headers: map[string]string{"Cookie": "shadow_access=" + jwt},
+	})
+	if !errors.Is(err, authz.ErrUnauthenticated) {
+		t.Errorf("Identify(no option) = %v, want ErrUnauthenticated", err)
+	}
+}
+
+func TestIdentifyRejectsBadAccessToken(t *testing.T) {
+	r := newRig(t)
+	auth := directauthz.New(r.checker,
+		directauthz.WithAccessTokenIdentity(r.resolver, httpauthz.Cookie("shadow_access"), ""),
+		directauthz.WithClock(func() time.Time { return time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC) }))
+
+	for _, tc := range []struct {
+		name, cookie string
+	}{
+		{"missing", "other=x"},
+		{"garbage", "shadow_access=not.a.jwt"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := auth.Identify(context.Background(), protosource.Request{
+				Headers: map[string]string{"Cookie": tc.cookie},
+			})
+			if !errors.Is(err, authz.ErrUnauthenticated) {
+				t.Errorf("Identify = %v, want ErrUnauthenticated", err)
+			}
+		})
+	}
+}
+
+// TestIdentifyRejectsShadowTokenAsAccessToken proves the opaque shadow
+// token (not a JWT) cannot be used on the identity fast path.
+func TestIdentifyRejectsShadowTokenAsAccessToken(t *testing.T) {
+	r := newRig(t)
+	auth := directauthz.New(r.checker,
+		directauthz.WithAccessTokenIdentity(r.resolver, httpauthz.Cookie("shadow_access"), ""),
+		directauthz.WithClock(func() time.Time { return time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC) }))
+	shadow := login(t, r)
+
+	_, err := auth.Identify(context.Background(), protosource.Request{
+		Headers: map[string]string{"Cookie": "shadow_access=" + shadow},
+	})
+	if !errors.Is(err, authz.ErrUnauthenticated) {
+		t.Errorf("Identify(shadow as access) = %v, want ErrUnauthenticated", err)
 	}
 }

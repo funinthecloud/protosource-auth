@@ -10,10 +10,10 @@ import (
 	"github.com/funinthecloud/protosource"
 	"github.com/funinthecloud/protosource/authz"
 
+	"github.com/funinthecloud/protosource-auth/functions"
 	rolev1 "github.com/funinthecloud/protosource-auth/gen/auth/role/v1"
 	tokenv1 "github.com/funinthecloud/protosource-auth/gen/auth/token/v1"
 	userv1 "github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
-	"github.com/funinthecloud/protosource-auth/functions"
 )
 
 // Checker dereferences a shadow token and verifies that its user holds a
@@ -168,6 +168,55 @@ func (c *Checker) Check(ctx context.Context, req CheckRequest) (*CheckResponse, 
 		UserID: userID,
 		JWT:    token.GetJwt(),
 	}, nil
+}
+
+// Identify dereferences a shadow token to its authenticated user id
+// without performing any function-grant check. It applies the same
+// liveness gates as [Checker.Check] — token ISSUED + unexpired, user
+// loaded + STATE_ACTIVE — so a revoked shadow or a locked/deleted user
+// is rejected with [authz.ErrUnauthenticated]. It is the validation
+// step behind minting a fresh access JWT from a shadow session (see
+// [AccessHandler]): the shadow remains the source of truth for instant
+// revocation, re-checked on every refresh.
+func (c *Checker) Identify(ctx context.Context, token string) (string, error) {
+	if token == "" {
+		return "", authz.ErrUnauthenticated
+	}
+
+	tokenAgg, err := c.tokenRepo.Load(ctx, token)
+	if err != nil {
+		if errors.Is(err, protosource.ErrAggregateNotFound) {
+			return "", authz.ErrUnauthenticated
+		}
+		return "", fmt.Errorf("service: load token: %w", err)
+	}
+	token0, ok := tokenAgg.(*tokenv1.Token)
+	if !ok {
+		return "", fmt.Errorf("service: loaded token is %T, want *tokenv1.Token", tokenAgg)
+	}
+	if token0.GetState() != tokenv1.State_STATE_ISSUED {
+		return "", authz.ErrUnauthenticated
+	}
+	if token0.GetExpiresAt() > 0 && c.clock().Unix() >= token0.GetExpiresAt() {
+		return "", authz.ErrUnauthenticated
+	}
+
+	userID := token0.GetUserId()
+	userAgg, err := c.userRepo.Load(ctx, userID)
+	if err != nil {
+		if errors.Is(err, protosource.ErrAggregateNotFound) {
+			return "", authz.ErrUnauthenticated
+		}
+		return "", fmt.Errorf("service: load user: %w", err)
+	}
+	user, ok := userAgg.(*userv1.User)
+	if !ok {
+		return "", fmt.Errorf("service: loaded user is %T, want *userv1.User", userAgg)
+	}
+	if user.GetState() != userv1.State_STATE_ACTIVE {
+		return "", authz.ErrUnauthenticated
+	}
+	return userID, nil
 }
 
 // resolveDiag captures information about how a function set was built so

@@ -168,10 +168,11 @@ Bootstrap before first deploy: `protosource-authmgr bootstrap --admin-email ... 
 ## Conventions
 
 - Module path: `github.com/funinthecloud/protosource-auth`
-- Go 1.25+, depends on `github.com/funinthecloud/protosource v0.6.1+` (updated for V2 federation work)
+- Go 1.25+, depends on `github.com/funinthecloud/protosource v0.8.0+` (v0.7.1 GH#96/PR#97: by-name singular embedded message events; v0.8.0: multi-cookie responses for the access JWT)
 - Generated files under `gen/` are auto-generated — never edit by hand
 - Proto files formatted with `clang-format --style=file -i proto/**/*.proto` (NOT `buf format`)
 - Protosource field-name contracts bit us in phase 2: aggregates need `create_at` / `create_by` / `modify_at` / `modify_by` (not `created_at`); command fields must name-match event fields for mechanical copying; ADD events embed the element message type (`RoleGrant grant`, `FunctionGrant grant`)
+- Singular embedded message events (v0.7.1) are matched to the aggregate field **by name**, not by type: a "set" event carries the populated same-named embed (`Issuer.oidc` ← `OIDCConfigSet.oidc`), a "clear" event carries it empty to nil the field (`OIDCConfigCleared.oidc`). The generator hard-fails if an event embeds a message present on the aggregate under a different field name — keep command/event embed field names identical to the aggregate's
 
 ## Function name convention
 
@@ -186,3 +187,52 @@ See `functions/match.go` for the exact matcher semantics and 28 test cases.
 ## TODO
 
 See [TODO.md](TODO.md) for remaining work.
+
+
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
+## Beads Issue Tracker
+
+This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
+
+### Quick Reference
+
+```bash
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --claim  # Claim work
+bd close <id>         # Complete work
+```
+
+### Rules
+
+- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
+- Run `bd prime` for detailed command reference and session close protocol
+- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
+
+## Session Completion
+
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+
+**MANDATORY WORKFLOW:**
+
+1. **File issues for remaining work** - Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
+4. **PUSH TO REMOTE** - This is MANDATORY:
+   ```bash
+   git pull --rebase
+   git push
+   git status  # MUST show "up to date with origin"
+   ```
+5. **Clean up** - Clear stashes, prune remote branches
+6. **Verify** - All changes committed AND pushed
+7. **Hand off** - Provide context for next session
+
+**CRITICAL RULES:**
+- Work is NOT complete until `git push` succeeds
+- NEVER stop before pushing - that leaves work stranded locally
+- NEVER say "ready to push when you are" - YOU must push
+- If push fails, resolve and retry until it succeeds
+<!-- END BEADS INTEGRATION -->

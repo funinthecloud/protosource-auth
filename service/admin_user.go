@@ -146,6 +146,8 @@ func applyError(ctx context.Context, err error) protosource.Response {
 		return adminError(http.StatusConflict, "operation not allowed in current state")
 	case errors.Is(err, protosource.ErrValidationFailed):
 		return adminError(http.StatusBadRequest, "validation failed")
+	case errors.Is(err, ErrIssuerNotExternal):
+		return adminError(http.StatusBadRequest, "issuer is not external")
 	default:
 		slog.ErrorContext(ctx, "admin: apply command", "error", err)
 		return adminError(http.StatusInternalServerError, "internal error")

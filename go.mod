@@ -15,10 +15,12 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.16
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.57.3
 	github.com/aws/aws-sdk-go-v2/service/kms v1.50.4
-	github.com/funinthecloud/protosource v0.6.1
+	github.com/coreos/go-oidc/v3 v3.19.0
+	github.com/funinthecloud/protosource v0.8.0
 	github.com/goforj/wire v1.2.0
 	golang.org/x/crypto v0.50.0
 	golang.org/x/net v0.53.0
+	golang.org/x/oauth2 v0.36.0
 	google.golang.org/protobuf v1.36.11
 )
 
@@ -44,6 +46,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.42.1 // indirect
 	github.com/aws/smithy-go v1.25.1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/google/cel-go v0.28.0 // indirect
 	github.com/google/subcommands v1.2.0 // indirect

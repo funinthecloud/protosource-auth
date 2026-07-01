@@ -66,6 +66,8 @@ func (h *Handler) RegisterRoutes(router *protosource.Router) {
 	router.Handle("POST", "auth/issuer/v1/deactivate", h.HandleDeactivate)
 	router.Handle("POST", "auth/issuer/v1/reactivate", h.HandleReactivate)
 	router.Handle("POST", "auth/issuer/v1/delete", h.HandleDelete)
+	router.Handle("POST", "auth/issuer/v1/setoidcconfig", h.HandleSetOIDCConfig)
+	router.Handle("POST", "auth/issuer/v1/clearoidcconfig", h.HandleClearOIDCConfig)
 	router.Handle("GET", "auth/issuer/v1/load/{id}", h.HandleLoad)
 	router.Handle("GET", "auth/issuer/v1/{id}", h.HandleGet)
 	router.Handle("GET", "auth/issuer/v1/{id}/history", h.HandleHistory)
@@ -332,6 +334,88 @@ func (h *Handler) HandleDelete(ctx context.Context, request protosource.Request)
 	}
 
 	cmd := &Delete{}
+	if err := unmarshalCommand(request, cmd); err != nil {
+		return errorResponse(request, http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
+	}
+
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
+	cmd.Actor = actor
+
+	version, err := h.repo.Apply(ctx, cmd)
+	if err != nil {
+		return commandErrorResponse(request, err)
+	}
+
+	resp := &responsev1.CommandResponse{Id: cmd.GetId(), Version: version}
+	body, contentType, err := marshalResponse(request, resp)
+	if err != nil {
+		return errorResponse(request, http.StatusInternalServerError, "CMD_MARSHAL", "failed to serialize response", err)
+	}
+	return protosource.Response{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+		Headers:    map[string]string{"Content-Type": contentType},
+	}
+}
+
+// HandleSetOIDCConfig processes a SetOIDCConfig command.
+func (h *Handler) HandleSetOIDCConfig(ctx context.Context, request protosource.Request) protosource.Response {
+	ctx, err := h.authorizer.Authorize(ctx, request, "auth.issuer.v1.SetOIDCConfig")
+	if err != nil {
+		return authzErrorResponse(request, err)
+	}
+
+	// Actor must be extracted by the Authorizer and put into ctx.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		return errorResponse(request, http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
+	}
+
+	cmd := &SetOIDCConfig{}
+	if err := unmarshalCommand(request, cmd); err != nil {
+		return errorResponse(request, http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
+	}
+
+	// Overwrite any Actor the client supplied in the command payload
+	// with the identity resolved above.
+	// Never trust an actor field coming from the wire
+	// — it would let any caller spoof any identity.
+	cmd.Actor = actor
+
+	version, err := h.repo.Apply(ctx, cmd)
+	if err != nil {
+		return commandErrorResponse(request, err)
+	}
+
+	resp := &responsev1.CommandResponse{Id: cmd.GetId(), Version: version}
+	body, contentType, err := marshalResponse(request, resp)
+	if err != nil {
+		return errorResponse(request, http.StatusInternalServerError, "CMD_MARSHAL", "failed to serialize response", err)
+	}
+	return protosource.Response{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+		Headers:    map[string]string{"Content-Type": contentType},
+	}
+}
+
+// HandleClearOIDCConfig processes a ClearOIDCConfig command.
+func (h *Handler) HandleClearOIDCConfig(ctx context.Context, request protosource.Request) protosource.Response {
+	ctx, err := h.authorizer.Authorize(ctx, request, "auth.issuer.v1.ClearOIDCConfig")
+	if err != nil {
+		return authzErrorResponse(request, err)
+	}
+
+	// Actor must be extracted by the Authorizer and put into ctx.
+	actor := authz.UserIDFromContext(ctx)
+	if actor == "" {
+		return errorResponse(request, http.StatusUnauthorized, "CMD_NO_ACTOR", "no actor identity found", nil)
+	}
+
+	cmd := &ClearOIDCConfig{}
 	if err := unmarshalCommand(request, cmd); err != nil {
 		return errorResponse(request, http.StatusBadRequest, "CMD_UNMARSHAL", "invalid request body", err)
 	}

@@ -3,6 +3,8 @@ package loginpage
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +18,7 @@ import (
 	keyv1 "github.com/funinthecloud/protosource-auth/gen/auth/key/v1"
 	tokenv1 "github.com/funinthecloud/protosource-auth/gen/auth/token/v1"
 	userv1 "github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
+	"github.com/funinthecloud/protosource-auth/internal/httputil"
 	"github.com/funinthecloud/protosource-auth/keyproviders/local"
 	"github.com/funinthecloud/protosource-auth/keys"
 	"github.com/funinthecloud/protosource-auth/service"
@@ -77,7 +80,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	})
 
 	loginer := service.NewLoginer(userRepo, issuerRepo, tokenRepo, dir, resolver)
-	page := New("default", "shadow", loginer)
+	page := New("default", "shadow", "shadow_access", loginer)
 
 	return &testEnv{page: page}
 }
@@ -103,9 +106,9 @@ func TestParentDomain(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.host, func(t *testing.T) {
-			got := parentDomain(tt.host)
+			got := httputil.ParentDomain(tt.host)
 			if got != tt.want {
-				t.Errorf("parentDomain(%q) = %q, want %q", tt.host, got, tt.want)
+				t.Errorf("ParentDomain(%q) = %q, want %q", tt.host, got, tt.want)
 			}
 		})
 	}
@@ -193,8 +196,8 @@ func TestIsAllowedRedirect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isAllowedRedirect(tt.redirect, tt.host); got != tt.want {
-				t.Errorf("isAllowedRedirect(%q, %q) = %v, want %v", tt.redirect, tt.host, got, tt.want)
+			if got := httputil.IsAllowedRedirect(tt.redirect, tt.host); got != tt.want {
+				t.Errorf("IsAllowedRedirect(%q, %q) = %v, want %v", tt.redirect, tt.host, got, tt.want)
 			}
 		})
 	}
@@ -220,8 +223,8 @@ func TestIsSecure(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := protosource.Request{Headers: tt.headers}
-			if got := isSecure(req); got != tt.want {
-				t.Errorf("isSecure() = %v, want %v", got, tt.want)
+			if got := httputil.IsSecure(req); got != tt.want {
+				t.Errorf("IsSecure() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -277,7 +280,7 @@ func TestNewPanicsOnNilLoginer(t *testing.T) {
 			t.Fatalf("unexpected panic: %v", r)
 		}
 	}()
-	New("issuer", "shadow", nil)
+	New("issuer", "shadow", "shadow_access", nil)
 }
 
 // -- handleLogin tests --
@@ -386,19 +389,26 @@ func TestHandleLoginSuccess(t *testing.T) {
 			}
 
 			// Verify response body.
-			var body map[string]bool
+			var body map[string]any
 			if err := json.Unmarshal([]byte(resp.Body), &body); err != nil {
 				t.Fatalf("unmarshal body: %v", err)
 			}
-			if !body["ok"] {
+			if ok, _ := body["ok"].(bool); !ok {
 				t.Error("body[ok] = false")
 			}
 
-			// Verify Set-Cookie header.
-			cookie := resp.Headers["Set-Cookie"]
-			if cookie == "" {
-				t.Fatal("missing Set-Cookie header")
+			// Verify shadow cookie (now delivered via Response.Cookies,
+			// alongside the companion access cookie).
+			var shadow *http.Cookie
+			for _, c := range resp.Cookies {
+				if c != nil && c.Name == "shadow" {
+					shadow = c
+				}
 			}
+			if shadow == nil {
+				t.Fatalf("missing shadow cookie; cookies=%v", resp.Cookies)
+			}
+			cookie := shadow.String()
 			if !strings.Contains(cookie, "shadow=") {
 				t.Errorf("cookie missing shadow= prefix: %s", cookie)
 			}
@@ -418,7 +428,77 @@ func TestHandleLoginSuccess(t *testing.T) {
 			if !strings.Contains(cookie, wantDomain) {
 				t.Errorf("cookie missing %s: %s", wantDomain, cookie)
 			}
+
+			// The companion access cookie is now a guaranteed part of a
+			// successful login (fail-closed otherwise) — HttpOnly so JS can
+			// never read it, and reported via expires_in.
+			var access *http.Cookie
+			for _, c := range resp.Cookies {
+				if c != nil && c.Name == "shadow_access" {
+					access = c
+				}
+			}
+			if access == nil {
+				t.Fatalf("missing access cookie; cookies=%v", resp.Cookies)
+			}
+			if !strings.Contains(access.String(), "HttpOnly") {
+				t.Errorf("access cookie missing HttpOnly: %s", access.String())
+			}
+			if n, _ := body["expires_in"].(float64); n <= 0 {
+				t.Errorf("expires_in = %v, want > 0", body["expires_in"])
+			}
 		})
+	}
+}
+
+// stubMinter is an injectable [service.AccessTokenMinter] for exercising the
+// access-token failure paths deterministically (the real minter shares the
+// issuer+resolver path with shadow minting, so it cannot fail in isolation).
+type stubMinter struct {
+	jwt string
+	exp int64
+	err error
+}
+
+func (s stubMinter) IssueAccessToken(_ context.Context, _, _ string) (string, int64, error) {
+	return s.jwt, s.exp, s.err
+}
+
+// A failure minting the companion access token must fail the whole login with
+// 503 and set NO cookies — never a half-initialized session (shadow without
+// access), which would break v2 access-cookie flows and hide key/JWKS
+// misconfiguration. Mirrors POST /auth/refresh.
+func TestHandleLoginAccessMintFailureIs503(t *testing.T) {
+	env := newTestEnv(t)
+	env.page.minter = stubMinter{err: errors.New("kms down")}
+
+	resp := env.page.handleLogin(context.Background(), protosource.Request{
+		Headers: secureHeaders("auth.drhayt.com"),
+		Body:    `{"email":"test@example.com","password":"testpass"}`,
+	})
+	if resp.StatusCode != 503 {
+		t.Fatalf("status = %d, want 503; body = %s", resp.StatusCode, resp.Body)
+	}
+	if len(resp.Cookies) != 0 {
+		t.Fatalf("expected no cookies on failed login, got %v", resp.Cookies)
+	}
+}
+
+// A minted access token whose lifetime is already non-positive is also a
+// misconfiguration and must 503 rather than set an instantly-stale cookie.
+func TestHandleLoginAccessExpiredIs503(t *testing.T) {
+	env := newTestEnv(t)
+	env.page.minter = stubMinter{jwt: "x", exp: time.Now().Add(-time.Hour).Unix()}
+
+	resp := env.page.handleLogin(context.Background(), protosource.Request{
+		Headers: secureHeaders("auth.drhayt.com"),
+		Body:    `{"email":"test@example.com","password":"testpass"}`,
+	})
+	if resp.StatusCode != 503 {
+		t.Fatalf("status = %d, want 503; body = %s", resp.StatusCode, resp.Body)
+	}
+	if len(resp.Cookies) != 0 {
+		t.Fatalf("expected no cookies, got %v", resp.Cookies)
 	}
 }
 
@@ -467,7 +547,7 @@ func TestHandleLoginExpiredToken(t *testing.T) {
 		service.WithLoginerClock(pastClock),
 		service.WithTokenTTL(1*time.Hour),
 	)
-	page := New("default", "shadow", loginer)
+	page := New("default", "shadow", "shadow_access", loginer)
 
 	resp := page.handleLogin(ctx, protosource.Request{
 		Headers: secureHeaders("auth.drhayt.com"),

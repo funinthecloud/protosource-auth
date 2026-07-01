@@ -220,9 +220,49 @@ func TestLoadConfigFromEnvRoundTrip(t *testing.T) {
 	if cfg.TokenTTL.String() != "4h0m0s" {
 		t.Errorf("TokenTTL = %v", cfg.TokenTTL)
 	}
+	// Access-token knobs default when unset.
+	if cfg.AccessTokenTTL.String() != "10m0s" {
+		t.Errorf("AccessTokenTTL default = %v, want 10m0s", cfg.AccessTokenTTL)
+	}
+	if cfg.AccessCookieName != "shadow_access" {
+		t.Errorf("AccessCookieName default = %q, want shadow_access", cfg.AccessCookieName)
+	}
 
 	// Cleanup (t.Setenv does this automatically, but be explicit)
 	_ = os.Unsetenv(app.EnvMasterKey)
+}
+
+func TestLoadConfigAccessTokenKnobs(t *testing.T) {
+	t.Setenv(app.EnvIssuerIss, "https://x")
+	t.Setenv(app.EnvAccessTokenTTL, "300") // seconds form
+	t.Setenv(app.EnvAccessAudience, "https://api.example.com")
+	t.Setenv(app.EnvShadowCookieName, "sess")
+	t.Setenv(app.EnvAccessCookieName, "sess_at")
+
+	cfg, err := app.LoadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("LoadConfigFromEnv: %v", err)
+	}
+	if cfg.AccessTokenTTL.String() != "5m0s" {
+		t.Errorf("AccessTokenTTL = %v, want 5m0s", cfg.AccessTokenTTL)
+	}
+	if cfg.AccessAudience != "https://api.example.com" {
+		t.Errorf("AccessAudience = %q", cfg.AccessAudience)
+	}
+	if cfg.AccessCookieName != "sess_at" {
+		t.Errorf("AccessCookieName = %q, want sess_at", cfg.AccessCookieName)
+	}
+}
+
+func TestConfigAccessCookieNameDerivesFromShadow(t *testing.T) {
+	masterKey, _ := local.GenerateMasterKey()
+	cfg := &app.Config{MasterKey: masterKey, IssuerIss: "https://x", ShadowCookieName: "sess"}
+	if err := cfg.Normalize(); err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	if cfg.AccessCookieName != "sess_access" {
+		t.Errorf("AccessCookieName = %q, want sess_access", cfg.AccessCookieName)
+	}
 }
 
 func TestLoadConfigPortFallback(t *testing.T) {

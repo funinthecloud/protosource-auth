@@ -32,6 +32,20 @@ import (
 // out from `iat`. Matches the Token aggregate's event_ttl_seconds.
 const DefaultTokenTTL = 10 * time.Hour
 
+// DefaultAccessTTL is the short lifetime of an offline-verifiable access
+// JWT minted by [Loginer.IssueAccessToken]. It is intentionally far
+// shorter than the shadow token: the access JWT is fire-and-forget and
+// JWKS-verifiable without a /authz/check hop, so its TTL *is* its
+// revocation window. The shadow token remains the instant-revoke handle
+// (a revoked shadow simply stops minting fresh access tokens).
+const DefaultAccessTTL = 10 * time.Minute
+
+// AccessTokenUse is the value of the "token_use" claim that marks a JWT
+// as a short-lived access token (as opposed to the shadow token's
+// internal embedded JWT, which carries no token_use). [VerifyAccessToken]
+// requires this claim, so the two JWT kinds can never be confused.
+const AccessTokenUse = "access"
+
 // Error sentinels returned by Loginer.Login.
 var (
 	// ErrInvalidCredentials is returned when the email is not found or
@@ -75,6 +89,12 @@ type Loginer struct {
 	clock    func() time.Time
 	tokenTTL time.Duration
 
+	// accessTTL is the lifetime of access JWTs minted by
+	// IssueAccessToken; accessAudience overrides their "aud" claim
+	// (empty → defaults to the SELF issuer's iss at mint time).
+	accessTTL      time.Duration
+	accessAudience string
+
 	// actor is the audit principal recorded on Token.Issue commands
 	// produced by this Loginer. Defaults to "loginer".
 	actor string
@@ -92,6 +112,22 @@ func WithLoginerClock(clock func() time.Time) LoginerOption {
 // aggregate's expires_at and the JWT's exp claim).
 func WithTokenTTL(ttl time.Duration) LoginerOption {
 	return func(l *Loginer) { l.tokenTTL = ttl }
+}
+
+// WithAccessTTL overrides the lifetime of access JWTs minted by
+// IssueAccessToken. A non-positive ttl is ignored.
+func WithAccessTTL(ttl time.Duration) LoginerOption {
+	return func(l *Loginer) {
+		if ttl > 0 {
+			l.accessTTL = ttl
+		}
+	}
+}
+
+// WithAccessAudience overrides the "aud" claim on minted access JWTs.
+// Empty leaves the default (the SELF issuer's iss).
+func WithAccessAudience(aud string) LoginerOption {
+	return func(l *Loginer) { l.accessAudience = aud }
 }
 
 // WithLoginerActor overrides the principal recorded on Token.Issue.
@@ -133,6 +169,7 @@ func NewLoginer(
 		resolver:   resolver,
 		clock:      time.Now,
 		tokenTTL:   DefaultTokenTTL,
+		accessTTL:  DefaultAccessTTL,
 		actor:      "loginer",
 	}
 	for _, opt := range opts {
@@ -150,6 +187,10 @@ type LoginRequest struct {
 
 // LoginResponse is the output of a successful [Loginer.Login].
 type LoginResponse struct {
+	// UserID is the authenticated user's id (the subject of the JWT).
+	// Exposed so browser callers (loginpage, oauth callback) can mint a
+	// companion access JWT without re-deriving the identity.
+	UserID string
 	// ShadowToken is the opaque bearer handed back to the caller. It is
 	// also the aggregate id of the underlying Token record.
 	ShadowToken string
@@ -192,7 +233,42 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 		return nil, ErrInvalidCredentials
 	}
 
-	issuerAgg, err := l.issuerRepo.Load(ctx, req.IssuerID)
+	issuer, err := l.loadSelfIssuer(ctx, req.IssuerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return l.mintShadowToken(ctx, user.GetId(), req.IssuerID, issuer)
+}
+
+// IssueForUser mints a shadow token for an already-authenticated local user,
+// skipping the password/credential check. It is the hand-off point for the
+// federated-login (PKCE) callback: once an external IdP's ID token has been
+// verified and mapped to a local user id (see [IdentityResolver]), the
+// callback calls this to mint the same kind of shadow token + JWT that
+// [Loginer.Login] produces for the password flow.
+//
+// selfIssuerID names the SELF issuer whose key signs the JWT (the same issuer
+// the password flow uses); it is loaded and validated (STATE_ACTIVE +
+// KIND_SELF) exactly like Login, so the iss/default-algorithm come from the
+// aggregate, not the caller. userID is trusted — the caller is responsible
+// for having authenticated it.
+func (l *Loginer) IssueForUser(ctx context.Context, userID, selfIssuerID string) (*LoginResponse, error) {
+	if userID == "" {
+		return nil, fmt.Errorf("service: IssueForUser: userID must not be empty")
+	}
+	issuer, err := l.loadSelfIssuer(ctx, selfIssuerID)
+	if err != nil {
+		return nil, err
+	}
+	return l.mintShadowToken(ctx, userID, selfIssuerID, issuer)
+}
+
+// loadSelfIssuer loads the issuer and verifies it is an ACTIVE KIND_SELF
+// issuer (only SELF issuers mint our shadow tokens). Shared by Login and
+// IssueForUser.
+func (l *Loginer) loadSelfIssuer(ctx context.Context, issuerID string) (*issuerv1.Issuer, error) {
+	issuerAgg, err := l.issuerRepo.Load(ctx, issuerID)
 	if err != nil {
 		return nil, fmt.Errorf("service: load issuer: %w", err)
 	}
@@ -203,7 +279,15 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	if issuer.GetState() != issuerv1.State_STATE_ACTIVE || issuer.GetKind() != issuerv1.Kind_KIND_SELF {
 		return nil, ErrIssuerNotActive
 	}
+	return issuer, nil
+}
 
+// mintShadowToken is the shared claims→sign→Apply body used by both the
+// password (Login) and federated (IssueForUser) flows: it generates an opaque
+// token id, signs a JWT with the SELF issuer's current key, and persists the
+// Token aggregate. The caller has already authenticated userID and validated
+// the issuer.
+func (l *Loginer) mintShadowToken(ctx context.Context, userID, issuerID string, issuer *issuerv1.Issuer) (*LoginResponse, error) {
 	now := l.clock()
 	expiresAt := now.Add(l.tokenTTL)
 
@@ -214,7 +298,7 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 
 	claims := map[string]any{
 		"iss": issuer.GetIss(),
-		"sub": user.GetId(),
+		"sub": userID,
 		"aud": issuer.GetIss(),
 		"iat": now.Unix(),
 		"exp": expiresAt.Unix(),
@@ -225,7 +309,7 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 		return nil, fmt.Errorf("service: marshal claims: %w", err)
 	}
 
-	signingKey, err := l.resolver.SigningKey(ctx, req.IssuerID, issuer.GetDefaultAlgorithm())
+	signingKey, err := l.resolver.SigningKey(ctx, issuerID, issuer.GetDefaultAlgorithm())
 	if err != nil {
 		return nil, fmt.Errorf("service: resolve signing key: %w", err)
 	}
@@ -237,8 +321,8 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	if _, err := l.tokenRepo.Apply(ctx, &tokenv1.Issue{
 		Id:        tokenID,
 		Actor:     l.actor,
-		UserId:    user.GetId(),
-		IssuerId:  req.IssuerID,
+		UserId:    userID,
+		IssuerId:  issuerID,
 		Jwt:       jwt,
 		IssuedAt:  now.Unix(),
 		ExpiresAt: expiresAt.Unix(),
@@ -247,10 +331,73 @@ func (l *Loginer) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	}
 
 	return &LoginResponse{
+		UserID:      userID,
 		ShadowToken: tokenID,
 		JWT:         jwt,
 		ExpiresAt:   expiresAt.Unix(),
 	}, nil
+}
+
+// IssueAccessToken mints a short-lived, offline-verifiable access JWT for
+// an already-authenticated user. Unlike the shadow token's internal JWT
+// (which is never returned to network callers), the access JWT is
+// deliberately handed to the caller and verified offline against the
+// SELF issuer's JWKS (/oauth/jwks) — see [VerifyAccessToken]. It carries
+// a "token_use":"access" claim so it can never be mistaken for the
+// shadow's embedded JWT, and a short TTL ([DefaultAccessTTL]) that is its
+// only revocation window: the shadow token remains the instant-revoke
+// handle.
+//
+// It is identity-only: the subject is the local user id. Function-grant
+// authorization stays with /authz/check + the shadow token; the access
+// JWT only tells a downstream service *who* the caller is without a
+// round-trip. selfIssuerID names the SELF issuer whose key signs it
+// (loaded + validated exactly like [Loginer.IssueForUser]).
+func (l *Loginer) IssueAccessToken(ctx context.Context, userID, selfIssuerID string) (jwt string, expiresAt int64, err error) {
+	if userID == "" {
+		return "", 0, fmt.Errorf("service: IssueAccessToken: userID must not be empty")
+	}
+	issuer, err := l.loadSelfIssuer(ctx, selfIssuerID)
+	if err != nil {
+		return "", 0, err
+	}
+
+	now := l.clock()
+	exp := now.Add(l.accessTTL)
+
+	jti, err := generateOpaqueToken()
+	if err != nil {
+		return "", 0, fmt.Errorf("service: generate access jti: %w", err)
+	}
+
+	aud := l.accessAudience
+	if aud == "" {
+		aud = issuer.GetIss()
+	}
+
+	claims := map[string]any{
+		"iss":       issuer.GetIss(),
+		"sub":       userID,
+		"aud":       aud,
+		"iat":       now.Unix(),
+		"exp":       exp.Unix(),
+		"jti":       jti,
+		"token_use": AccessTokenUse,
+	}
+	claimsJSON, err := json.Marshal(claims)
+	if err != nil {
+		return "", 0, fmt.Errorf("service: marshal access claims: %w", err)
+	}
+
+	signingKey, err := l.resolver.SigningKey(ctx, selfIssuerID, issuer.GetDefaultAlgorithm())
+	if err != nil {
+		return "", 0, fmt.Errorf("service: resolve signing key: %w", err)
+	}
+	signed, err := signingKey.Sign(claimsJSON)
+	if err != nil {
+		return "", 0, fmt.Errorf("service: sign access jwt: %w", err)
+	}
+	return signed, exp.Unix(), nil
 }
 
 // generateOpaqueToken produces a URL-safe random token id suitable for
