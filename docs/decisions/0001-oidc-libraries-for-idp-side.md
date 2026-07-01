@@ -72,8 +72,10 @@ libraries.
 - The HTTP client and clock are injectable, so tests stand up an `httptest`
   mock IdP (discovery + JWKS + token endpoint, RS256-signed ID token) and drive
   the real verification path.
-- Pinned-endpoint mode (no `discovery_url`, only `authorization_endpoint` /
-  `token_endpoint` / `jwks_uri`) cannot learn the IdP's canonical `iss`, so it
-  verifies signature + audience + expiry with `SkipIssuerCheck` and is
-  documented as a fallback — `discovery_url` is preferred for full `iss`
-  validation. (Future: add an explicit issuer field to `OIDCConfig`.)
+- Pinned-endpoint mode (no `discovery_url`) now **requires** an explicit
+  `issuer` field in `OIDCConfig` (alongside the three endpoints). The ID-token
+  verifier is built with `oidc.NewVerifier(issuer, keySet, cfg)` so the `iss`
+  claim **is** validated; `SkipIssuerCheck` is not used. Configuration that
+  omits the `issuer` field in pinned mode is rejected at runtime. `discovery_url`
+  remains preferred because the library can discover the authoritative issuer
+  value automatically.
