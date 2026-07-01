@@ -70,6 +70,9 @@ func VerifyAccessToken(ctx context.Context, resolver *keys.Resolver, jwt, expect
 	if claims.Subject == "" {
 		return nil, ErrAccessTokenInvalid
 	}
+	if claims.Issuer == "" || claims.Audience == "" {
+		return nil, ErrAccessTokenInvalid
+	}
 	if claims.ExpiresAt == 0 || now.Unix() >= claims.ExpiresAt {
 		return nil, ErrAccessTokenInvalid
 	}

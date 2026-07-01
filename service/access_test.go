@@ -161,6 +161,57 @@ func TestVerifyAccessTokenRejections(t *testing.T) {
 			t.Fatalf("err = %v, want ErrAccessTokenInvalid", err)
 		}
 	})
+
+	// Negative cases exercising the new fail-closed check for empty iss/aud.
+	// We sign directly via the resolver (the minter always populates both).
+	t.Run("empty issuer", func(t *testing.T) {
+		c := AccessClaims{
+			Subject:   "user-1",
+			Audience:  rig.issuerIss,
+			TokenUse:  AccessTokenUse,
+			ExpiresAt: now.Add(time.Hour).Unix(),
+			// Issuer left empty
+		}
+		payload, err := json.Marshal(c)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		lk, err := rig.resolver.SigningKey(ctx, rig.issuerID, "EdDSA")
+		if err != nil {
+			t.Fatalf("SigningKey: %v", err)
+		}
+		badJWT, err := lk.Sign(payload)
+		if err != nil {
+			t.Fatalf("Sign: %v", err)
+		}
+		if _, err := VerifyAccessToken(ctx, rig.resolver, badJWT, "", now); !errors.Is(err, ErrAccessTokenInvalid) {
+			t.Fatalf("err = %v, want ErrAccessTokenInvalid", err)
+		}
+	})
+	t.Run("empty audience", func(t *testing.T) {
+		c := AccessClaims{
+			Issuer:    rig.issuerIss,
+			Subject:   "user-1",
+			TokenUse:  AccessTokenUse,
+			ExpiresAt: now.Add(time.Hour).Unix(),
+			// Audience left empty
+		}
+		payload, err := json.Marshal(c)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		lk, err := rig.resolver.SigningKey(ctx, rig.issuerID, "EdDSA")
+		if err != nil {
+			t.Fatalf("SigningKey: %v", err)
+		}
+		badJWT, err := lk.Sign(payload)
+		if err != nil {
+			t.Fatalf("Sign: %v", err)
+		}
+		if _, err := VerifyAccessToken(ctx, rig.resolver, badJWT, "", now); !errors.Is(err, ErrAccessTokenInvalid) {
+			t.Fatalf("err = %v, want ErrAccessTokenInvalid", err)
+		}
+	})
 }
 
 func TestCheckerIdentify(t *testing.T) {

@@ -124,6 +124,9 @@ func verifyState(
 	if claims.State == "" || claims.State != expectState {
 		return nil, errStateInvalid
 	}
+	if claims.Verifier == "" || claims.RedirectURI == "" || claims.IDP == "" {
+		return nil, errStateInvalid
+	}
 	return &claims, nil
 }
 
@@ -133,6 +136,9 @@ func verifyState(
 func jwtHeaderKid(jwt string) (string, error) {
 	first, _, ok := strings.Cut(jwt, ".")
 	if !ok || first == "" {
+		return "", errStateInvalid
+	}
+	if len(first) > 4096 {
 		return "", errStateInvalid
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(first)

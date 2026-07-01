@@ -142,3 +142,38 @@ func TestStateCookieMissing(t *testing.T) {
 		t.Fatal("expected empty state to be rejected")
 	}
 }
+
+func TestStateCookieMissingCriticalFields(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+	resolver := newSigningResolver(t, func() time.Time { return now })
+
+	// Sign a structurally valid state cookie (crypto + sig + expiry + state-nonce all pass)
+	// but leave one required claim empty. verifyState must fail closed with the sentinel.
+	jwt, err := signState(ctx, resolver, "default", "EdDSA",
+		"", "https://app.example.com/", "nonce", "google", now, 10*time.Minute)
+	if err != nil {
+		t.Fatalf("signState: %v", err)
+	}
+	if _, err := verifyState(ctx, resolver, jwt, "nonce", now); err != errStateInvalid {
+		t.Fatalf("expected errStateInvalid for empty Verifier, got %v", err)
+	}
+
+	jwt, err = signState(ctx, resolver, "default", "EdDSA",
+		"v", "", "nonce", "google", now, 10*time.Minute)
+	if err != nil {
+		t.Fatalf("signState: %v", err)
+	}
+	if _, err := verifyState(ctx, resolver, jwt, "nonce", now); err != errStateInvalid {
+		t.Fatalf("expected errStateInvalid for empty RedirectURI, got %v", err)
+	}
+
+	jwt, err = signState(ctx, resolver, "default", "EdDSA",
+		"v", "https://app.example.com/", "nonce", "", now, 10*time.Minute)
+	if err != nil {
+		t.Fatalf("signState: %v", err)
+	}
+	if _, err := verifyState(ctx, resolver, jwt, "nonce", now); err != errStateInvalid {
+		t.Fatalf("expected errStateInvalid for empty IDP, got %v", err)
+	}
+}
