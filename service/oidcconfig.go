@@ -91,6 +91,9 @@ type SetRequest struct {
 	JITPolicy        issuerv1.OIDCJITPolicy
 	JITDefaultRoleID string
 	JITDomain        string
+
+	// Issuer is the expected "iss" claim for pinned-mode (no discovery_url) ID tokens.
+	Issuer string
 }
 
 // Set encrypts the client secret (if provided) and applies a SetOIDCConfig
@@ -119,6 +122,7 @@ func (c *OIDCConfigurator) Set(ctx context.Context, req SetRequest) error {
 		JitPolicy:             req.JITPolicy,
 		JitDefaultRoleId:      req.JITDefaultRoleID,
 		JitDomain:             req.JITDomain,
+		Issuer:                req.Issuer,
 	}
 
 	if len(req.ClientSecret) > 0 {
@@ -282,6 +286,7 @@ func protoCloneOIDCConfig(in *issuerv1.OIDCConfig) *issuerv1.OIDCConfig {
 		JitPolicy:                in.GetJitPolicy(),
 		JitDefaultRoleId:         in.GetJitDefaultRoleId(),
 		JitDomain:                in.GetJitDomain(),
+		Issuer:                   in.GetIssuer(),
 	}
 	for k, v := range in.GetClaimMap() {
 		out.ClaimMap[k] = v

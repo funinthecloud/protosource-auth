@@ -45,7 +45,8 @@ type mockIDP struct {
 	clientID string
 	sub      string
 	email    string
-	aud      string // aud claim in minted ID tokens (defaults to clientID)
+	aud      string // aud claim (defaults to clientID)
+	iss      string // iss claim (defaults to server.URL)
 }
 
 func newMockIDP(t *testing.T) *mockIDP {
@@ -61,6 +62,7 @@ func newMockIDP(t *testing.T) *mockIDP {
 		sub:      "idp-subject-789",
 		email:    "alice@idp.example",
 		aud:      "client-123",
+		// iss defaults to server.URL after server is created below
 	}
 
 	mux := http.NewServeMux()
@@ -101,6 +103,9 @@ func newMockIDP(t *testing.T) *mockIDP {
 
 	idp.server = httptest.NewServer(mux)
 	t.Cleanup(idp.server.Close)
+	if idp.iss == "" {
+		idp.iss = idp.server.URL
+	}
 	return idp
 }
 
@@ -108,7 +113,7 @@ func (idp *mockIDP) signIDToken() string {
 	now := time.Now()
 	header := map[string]any{"alg": "RS256", "typ": "JWT", "kid": idp.kid}
 	payload := map[string]any{
-		"iss":   idp.server.URL,
+		"iss":   idp.iss,
 		"sub":   idp.sub,
 		"aud":   idp.aud,
 		"exp":   now.Add(time.Hour).Unix(),
@@ -132,6 +137,24 @@ func (idp *mockIDP) setIDTokenAud(aud string) {
 	if aud != "" {
 		idp.aud = aud
 	}
+}
+
+// setIDTokenIss changes the iss claim (used for testing pinned-mode issuer
+// validation / mismatch rejection).
+func (idp *mockIDP) setIDTokenIss(iss string) {
+	if iss != "" {
+		idp.iss = iss
+	}
+}
+
+// signWithIssuer signs an ID token using this mock's key but with the
+// supplied issuer claim. Useful for testing issuer validation in pinned mode.
+func (idp *mockIDP) signWithIssuer(iss string) string {
+	orig := idp.iss
+	idp.iss = iss
+	token := idp.signIDToken()
+	idp.iss = orig
+	return token
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -539,6 +562,7 @@ func TestBuildOIDCMetaPinnedRequiresAllEndpoints(t *testing.T) {
 		AuthorizationEndpoint: "https://idp.example/authorize",
 		TokenEndpoint:         "https://idp.example/token",
 		JwksUri:               "https://idp.example/jwks",
+		Issuer:                "https://idp.example", // required for proper iss validation in pinned mode
 	}
 
 	for _, tc := range []struct {
@@ -549,6 +573,7 @@ func TestBuildOIDCMetaPinnedRequiresAllEndpoints(t *testing.T) {
 		{"missing authorization_endpoint", func(c *issuerv1.OIDCConfig) { c.AuthorizationEndpoint = "" }, "authorization_endpoint"},
 		{"missing token_endpoint", func(c *issuerv1.OIDCConfig) { c.TokenEndpoint = "" }, "token_endpoint"},
 		{"missing jwks_uri", func(c *issuerv1.OIDCConfig) { c.JwksUri = "" }, "jwks_uri"},
+		{"missing issuer", func(c *issuerv1.OIDCConfig) { c.Issuer = "" }, "issuer"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			oc := &issuerv1.OIDCConfig{
@@ -573,6 +598,68 @@ func TestBuildOIDCMetaPinnedRequiresAllEndpoints(t *testing.T) {
 	}
 	if m.authURL != full.AuthorizationEndpoint || m.tokenURL != full.TokenEndpoint {
 		t.Errorf("pinned meta = {%q,%q}, want {%q,%q}", m.authURL, m.tokenURL, full.AuthorizationEndpoint, full.TokenEndpoint)
+	}
+}
+
+// TestPinnedIssuerValidation shows that when using pinned + explicit issuer,
+// the verifier rejects tokens whose "iss" does not match (even if signature is valid).
+func TestPinnedIssuerValidation(t *testing.T) {
+	now := time.Now().UTC()
+	rig := newOAuthRig(t, func() time.Time { return now }, fakeResolver{userID: "u1"})
+	ctx := context.Background()
+
+	base := rig.idp.server.URL
+	pinned := &issuerv1.OIDCConfig{
+		ClientId:              rig.idp.clientID,
+		AuthorizationEndpoint: base + "/authorize",
+		TokenEndpoint:         base + "/token",
+		JwksUri:               base + "/jwks",
+		Issuer:                "https://different-issuer.example", // deliberately wrong vs what the token will carry
+	}
+
+	m, err := rig.handler.buildOIDCMeta(ctx, pinned)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	// Token from the mock carries the real server.URL as iss.
+	token := rig.idp.signIDToken()
+
+	_, err = m.verifier.Verify(ctx, token)
+	if err == nil {
+		t.Fatal("expected verification to fail for mismatched issuer in pinned mode")
+	}
+	if !strings.Contains(err.Error(), "issuer") {
+		t.Errorf("expected issuer-related error, got: %v", err)
+	}
+}
+
+// TestBuildOIDCMetaPinnedWithIssuer verifies that when an explicit issuer
+// is supplied for pinned mode we construct the verifier with issuer checking
+// enabled (no SkipIssuerCheck, non-empty issuer to NewVerifier).
+func TestBuildOIDCMetaPinnedWithIssuer(t *testing.T) {
+	now := time.Now().UTC()
+	rig := newOAuthRig(t, func() time.Time { return now }, fakeResolver{userID: "user-123"})
+	ctx := context.Background()
+
+	oc := &issuerv1.OIDCConfig{
+		ClientId:              "client-pinned",
+		AuthorizationEndpoint: "https://pinned.example/authorize",
+		TokenEndpoint:         "https://pinned.example/token",
+		JwksUri:               "https://pinned.example/jwks",
+		Issuer:                "https://pinned.example",
+	}
+
+	m, err := rig.handler.buildOIDCMeta(ctx, oc)
+	if err != nil {
+		t.Fatalf("buildOIDCMeta: %v", err)
+	}
+
+	// We can't easily inspect the internal cfg of the verifier, but we can
+	// at least ensure it was created (and in real usage the Verify call
+	// will reject wrong-iss tokens).
+	if m.verifier == nil {
+		t.Fatal("expected non-nil verifier for pinned+issuer")
 	}
 }
 

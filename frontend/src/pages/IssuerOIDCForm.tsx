@@ -73,6 +73,7 @@ export default function IssuerOIDCForm({
   const [authEndpoint, setAuthEndpoint] = useState(existing?.authorizationEndpoint ?? "");
   const [tokenEndpoint, setTokenEndpoint] = useState(existing?.tokenEndpoint ?? "");
   const [jwksUri, setJwksUri] = useState(existing?.jwksUri ?? "");
+  const [issuerStr, setIssuerStr] = useState(existing?.issuer ?? "");
   const [audiences, setAudiences] = useState((existing?.allowedAudiences ?? []).join("\n"));
   const [claims, setClaims] = useState<ClaimRow[]>(claimMapToRows(existing?.claimMap));
   const [jitPolicy, setJitPolicy] = useState<OIDCJITPolicy>(existing?.jitPolicy ?? OIDCJITPolicy.JIT_REJECT);
@@ -110,6 +111,7 @@ export default function IssuerOIDCForm({
       authorization_endpoint: mode === "pinned" ? authEndpoint.trim() : "",
       token_endpoint: mode === "pinned" ? tokenEndpoint.trim() : "",
       jwks_uri: mode === "pinned" ? jwksUri.trim() : "",
+      issuer: mode === "pinned" ? issuerStr.trim() : "",
       allowed_audiences: audiences
         .split("\n")
         .map((s) => s.trim())
@@ -237,6 +239,13 @@ export default function IssuerOIDCForm({
                 placeholder="JWKS URI"
                 value={jwksUri}
                 onChange={(e) => setJwksUri(e.target.value)}
+                className={inputCls}
+              />
+              <input
+                type="url"
+                placeholder="Issuer (iss) - required for pinned mode"
+                value={issuerStr}
+                onChange={(e) => setIssuerStr(e.target.value)}
                 className={inputCls}
               />
             </div>

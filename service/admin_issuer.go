@@ -63,6 +63,9 @@ type adminSetOIDCRequest struct {
 	AllowedAudiences []string          `json:"allowed_audiences"`
 	ClaimMap         map[string]string `json:"claim_map"`
 
+	// Issuer is the expected iss claim for pinned (no discovery) mode.
+	Issuer string `json:"issuer"`
+
 	JITPolicy        issuerv1.OIDCJITPolicy `json:"jit_policy"`
 	JITDefaultRoleID string                 `json:"jit_default_role_id"`
 	JITDomain        string                 `json:"jit_domain"`
@@ -110,6 +113,7 @@ func (a *AdminIssuer) handleSetOIDC(ctx context.Context, req protosource.Request
 		JWKSURI:               in.JWKSURI,
 		AllowedAudiences:      in.AllowedAudiences,
 		ClaimMap:              in.ClaimMap,
+		Issuer:                in.Issuer,
 		JITPolicy:             in.JITPolicy,
 		JITDefaultRoleID:      in.JITDefaultRoleID,
 		JITDomain:             in.JITDomain,

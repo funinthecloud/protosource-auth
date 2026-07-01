@@ -491,17 +491,18 @@ func (h *OAuthHandler) buildOIDCMeta(ctx context.Context, oc *issuerv1.OIDCConfi
 		}, nil
 	}
 
-	// Pinned-endpoint mode: no discovery document, so we cannot learn the
-	// IdP's canonical issuer string to enforce the `iss` claim. Verify
-	// signature + audience + expiry against the configured JWKS and skip the
-	// issuer check. Prefer discovery_url for full iss validation.
-	// ponytail: acceptable for pinned deployments (iss check skipped); audiences
-	// now handled (SkipClientIDCheck + audienceMatches when allowed_audiences set).
+	// Pinned-endpoint mode (no discovery_url).
 	//
-	// All three endpoints are required: without authorization_endpoint or
-	// token_endpoint, /oauth/authorize would build a redirect (and later a
-	// token exchange) against an empty URL. Fail closed at config-resolution
-	// time instead of producing a malformed redirect at runtime.
+	// discovery_url is strongly preferred because it lets us learn the exact
+	// issuer identifier from the IdP and get full iss validation for free.
+	//
+	// For pinned mode we now *require* an explicit "issuer" field in
+	// OIDCConfig. We pass it to NewVerifier so that iss is validated
+	// (no SkipIssuerCheck). This eliminates the previous weakness where
+	// any token that verified against the JWKS + aud/exp would be accepted,
+	// even from a completely different issuer.
+	//
+	// All three endpoints + issuer are required for pinned configs.
 	var missing []string
 	if oc.GetAuthorizationEndpoint() == "" {
 		missing = append(missing, "authorization_endpoint")
@@ -512,15 +513,19 @@ func (h *OAuthHandler) buildOIDCMeta(ctx context.Context, oc *issuerv1.OIDCConfi
 	if oc.GetJwksUri() == "" {
 		missing = append(missing, "jwks_uri")
 	}
+	if oc.GetIssuer() == "" {
+		missing = append(missing, "issuer")
+	}
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("service: pinned OIDC config (no discovery_url) is missing required %s", strings.Join(missing, ", "))
 	}
-	cfg.SkipIssuerCheck = true
+
 	keySet := oidc.NewRemoteKeySet(cctx, oc.GetJwksUri())
+	issuer := oc.GetIssuer()
 	return &oidcMeta{
 		authURL:  oc.GetAuthorizationEndpoint(),
 		tokenURL: oc.GetTokenEndpoint(),
-		verifier: oidc.NewVerifier("", keySet, cfg),
+		verifier: oidc.NewVerifier(issuer, keySet, cfg),
 	}, nil
 }
 

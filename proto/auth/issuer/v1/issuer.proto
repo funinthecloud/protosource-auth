@@ -107,6 +107,14 @@ message OIDCConfig {
   string          token_endpoint         = 7;
   string          jwks_uri               = 8;  // for ID token signature verification in /oauth/callback
   repeated string allowed_audiences      = 9;
+  // issuer is the exact "iss" (issuer) claim value expected in ID tokens from this
+  // external IdP when using pinned endpoints (no discovery_url).
+  // When provided, the ID token verifier will enforce the issuer claim (no SkipIssuerCheck).
+  // When using discovery_url, the issuer is learned from the IdP and this field is not required.
+  // Providing this field for pinned mode is strongly recommended.
+  // If neither discovery_url nor issuer is supplied for a KIND_EXTERNAL issuer,
+  // issuer validation is skipped entirely (see buildOIDCMeta in service/oauth.go).
+  string issuer = 14;
   // claim_map keys are our internal names (e.g. "email_at_link", "display_name");
   // values are the claim names in the IdP ID token (e.g. "email", "name").
   map<string, string> claim_map           = 10;

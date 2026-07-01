@@ -141,6 +141,8 @@ B. **Explicitly future-only**: Document in proto + form + CLAUDE.md + decision d
 
 **Status:** ✅ **COMPLETED** (wired in this session): SkipClientIDCheck when list non-empty + explicit `audienceMatches` union check after Verify (in both paths). New passing tests for extra-aud success + mismatch failure. ponytail comment lightly updated. Behavior unchanged when list empty.
 
+For pinned: now **requires** `issuer` field (enforced in buildOIDCMeta); uses `NewVerifier(issuer, ...)` so iss is validated. Added test for missing issuer + mismatch rejection. Legacy weak path removed.
+
 ---
 
 ### 4. Pinned-endpoint OIDC mode weakens issuer validation (SkipIssuerCheck + empty issuer) — Grok #3

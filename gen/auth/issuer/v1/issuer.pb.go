@@ -418,8 +418,12 @@ type OIDCConfig struct {
 	JitPolicy        OIDCJITPolicy     `protobuf:"varint,11,opt,name=jit_policy,json=jitPolicy,proto3,enum=auth.issuer.v1.OIDCJITPolicy" json:"jit_policy,omitempty"`
 	JitDefaultRoleId string            `protobuf:"bytes,12,opt,name=jit_default_role_id,json=jitDefaultRoleId,proto3" json:"jit_default_role_id,omitempty"`
 	JitDomain        string            `protobuf:"bytes,13,opt,name=jit_domain,json=jitDomain,proto3" json:"jit_domain,omitempty"` // for JIT_DOMAIN_RULE, e.g. "example.com" or ".corp.example.com"
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// issuer is the exact "iss" (issuer) claim value expected in ID tokens from this
+	// external IdP when using pinned endpoints (no discovery_url).
+	// When provided, the ID token verifier will enforce the issuer claim.
+	Issuer        string `protobuf:"bytes,14,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *OIDCConfig) Reset() {
@@ -539,6 +543,13 @@ func (x *OIDCConfig) GetJitDefaultRoleId() string {
 func (x *OIDCConfig) GetJitDomain() string {
 	if x != nil {
 		return x.JitDomain
+	}
+	return ""
+}
+
+func (x *OIDCConfig) GetIssuer() string {
+	if x != nil {
+		return x.Issuer
 	}
 	return ""
 }
