@@ -26,6 +26,11 @@ import (
 	"github.com/funinthecloud/protosource-auth/keyproviders/local"
 )
 
+// testAllowedAudiences is a test-only hook (default empty) read when
+// newOAuthRig registers the external issuer. Allows exercising
+// allowed_audiences wiring without changing all call sites.
+var testAllowedAudiences []string
+
 // ── mock OIDC IdP ──
 
 // mockIDP is a minimal external OpenID Provider for tests: it serves a
@@ -40,6 +45,7 @@ type mockIDP struct {
 	clientID string
 	sub      string
 	email    string
+	aud      string // aud claim in minted ID tokens (defaults to clientID)
 }
 
 func newMockIDP(t *testing.T) *mockIDP {
@@ -54,6 +60,7 @@ func newMockIDP(t *testing.T) *mockIDP {
 		clientID: "client-123",
 		sub:      "idp-subject-789",
 		email:    "alice@idp.example",
+		aud:      "client-123",
 	}
 
 	mux := http.NewServeMux()
@@ -103,7 +110,7 @@ func (idp *mockIDP) signIDToken() string {
 	payload := map[string]any{
 		"iss":   idp.server.URL,
 		"sub":   idp.sub,
-		"aud":   idp.clientID,
+		"aud":   idp.aud,
 		"exp":   now.Add(time.Hour).Unix(),
 		"iat":   now.Add(-time.Minute).Unix(),
 		"email": idp.email,
@@ -117,6 +124,14 @@ func (idp *mockIDP) signIDToken() string {
 		panic(err)
 	}
 	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+// setIDTokenAud changes the aud claim for subsequently signed ID tokens
+// (used to test allowed_audiences success/failure paths).
+func (idp *mockIDP) setIDTokenAud(aud string) {
+	if aud != "" {
+		idp.aud = aud
+	}
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -190,6 +205,7 @@ func newOAuthRig(t *testing.T, clock func() time.Time, identity IdentityResolver
 			ClientSecretMasterKeyRef: "local-master",
 			DiscoveryUrl:             idp.server.URL,
 			ClaimMap:                 map[string]string{"email_at_link": "email"},
+			AllowedAudiences:         testAllowedAudiences,
 		},
 	}); err != nil {
 		t.Fatalf("register external issuer: %v", err)
@@ -557,5 +573,78 @@ func TestBuildOIDCMetaPinnedRequiresAllEndpoints(t *testing.T) {
 	}
 	if m.authURL != full.AuthorizationEndpoint || m.tokenURL != full.TokenEndpoint {
 		t.Errorf("pinned meta = {%q,%q}, want {%q,%q}", m.authURL, m.tokenURL, full.AuthorizationEndpoint, full.TokenEndpoint)
+	}
+}
+
+// ── allowed_audiences wiring tests (PR#27) ──
+
+// TestCallbackAllowedAudienceExtraSucceeds registers an issuer with
+// allowed_audiences containing a value different from clientID, has the
+// mock ID token use that extra aud, and verifies the full happy-path
+// callback succeeds (SkipClientIDCheck + audienceMatches pass).
+func TestCallbackAllowedAudienceExtraSucceeds(t *testing.T) {
+	now := time.Now().UTC()
+	extra := "https://app.example.com"
+	// Override for this rig only; restore after so later tests unaffected.
+	prev := testAllowedAudiences
+	testAllowedAudiences = []string{extra}
+	defer func() { testAllowedAudiences = prev }()
+
+	rig := newOAuthRig(t, func() time.Time { return now }, fakeResolver{userID: "user-123"})
+	rig.idp.setIDTokenAud(extra) // mock produces id_token with the allowed extra aud
+	ctx := context.Background()
+
+	state, cookiePair := driveAuthorize(t, rig)
+
+	resp := rig.router.Dispatch(ctx, "GET", "/oauth/callback", protosource.Request{
+		QueryParameters: map[string]string{"code": "auth-code", "state": state},
+		Headers: map[string]string{
+			"host":              "auth.example.com",
+			"x-forwarded-proto": "https",
+			"cookie":            cookiePair,
+		},
+	})
+
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("callback status = %d, want 302; body=%s", resp.StatusCode, resp.Body)
+	}
+	if loc := resp.Headers["Location"]; loc != "https://app.example.com/home" {
+		t.Errorf("Location = %q, want original redirect_uri", loc)
+	}
+	shadowCookie := findCookie(resp.Cookies, "shadow")
+	if shadowCookie == nil || shadowCookie.Value == "" {
+		t.Fatalf("expected shadow cookie on success; cookies=%v", resp.Cookies)
+	}
+}
+
+// TestCallbackAllowedAudienceMismatchFails uses allowed_audiences but
+// the ID token carries an unrelated aud; must fail closed with id_token_invalid.
+func TestCallbackAllowedAudienceMismatchFails(t *testing.T) {
+	now := time.Now().UTC()
+	extra := "https://app.example.com"
+	prev := testAllowedAudiences
+	testAllowedAudiences = []string{extra}
+	defer func() { testAllowedAudiences = prev }()
+
+	rig := newOAuthRig(t, func() time.Time { return now }, fakeResolver{userID: "user-123"})
+	rig.idp.setIDTokenAud("https://evil.example.com") // unrelated aud
+	ctx := context.Background()
+
+	state, cookiePair := driveAuthorize(t, rig)
+
+	resp := rig.router.Dispatch(ctx, "GET", "/oauth/callback", protosource.Request{
+		QueryParameters: map[string]string{"code": "auth-code", "state": state},
+		Headers: map[string]string{
+			"host":              "auth.example.com",
+			"x-forwarded-proto": "https",
+			"cookie":            cookiePair,
+		},
+	})
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401 for aud mismatch; body=%s", resp.StatusCode, resp.Body)
+	}
+	if !strings.Contains(resp.Body, "id_token_invalid") {
+		t.Errorf("body = %q, want id_token_invalid sentinel", resp.Body)
 	}
 }

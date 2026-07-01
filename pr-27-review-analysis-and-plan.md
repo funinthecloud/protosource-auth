@@ -139,7 +139,7 @@ B. **Explicitly future-only**: Document in proto + form + CLAUDE.md + decision d
 
 **Priority:** High (correctness / don't mislead operators + stored config). Medium implementation effort.
 
-**Status:** Decide + implement or document before merge. (Do not ship advertised-but-broken feature.)
+**Status:** ✅ **COMPLETED** (wired in this session): SkipClientIDCheck when list non-empty + explicit `audienceMatches` union check after Verify (in both paths). New passing tests for extra-aud success + mismatch failure. ponytail comment lightly updated. Behavior unchanged when list empty.
 
 ---
 

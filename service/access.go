@@ -10,6 +10,7 @@ import (
 	"github.com/funinthecloud/protosource"
 	"github.com/funinthecloud/protosource/authz"
 
+	"github.com/funinthecloud/protosource-auth/internal/httputil"
 	"github.com/funinthecloud/protosource-auth/keys"
 )
 
@@ -87,14 +88,14 @@ func VerifyAccessToken(ctx context.Context, resolver *keys.Resolver, jwt, expect
 // token never reaches JavaScript, so it cannot be exfiltrated by XSS.
 // Downstream resource servers under the same registrable domain read it
 // from the cookie and verify it offline via JWKS. The cookie is scoped
-// to ".eTLD+1" (parentCookieDomain) so it flows across the deployment's
+// to ".eTLD+1" (httputil.ParentDomain) so it flows across the deployment's
 // subdomains exactly like the shadow cookie. maxAge is in seconds.
 func newAccessCookie(name, value, host string, maxAge int) *http.Cookie {
 	return &http.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     "/",
-		Domain:   parentCookieDomain(host),
+		Domain:   httputil.ParentDomain(host),
 		MaxAge:   maxAge,
 		Secure:   true,
 		HttpOnly: true,
@@ -191,11 +192,11 @@ func (h *AccessHandler) RegisterRoutes(router *protosource.Router) {
 }
 
 func (h *AccessHandler) handleRefresh(ctx context.Context, req protosource.Request) protosource.Response {
-	if !requestIsSecure(req) {
+	if !httputil.IsSecure(req) {
 		return accessError(http.StatusForbidden, "https_required")
 	}
 
-	shadow := cookieValue(req, h.shadowCookieName)
+	shadow := httputil.CookieValue(req, h.shadowCookieName)
 	if shadow == "" {
 		return accessError(http.StatusUnauthorized, "unauthenticated")
 	}
@@ -219,7 +220,7 @@ func (h *AccessHandler) handleRefresh(ctx context.Context, req protosource.Reque
 		return accessError(http.StatusServiceUnavailable, "service_unavailable")
 	}
 
-	cookie := newAccessCookie(h.accessCookieName, jwt, reqHost(req), maxAge)
+	cookie := newAccessCookie(h.accessCookieName, jwt, httputil.ReqHost(req), maxAge)
 	body, _ := json.Marshal(map[string]int{"expires_in": maxAge})
 	return protosource.Response{
 		StatusCode: http.StatusOK,

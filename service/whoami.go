@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/funinthecloud/protosource"
 
 	tokenv1 "github.com/funinthecloud/protosource-auth/gen/auth/token/v1"
 	userv1 "github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
+	"github.com/funinthecloud/protosource-auth/internal/httputil"
 )
 
 // Whoami serves GET /whoami, returning the authenticated user's identity
@@ -75,7 +75,7 @@ type whoamiRole struct {
 }
 
 func (w *Whoami) handle(ctx context.Context, req protosource.Request) protosource.Response {
-	token := cookieValue(req, w.cookieName)
+	token := httputil.CookieValue(req, w.cookieName)
 	if token == "" {
 		return whoamiError(http.StatusUnauthorized, "unauthenticated")
 	}
@@ -136,23 +136,6 @@ func (w *Whoami) handle(ctx context.Context, req protosource.Request) protosourc
 	}
 }
 
-// cookieValue extracts a named cookie from the Cookie header.
-// It checks lowercase then title-case to handle different
-// header canonicalization across adapters.
-func cookieValue(req protosource.Request, name string) string {
-	raw := reqHeader(req, "Cookie")
-	if raw == "" {
-		return ""
-	}
-	header := http.Header{"Cookie": {raw}}
-	fakeReq := &http.Request{Header: header}
-	c, err := fakeReq.Cookie(name)
-	if err != nil {
-		return ""
-	}
-	return c.Value
-}
-
 func whoamiError(status int, message string) protosource.Response {
 	body, _ := json.Marshal(map[string]string{"error": message})
 	return protosource.Response{
@@ -164,12 +147,3 @@ func whoamiError(status int, message string) protosource.Response {
 
 // Ensure Whoami satisfies RouteRegistrar.
 var _ protosource.RouteRegistrar = (*Whoami)(nil)
-
-// reqHeader returns the first non-empty value for the given header,
-// trying lowercase then the original form.
-func reqHeader(req protosource.Request, name string) string {
-	if v := req.Headers[strings.ToLower(name)]; v != "" {
-		return v
-	}
-	return req.Headers[name]
-}

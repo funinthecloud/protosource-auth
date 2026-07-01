@@ -129,11 +129,11 @@ func (r *endToEndRig) seed(t *testing.T, email, password string, grants []string
 
 	issuerID = "issuer-self"
 	if _, err := r.issuerRepo.Apply(ctx, &issuerv1.Register{
-		Id:              issuerID,
-		Actor:           "bootstrap",
-		Iss:             "https://auth.example.com",
-		DisplayName:     "Example Auth",
-		Kind:            issuerv1.Kind_KIND_SELF,
+		Id:               issuerID,
+		Actor:            "bootstrap",
+		Iss:              "https://auth.example.com",
+		DisplayName:      "Example Auth",
+		Kind:             issuerv1.Kind_KIND_SELF,
 		DefaultAlgorithm: ed25519signer.Algorithm,
 	}); err != nil {
 		t.Fatalf("seed Register issuer: %v", err)

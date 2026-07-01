@@ -5,20 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
 
-	"golang.org/x/net/publicsuffix"
 	"golang.org/x/oauth2"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 
 	"github.com/funinthecloud/protosource"
 	issuerv1 "github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1"
+	"github.com/funinthecloud/protosource-auth/internal/httputil"
 	"github.com/funinthecloud/protosource-auth/keys"
 )
 
@@ -213,7 +211,7 @@ var _ protosource.RouteRegistrar = (*OAuthHandler)(nil)
 // PKCE verifier + signed state cookie, and 302-redirects the browser to the
 // chosen IdP's authorization endpoint.
 func (h *OAuthHandler) HandleAuthorize(ctx context.Context, req protosource.Request) protosource.Response {
-	if !requestIsSecure(req) {
+	if !httputil.IsSecure(req) {
 		return oauthRedirectError(http.StatusForbidden, "https_required")
 	}
 
@@ -227,11 +225,11 @@ func (h *OAuthHandler) HandleAuthorize(ctx context.Context, req protosource.Requ
 		return resp
 	}
 
-	host := reqHost(req)
+	host := httputil.ReqHost(req)
 	redirectURI := req.QueryParameters["redirect_uri"]
 	if redirectURI == "" {
 		redirectURI = "/" // post-login default: our own host root
-	} else if !isAllowedRedirectURL(redirectURI, host) {
+	} else if !httputil.IsAllowedRedirect(redirectURI, host) {
 		return oauthRedirectError(http.StatusBadRequest, "invalid_redirect_uri")
 	}
 
@@ -271,7 +269,7 @@ func (h *OAuthHandler) HandleAuthorize(ctx context.Context, req protosource.Requ
 		Name:     h.stateCookieName,
 		Value:    stateJWT,
 		Path:     "/oauth/callback",
-		Domain:   parentCookieDomain(host),
+		Domain:   httputil.ParentDomain(host),
 		MaxAge:   int(h.stateTTL.Seconds()),
 		Secure:   true,
 		HttpOnly: true,
@@ -295,7 +293,7 @@ func (h *OAuthHandler) HandleAuthorize(ctx context.Context, req protosource.Requ
 // and 302-redirects back to the originally requested redirect_uri with the
 // shadow cookie set.
 func (h *OAuthHandler) HandleCallback(ctx context.Context, req protosource.Request) protosource.Response {
-	if !requestIsSecure(req) {
+	if !httputil.IsSecure(req) {
 		return oauthRedirectError(http.StatusForbidden, "https_required")
 	}
 
@@ -311,7 +309,7 @@ func (h *OAuthHandler) HandleCallback(ctx context.Context, req protosource.Reque
 	}
 
 	now := h.now()
-	stateJWT := cookieValue(req, h.stateCookieName)
+	stateJWT := httputil.CookieValue(req, h.stateCookieName)
 	claims, err := verifyState(ctx, h.resolver, stateJWT, stateParam, now)
 	if err != nil {
 		// Covers missing/tampered/expired cookie and state mismatch.
@@ -354,6 +352,9 @@ func (h *OAuthHandler) HandleCallback(ctx context.Context, req protosource.Reque
 	if err != nil {
 		return oauthRedirectError(http.StatusUnauthorized, "id_token_invalid")
 	}
+	if !audienceMatches(idToken, oc.GetClientId(), oc.GetAllowedAudiences()) {
+		return oauthRedirectError(http.StatusUnauthorized, "id_token_invalid")
+	}
 
 	var allClaims map[string]any
 	if err := idToken.Claims(&allClaims); err != nil {
@@ -389,7 +390,7 @@ func (h *OAuthHandler) HandleCallback(ctx context.Context, req protosource.Reque
 		return oauthRedirectError(http.StatusServiceUnavailable, "token_issue_failed")
 	}
 
-	host := reqHost(req)
+	host := httputil.ReqHost(req)
 	shadowMaxAge := int(time.Unix(loginResp.ExpiresAt, 0).Sub(now).Seconds())
 	accessMaxAge := int(time.Unix(accessExp, 0).Sub(now).Seconds())
 	if shadowMaxAge <= 0 || accessMaxAge <= 0 {
@@ -400,7 +401,7 @@ func (h *OAuthHandler) HandleCallback(ctx context.Context, req protosource.Reque
 		Name:     h.shadowCookieName,
 		Value:    loginResp.ShadowToken,
 		Path:     "/",
-		Domain:   parentCookieDomain(host),
+		Domain:   httputil.ParentDomain(host),
 		MaxAge:   shadowMaxAge,
 		Secure:   true,
 		HttpOnly: true,
@@ -415,7 +416,7 @@ func (h *OAuthHandler) HandleCallback(ctx context.Context, req protosource.Reque
 		Name:     h.stateCookieName,
 		Value:    "",
 		Path:     "/oauth/callback",
-		Domain:   parentCookieDomain(host),
+		Domain:   httputil.ParentDomain(host),
 		MaxAge:   -1,
 		Secure:   true,
 		HttpOnly: true,
@@ -468,6 +469,9 @@ func (h *OAuthHandler) oidcMetaFor(ctx context.Context, issuerID string, oc *iss
 func (h *OAuthHandler) buildOIDCMeta(ctx context.Context, oc *issuerv1.OIDCConfig) (*oidcMeta, error) {
 	cctx := h.idpContext(ctx)
 	cfg := &oidc.Config{ClientID: oc.GetClientId(), Now: h.now}
+	if len(oc.GetAllowedAudiences()) > 0 {
+		cfg.SkipClientIDCheck = true
+	}
 
 	if du := oc.GetDiscoveryUrl(); du != "" {
 		// go-oidc's NewProvider takes the IdP *issuer base* URL and appends
@@ -491,8 +495,8 @@ func (h *OAuthHandler) buildOIDCMeta(ctx context.Context, oc *issuerv1.OIDCConfi
 	// IdP's canonical issuer string to enforce the `iss` claim. Verify
 	// signature + audience + expiry against the configured JWKS and skip the
 	// issuer check. Prefer discovery_url for full iss validation.
-	// ponytail: acceptable for pinned deployments; tighten if an issuer field
-	// is added to OIDCConfig.
+	// ponytail: acceptable for pinned deployments (iss check skipped); audiences
+	// now handled (SkipClientIDCheck + audienceMatches when allowed_audiences set).
 	//
 	// All three endpoints are required: without authorization_endpoint or
 	// token_endpoint, /oauth/authorize would build a redirect (and later a
@@ -534,6 +538,24 @@ func issuerBaseFromDiscoveryURL(du string) string {
 	// A trailing slash on a bare issuer base would make go-oidc fetch a
 	// double-slash path and fail its exact issuer-string comparison, so drop it.
 	return trimmed
+}
+
+// audienceMatches reports whether the ID token's aud claim satisfies the
+// clientID or one of the allowed_audiences. Called after verifier.Verify
+// when we set SkipClientIDCheck (i.e. when allowed_audiences is non-empty).
+// Empty allowed list is not passed here (verifier enforces clientID instead).
+func audienceMatches(idToken *oidc.IDToken, clientID string, allowed []string) bool {
+	for _, a := range idToken.Audience {
+		if a == clientID {
+			return true
+		}
+		for _, w := range allowed {
+			if a == w {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // idpContext returns a context carrying our injectable HTTP client for both
@@ -598,93 +620,7 @@ func oauthRedirectError(status int, code string) protosource.Response {
 	}
 }
 
-// ── request/cookie helpers ──
-//
-// These mirror loginpage's host/redirect/HTTPS helpers. They are duplicated
-// here (rather than exported from loginpage) to keep the dependency direction
-// service → loginpage one-way. ponytail/TODO: consolidate the cookie-domain +
-// redirect-validation helpers into a shared internal package once a second
-// consumer (beyond loginpage and this handler) appears.
-
-// reqHeader is defined in whoami.go (same package) and reused here.
-
-// requestIsSecure reports whether the request arrived over HTTPS, per the
-// X-Forwarded-Proto header set by the API gateway / load balancer.
-func requestIsSecure(req protosource.Request) bool {
-	proto := reqHeader(req, "X-Forwarded-Proto")
-	if proto == "" {
-		return false
-	}
-	if i := strings.IndexByte(proto, ','); i != -1 {
-		proto = proto[:i]
-	}
-	return strings.EqualFold(strings.TrimSpace(proto), "https")
-}
-
-// reqHost extracts the Host header (set by the adapter even though net/http
-// strips it from r.Header).
-func reqHost(req protosource.Request) string {
-	if h := req.Headers["host"]; h != "" {
-		return h
-	}
-	return req.Headers["Host"]
-}
-
-// isAllowedRedirectURL validates that a post-login redirect target is HTTPS
-// and shares the request host's registrable domain (eTLD+1), preventing
-// open-redirect to a third-party site.
-func isAllowedRedirectURL(redirect, host string) bool {
-	u, err := url.Parse(redirect)
-	if err != nil {
-		return false
-	}
-	if u.Scheme != "https" {
-		return false
-	}
-	hostDomain := registrableDomain(host)
-	if hostDomain == "" {
-		return false
-	}
-	return registrableDomain(u.Host) == hostDomain
-}
-
-// registrableDomain extracts the eTLD+1 from a host (optional port). Returns
-// "" for IPs, localhost, and unparseable hosts.
-func registrableDomain(host string) string {
-	h, _, err := net.SplitHostPort(host)
-	if err != nil {
-		h = host
-	}
-	if net.ParseIP(h) != nil {
-		return ""
-	}
-	etld1, err := publicsuffix.EffectiveTLDPlusOne(h)
-	if err != nil {
-		return ""
-	}
-	return etld1
-}
-
-// parentCookieDomain derives the cookie Domain (".eTLD+1") from a Host header
-// so the cookie scopes across subdomains. Returns "" for IPs / localhost (the
-// browser then scopes the cookie to the exact host).
-func parentCookieDomain(host string) string {
-	h, _, err := net.SplitHostPort(host)
-	if err != nil {
-		h = host
-	}
-	if len(h) > 0 && h[0] == '[' {
-		h = h[1:]
-		if i := len(h) - 1; i >= 0 && h[i] == ']' {
-			h = h[:i]
-		}
-	}
-	if net.ParseIP(h) != nil {
-		return ""
-	}
-	etld1, err := publicsuffix.EffectiveTLDPlusOne(h)
-	if err != nil {
-		return ""
-	}
-	return "." + etld1
-}
+// Cookie/redirect helpers have been deduplicated into internal/httputil
+// (ReqHost, ReqHeader, IsSecure, RegistrableDomain, ParentDomain,
+// IsAllowedRedirect, CookieValue). Call sites updated; old local copies removed.
+// (This resolves the prior duplication noted for loginpage + service.)

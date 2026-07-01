@@ -74,16 +74,16 @@ func (d *Discovery) handleDiscovery(ctx context.Context, req protosource.Request
 	base := issuerBase(d.issuer)
 
 	doc := map[string]any{
-		"issuer":                 d.issuer,
-		"authorization_endpoint": base + "/oauth/authorize",
-		"token_endpoint":         base + "/oauth/token",
-		"userinfo_endpoint":      base + "/oauth/userinfo",
-		"jwks_uri":               base + "/oauth/jwks",
-		"end_session_endpoint":   base + "/oauth/logout",
-		"cookie_name":            d.cookieName,
-		"response_types_supported":          []string{"code"},
-		"grant_types_supported":             []string{"authorization_code", "refresh_token"},
-		"code_challenge_methods_supported":  []string{"S256"},
+		"issuer":                                d.issuer,
+		"authorization_endpoint":                base + "/oauth/authorize",
+		"token_endpoint":                        base + "/oauth/token",
+		"userinfo_endpoint":                     base + "/oauth/userinfo",
+		"jwks_uri":                              base + "/oauth/jwks",
+		"end_session_endpoint":                  base + "/oauth/logout",
+		"cookie_name":                           d.cookieName,
+		"response_types_supported":              []string{"code"},
+		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
+		"code_challenge_methods_supported":      []string{"S256"},
 		"token_endpoint_auth_methods_supported": []string{"none"},
 		"id_token_signing_alg_values_supported": []string{"EdDSA", "RS256"},
 	}

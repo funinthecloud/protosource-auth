@@ -18,6 +18,7 @@ import (
 	keyv1 "github.com/funinthecloud/protosource-auth/gen/auth/key/v1"
 	tokenv1 "github.com/funinthecloud/protosource-auth/gen/auth/token/v1"
 	userv1 "github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
+	"github.com/funinthecloud/protosource-auth/internal/httputil"
 	"github.com/funinthecloud/protosource-auth/keyproviders/local"
 	"github.com/funinthecloud/protosource-auth/keys"
 	"github.com/funinthecloud/protosource-auth/service"
@@ -105,9 +106,9 @@ func TestParentDomain(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.host, func(t *testing.T) {
-			got := parentDomain(tt.host)
+			got := httputil.ParentDomain(tt.host)
 			if got != tt.want {
-				t.Errorf("parentDomain(%q) = %q, want %q", tt.host, got, tt.want)
+				t.Errorf("ParentDomain(%q) = %q, want %q", tt.host, got, tt.want)
 			}
 		})
 	}
@@ -195,8 +196,8 @@ func TestIsAllowedRedirect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isAllowedRedirect(tt.redirect, tt.host); got != tt.want {
-				t.Errorf("isAllowedRedirect(%q, %q) = %v, want %v", tt.redirect, tt.host, got, tt.want)
+			if got := httputil.IsAllowedRedirect(tt.redirect, tt.host); got != tt.want {
+				t.Errorf("IsAllowedRedirect(%q, %q) = %v, want %v", tt.redirect, tt.host, got, tt.want)
 			}
 		})
 	}
@@ -222,8 +223,8 @@ func TestIsSecure(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := protosource.Request{Headers: tt.headers}
-			if got := isSecure(req); got != tt.want {
-				t.Errorf("isSecure() = %v, want %v", got, tt.want)
+			if got := httputil.IsSecure(req); got != tt.want {
+				t.Errorf("IsSecure() = %v, want %v", got, tt.want)
 			}
 		})
 	}

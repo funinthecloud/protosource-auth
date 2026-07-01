@@ -9,6 +9,7 @@ import (
 	"github.com/funinthecloud/protosource/authz"
 
 	issuerv1 "github.com/funinthecloud/protosource-auth/gen/auth/issuer/v1"
+	"github.com/funinthecloud/protosource-auth/internal/httputil"
 )
 
 // AdminIssuer provides the secret-safe admin endpoint the SPA uses to set or
@@ -71,7 +72,7 @@ func (a *AdminIssuer) handleSetOIDC(ctx context.Context, req protosource.Request
 	// This endpoint accepts a plaintext client_secret in the body, so it must
 	// fail closed on cleartext exactly like /oauth/authorize, /oauth/callback,
 	// and /auth/refresh — never let secret material ride over non-HTTPS.
-	if !requestIsSecure(req) {
+	if !httputil.IsSecure(req) {
 		return adminError(http.StatusForbidden, "https_required")
 	}
 

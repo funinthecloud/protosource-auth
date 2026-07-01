@@ -10,10 +10,10 @@ import (
 	"github.com/funinthecloud/protosource"
 	"github.com/funinthecloud/protosource/authz"
 
+	"github.com/funinthecloud/protosource-auth/functions"
 	rolev1 "github.com/funinthecloud/protosource-auth/gen/auth/role/v1"
 	tokenv1 "github.com/funinthecloud/protosource-auth/gen/auth/token/v1"
 	userv1 "github.com/funinthecloud/protosource-auth/gen/auth/user/v1"
-	"github.com/funinthecloud/protosource-auth/functions"
 )
 
 // Checker dereferences a shadow token and verifies that its user holds a
